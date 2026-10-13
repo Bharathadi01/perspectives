@@ -1,0 +1,9 @@
+/apps/mobile/ @developer-a
+/apps/api/ @developer-b
+/apps/api/prisma/ @developer-b @developer-a
+/packages/api-client/ @developer-a @developer-b
+/packages/contracts/ @developer-a @developer-b
+/packages/design-tokens/ @developer-a @developer-b
+/docs/SECURITY.md @developer-b @developer-a
+/CLAUDE.md @developer-a @developer-b
+/pnpm-lock.yaml @developer-a @developer-b

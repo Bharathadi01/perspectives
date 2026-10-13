@@ -1,0 +1,225 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                                  String    @id @default(uuid())
+  phoneNumber                         String?   @unique
+  email                               String?   @unique
+  status                              String    @default("active") // active, suspended, deleted
+  termsAcceptedVersion                String    @default("1.0")
+  communityGuidelinesAcceptedVersion  String    @default("1.0")
+  privacyConsentAcceptedVersion       String    @default("1.0")
+  createdAt                           DateTime  @default(now())
+  updatedAt                           DateTime  @updatedAt
+
+  profile             Profile?
+  requests            PerspectiveRequest[]
+  responses           PerspectiveResponse[]
+  blocksInitiated     Block[]               @relation("Blocker")
+  blocksReceived      Block[]               @relation("Blocked")
+  reportsFiled        Report[]              @relation("Reporter")
+  idempotencyRecords  IdempotencyRecord[]
+  deletionJobs        DeletionJob[]
+
+  @@map("users")
+}
+
+model Profile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName     String
+  birthYear       Int?
+  ageBand         String?
+  cityId          String?
+  bio             String    @default("")
+  photoUrls       String[]  @default([])
+  languages       String[]  @default(["en"])
+  lenses          String[]  @default([])
+  connectionModes String[]  @default(["friends", "network"])
+  contactVerified Boolean   @default(true)
+  selfieVerified  Boolean   @default(false)
+  helpfulnessTier String    @default("new") // new, active, trusted, expert
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  prompts         ProfilePrompt[]
+
+  @@map("profiles")
+}
+
+model ProfilePrompt {
+  id        String   @id @default(uuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  promptId  String
+  question  String
+  answer    String
+  createdAt DateTime @default(now())
+
+  @@map("profile_prompts")
+}
+
+model PerspectiveRequest {
+  id                     String    @id @default(uuid())
+  authorId               String
+  author                 User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  category               String    // style, fitness, dating_profile, career, etc.
+  question               String
+  context                String?
+  responseStyle          String    @default("direct")
+  status                 String    @default("active") // draft, pending_moderation, active, fulfilled, expired, removed, archived
+  moderationState        String    @default("allowed") // allowed, pending, removed
+  allowsConnection       Boolean   @default(true)
+  allowedConnectionModes String[]  @default(["friends", "network"])
+  audienceLanguages      String[]  @default(["en"])
+  audienceLenses         String[]  @default([])
+  responseCount          Int       @default(0)
+  helpfulCount           Int       @default(0)
+  expiresAt              DateTime
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  media                  RequestMedia[]
+  responses              PerspectiveResponse[]
+
+  @@index([status, moderationState, createdAt])
+  @@index([authorId, status])
+  @@map("perspective_requests")
+}
+
+model RequestMedia {
+  id              String             @id @default(uuid())
+  requestId       String
+  request         PerspectiveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  type            String             @default("image") // image, text
+  storagePath     String
+  moderationState String             @default("allowed")
+  createdAt       DateTime           @default(now())
+
+  @@map("request_media")
+}
+
+model PerspectiveResponse {
+  id               String             @id @default(uuid())
+  requestId        String
+  request          PerspectiveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId         String
+  author           User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  firstImpression  String
+  reason           String?
+  suggestion       String?
+  tags             String[]           @default([])
+  tone             String             @default("constructive")
+  connectionIntent String?            // chat, friends, date, collaborate, network
+  status           String             @default("delivered") // submitted, pending_moderation, delivered, helpful, archived, reported, removed
+  moderationState  String             @default("allowed")
+  createdAt        DateTime           @default(now())
+
+  feedback         ResponseFeedback[]
+
+  @@unique([requestId, authorId], name: "one_response_per_request_responder")
+  @@index([requestId, status])
+  @@index([authorId, createdAt])
+  @@map("responses")
+}
+
+model ResponseFeedback {
+  id              String              @id @default(uuid())
+  responseId      String
+  response        PerspectiveResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  rating          String              // helpful, not_helpful
+  unhelpfulReason String?             // vague, irrelevant, insulting, sexual, spam, unsafe
+  thankPrivately  Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+
+  @@map("response_feedback")
+}
+
+model Connection {
+  id               String    @id @default(uuid())
+  memberAId        String
+  memberBId        String
+  status           String    @default("active") // active, paused, unmatched, blocked
+  mode             String    // chat, friends, date, collaborate, network
+  originRequestId  String
+  originResponseId String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  messages         ChatMessage[]
+
+  @@unique([memberAId, memberBId, mode])
+  @@index([memberAId, status])
+  @@index([memberBId, status])
+  @@map("connections")
+}
+
+model ChatMessage {
+  id           String     @id @default(uuid())
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  senderId     String
+  text         String
+  createdAt    DateTime   @default(now())
+
+  @@index([connectionId, createdAt])
+  @@map("messages")
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@map("blocks")
+}
+
+model Report {
+  id         String   @id @default(uuid())
+  reporterId String
+  reporter   User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType String   // request, response, message, user
+  targetId   String
+  reason     String
+  note       String?
+  status     String   @default("unreviewed") // unreviewed, machineAllowed, humanReview, allowed, removed
+  createdAt  DateTime @default(now())
+
+  @@map("reports")
+}
+
+model IdempotencyRecord {
+  id              String   @id @default(uuid())
+  actorId         String
+  actor           User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  scope           String
+  key             String
+  responsePayload Json?
+  createdAt       DateTime @default(now())
+
+  @@unique([actorId, scope, key])
+  @@map("idempotency_keys")
+}
+
+model DeletionJob {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String   @default("pending") // pending, running, completed, failed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("deletion_jobs")
+}

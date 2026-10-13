@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Perspective",
+    "slug": "perspective",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F4EE"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.perspective.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F4EE"
+      },
+      "package": "com.perspective.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "perspective"
+  }
+}

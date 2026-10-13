@@ -1,0 +1,24 @@
+## Issue and scope
+
+## Acceptance criteria
+- [ ]
+
+## Changed files
+
+## Contract/schema/security/design impact
+
+## Tests and commands
+
+## Agent-generated work reviewed
+- [ ] I inspected all generated changes.
+
+## Shared-file ownership
+- [ ] No shared file changed without declared ownership.
+
+## Checklist
+- [ ] Format, lint, typecheck
+- [ ] Unit/integration/component tests
+- [ ] OpenAPI client regenerated or no drift
+- [ ] Migration reviewed or no schema change
+- [ ] No secrets or sensitive logging
+- [ ] Docs updated
