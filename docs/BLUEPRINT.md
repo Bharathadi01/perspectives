@@ -4,7 +4,7 @@
 
 ## Executive Decision
 
-Perspective uses Hinge as a structural reference, not as a clone. Preserve Hinge's strongest interaction ideas—rich profiles built from photos and prompts, audio prompts, responding to one specific element, deliberate one-at-a-time decisions, and mutual consent before private chat—but make the thing people respond to a **post**: a photo or audio clip with a prompt or question on which someone wants honest outside perspective.
+Perspective uses Hinge as its UI and structural reference. For initial development the UI is deliberately Hinge-like (a temporary placeholder to be redesigned once the logic is done; see `PRODUCT.md` for the limits). Preserve Hinge's strongest interaction ideas—rich profiles built from photos and prompts, audio prompts, responding to one specific element, deliberate one-at-a-time decisions, and mutual consent before private chat—but make the thing people respond to a **post**: a photo or audio clip with a prompt or question on which someone wants honest outside perspective.
 
 The product is positioned as **“See yourself through other people’s eyes—and connect through what you notice.”** It is a dating app at its core with a unique hook: perspectives. It is not marketed as “a dating app.” It is marketed perspectives-first, and the same open Connect also leads to friends, gym buddies, collaborators, and networking. Dating is the business and the long-term revenue driver, but the product never labels a connection as dating, friends, or networking.
 

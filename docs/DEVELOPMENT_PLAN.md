@@ -51,5 +51,8 @@ Report UX, policy education, account controls, accessibility audit, instrumentat
 ## Phase 6 — Evidence-based scale
 Redis only for measured horizontal realtime/queue/cache need. pgvector only after a semantic ranking experiment. FastAPI only for Python-only/GPU/independent model workloads. S3 only if Cloudinary economics/control justify migration. Monetization is designed in this phase around the connect economy (see `PRODUCT.md`).
 
+## Phase 7 — UI redesign
+Once the logic and algorithms are done, redesign the interim Hinge-like UI into Perspective's own look. This must happen before any public release or store submission. Because styling lives in design tokens and components are small and reusable, this should be mostly a restyle, not a rewrite.
+
 ## Definition of done
 Acceptance criteria pass; docs/contracts updated; authorization and failure paths tested; accessible states implemented; analytics contains no sensitive content; migrations reviewed; API client regenerated; CI green; human review complete.

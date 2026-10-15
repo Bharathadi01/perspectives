@@ -1,7 +1,7 @@
 # Design System
 
 ## Direction
-Original, warm, editorial, calm, and human. Hinge may inform interaction hierarchy but not visual appearance or wording.
+Target direction: original, warm, editorial, calm, and human. For initial development the layout and interaction should closely follow Hinge (see `PRODUCT.md`), built with our own design tokens and copy. This is a temporary placeholder; the final visual design will be redone by the product owner after the logic is complete, and the Hinge-like UI must be replaced before any public release or store submission.
 
 ## Tokens
 - Background: `#F7F4EE`

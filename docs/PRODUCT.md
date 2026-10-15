@@ -38,7 +38,7 @@ Perspective is a dating app at its core, with one unique hook: perspectives. Peo
 
 **Audience:** gender and age range (always 18+), set at the profile level. It is not set per post. A profile is shown only to people inside its audience.
 
-**Hinge is an interaction reference only.** Profiles with photos and prompts, audio prompts, and a basics row come from there. Do not copy Hinge's assets, strings, icons, visuals, or pixel layouts.
+**Hinge is the UI and structural reference.** For initial development the UI should look and feel similar to Hinge in layout, structure, and interaction (profiles of photos and prompts, audio prompts, a basics row, one profile at a time). This is a temporary placeholder: the product owner will redesign it to Perspective's own look once logic and algorithms are done, and it must be replaced before any public release or store submission. Never use Hinge's name or logo, never claim affiliation, and never copy actual Hinge files (images, exported icons, fonts, sounds, animations). Write our own copy and use our own design tokens.
 
 ## Giving a perspective
 - The giver sees the owner's profile first (photos, basics, posts), then picks one post to answer.

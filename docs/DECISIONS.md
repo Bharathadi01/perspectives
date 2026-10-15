@@ -41,6 +41,12 @@ Decision: the product is a dating app at its core with a unique perspectives hoo
 Status: accepted (product owner, 2026-10-16).
 Decision: selfie verification is required at profile creation, so only verified 18+ users exist. Content rules: no nudity or sexual content; shirtless, gym, and swimwear photos are allowed; body shaming and abuse are not allowed in posts or perspectives.
 
+## ADR-011: Temporary Hinge-like UI
+Status: accepted (product owner, 2026-10-16).
+Context: earlier docs forbade copying Hinge's visuals and pixel layouts.
+Decision: for initial development the UI looks and feels similar to Hinge in layout, structure, and interaction, using our own tokens and copy. It is a placeholder; the product owner will redesign the UI once all logic and algorithms are done. Still forbidden: Hinge's name or logo, claiming affiliation, and copying actual Hinge files (images, exported icons, fonts, sounds, animations).
+Consequences: keep UI code componentized with styling in design tokens so the redesign is mostly a restyle. The Hinge-like UI must be replaced before any public release or store submission.
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded
