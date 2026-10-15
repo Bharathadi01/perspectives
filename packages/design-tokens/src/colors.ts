@@ -1,12 +1,25 @@
 export const colors = {
   background: '#F7F4EE',
   surface: '#FFFFFF',
+  /** Quiet fills: inputs, chips, secondary cards. */
+  surfaceMuted: '#F1EDE6',
+  border: '#E6E1D7',
   ink: '#17171B',
   muted: '#6E6C73',
+  /** Text and icons on brand or dark backgrounds. */
+  onDark: '#FFFFFF',
   brand: '#5B4BDB',
+  brandSoft: '#ECE9FB',
   success: '#287A5B',
   warning: '#B86B20',
   danger: '#B33A3A',
+  /** Dark bottom tab bar (Hinge-style interim layout). */
+  tabBar: '#17171B',
+  tabBarInactive: '#8E8C93',
+  /** Scrim behind prompt text on photos and behind sheets. */
+  photoScrim: 'rgba(23, 23, 27, 0.45)',
+  overlay: 'rgba(23, 23, 27, 0.55)',
+  shadow: '#17171B',
 } as const;
 
 export type Colors = typeof colors;

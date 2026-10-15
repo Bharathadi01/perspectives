@@ -1,208 +1,180 @@
-import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { useChat } from '../../src/features/chat/useChat';
-import { useConnections } from '../../src/features/connections/useConnections';
-import { OriginContextCard } from '../../src/components/OriginContextCard';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { RULES } from '@perspective/contracts';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useRef, useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Avatar } from '../../src/components/profile/Avatar';
+import { SafetyMenu } from '../../src/components/SafetyMenu';
+import { Button } from '../../src/components/ui/Button';
+import { Screen } from '../../src/components/ui/Screen';
+import { Sheet } from '../../src/components/ui/Sheet';
+import { ErrorState, LoadingState } from '../../src/components/ui/States';
+import { Label } from '../../src/components/ui/Text';
+import { useToast } from '../../src/components/ui/Toast';
+import { useConnections, useMessages, useSendMessage, useUnmatch } from '../../src/features/hooks';
+import { errorMessage } from '../../src/lib/errors';
 import { theme } from '../../src/theme';
 
-export default function ChatScreen() {
+export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const connectionId = Array.isArray(id) ? id[0] : id || '';
+  const connectionId = id ?? '';
+  const connections = useConnections();
+  const messages = useMessages(connectionId);
+  const send = useSendMessage(connectionId);
+  const unmatch = useUnmatch();
+  const toast = useToast();
+  const [text, setText] = useState('');
+  const [menu, setMenu] = useState(false);
+  const [safety, setSafety] = useState(false);
+  const list = useRef<FlatList>(null);
 
-  const { data: messages, isLoading, sendMessage, isSending } = useChat(connectionId);
-  const { data: connections } = useConnections();
-  const connection = connections?.find((c) => c.id === connectionId);
+  const connection = connections.data?.find((c) => c.id === connectionId);
+  if (connections.isLoading || messages.isLoading) return <LoadingState />;
+  if (!connection || messages.isError) {
+    return <ErrorState error={messages.error} onRetry={() => router.back()} />;
+  }
+  const partner = connection.partner;
 
-  const [inputText, setInputText] = useState('');
-
-  const handleSend = async () => {
-    if (!inputText.trim()) return;
-    const text = inputText.trim();
-    setInputText('');
-    await sendMessage(text);
+  const submit = async () => {
+    const body = text.trim();
+    if (!body) return;
+    setText('');
+    try {
+      await send.run(body);
+    } catch (err) {
+      setText(body);
+      toast(errorMessage(err), 'error');
+    }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Pinned Origin Card */}
-        {connection && <OriginContextCard origin={connection.origin} />}
+    <Screen edges={['top', 'bottom']}>
+      <View style={s.header}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" style={s.icon}>
+          <Ionicons name="chevron-back" size={26} color={theme.colors.ink} />
+        </Pressable>
+        <Pressable
+          style={s.who}
+          onPress={() => router.push({ pathname: '/profile/[id]', params: { id: partner.id } })}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${partner.displayName}'s profile`}
+        >
+          <Avatar name={partner.displayName} url={partner.primaryPhotoUrl} size={32} />
+          <Text style={s.name}>{partner.displayName}</Text>
+        </Pressable>
+        <Pressable onPress={() => setMenu(true)} accessibilityRole="button" accessibilityLabel="Conversation options" style={s.icon}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.ink} />
+        </Pressable>
+      </View>
 
-        {isLoading ? (
-          <ActivityIndicator
-            style={{ marginTop: theme.spacing.xl }}
-            color={theme.colors.brand}
-          />
-        ) : (
-          messages?.map((msg) => {
-            const isMe = msg.senderId !== connection?.partner.id && msg.senderId !== 'system';
-            const isSystem = msg.senderId === 'system';
-
-            if (isSystem) {
-              return (
-                <View key={msg.id} style={styles.systemBubble}>
-                  <Text style={styles.systemText}>{msg.text}</Text>
-                </View>
-              );
-            }
-
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <FlatList
+          ref={list}
+          data={messages.data ?? []}
+          keyExtractor={(m) => m.id}
+          contentContainerStyle={s.list}
+          onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+          ListHeaderComponent={
+            <View style={s.origin}>
+              <Label>How you connected</Label>
+              <Text style={s.originPrompt}>On “{connection.origin.postPrompt}”</Text>
+              <Text style={s.originComment}>“{connection.origin.comment}”</Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const mine = item.senderId !== partner.id;
             return (
-              <View
-                key={msg.id}
-                style={[
-                  styles.messageRow,
-                  isMe ? styles.messageRowMe : styles.messageRowThem,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.bubble,
-                    isMe ? styles.bubbleMe : styles.bubbleThem,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.messageText,
-                      isMe ? styles.messageTextMe : styles.messageTextThem,
-                    ]}
-                  >
-                    {msg.text}
-                  </Text>
-                </View>
+              <View style={[s.bubble, mine ? s.mine : s.theirs]}>
+                <Text style={[s.text, mine && s.textMine]}>{item.text}</Text>
               </View>
             );
-          })
-        )}
-      </ScrollView>
-
-      {/* Input bar */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a thoughtful reply..."
-          placeholderTextColor={theme.colors.muted}
-          value={inputText}
-          onChangeText={setInputText}
-          onSubmitEditing={handleSend}
+          }}
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-          onPress={handleSend}
-          disabled={!inputText.trim() || isSending}
-        >
-          <Text style={styles.sendBtnText}>Send</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        <View style={s.composer}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Write a message"
+            placeholderTextColor={theme.colors.muted}
+            accessibilityLabel="Message"
+            maxLength={RULES.messageMaxLength}
+            multiline
+            style={s.input}
+          />
+          <Pressable
+            onPress={() => void submit()}
+            disabled={!text.trim() || send.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="Send"
+            style={[s.send, (!text.trim() || send.isPending) && s.sendOff]}
+          >
+            <Ionicons name="arrow-up" size={22} color={theme.colors.onDark} />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+
+      <Sheet visible={menu} onClose={() => setMenu(false)} title={partner.displayName}>
+        <Button
+          title="Unmatch"
+          variant="secondary"
+          onPress={() =>
+            void unmatch
+              .run(connectionId)
+              .then(() => {
+                setMenu(false);
+                toast('Unmatched.', 'info');
+                router.back();
+              })
+              .catch((err: unknown) => toast(errorMessage(err), 'error'))
+          }
+        />
+        <Button
+          title="Report or block"
+          variant="danger"
+          onPress={() => {
+            setMenu(false);
+            setSafety(true);
+          }}
+        />
+      </Sheet>
+      <SafetyMenu
+        visible={safety}
+        onClose={() => setSafety(false)}
+        target={{ type: 'profile', id: partner.id, label: partner.displayName }}
+        userId={partner.id}
+        onDone={() => router.back()}
+      />
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
-  },
-  systemBubble: {
-    backgroundColor: '#EAE6DC',
-    padding: theme.spacing.sm,
-    borderRadius: theme.radius.control,
-    marginVertical: theme.spacing.sm,
-    alignSelf: 'center',
-  },
-  systemText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.muted,
-    textAlign: 'center',
-  },
-  messageRow: {
-    marginVertical: 4,
-    flexDirection: 'row',
-  },
-  messageRowMe: {
-    justifyContent: 'flex-end',
-  },
-  messageRowThem: {
-    justifyContent: 'flex-start',
-  },
-  bubble: {
-    maxWidth: '80%',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: 18,
-  },
-  bubbleMe: {
-    backgroundColor: theme.colors.brand,
-    borderBottomRightRadius: 4,
-  },
-  bubbleThem: {
-    backgroundColor: theme.colors.surface,
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-  },
-  messageText: {
-    fontSize: theme.typography.fontSize.base,
-    lineHeight: 22,
-  },
-  messageTextMe: {
-    color: theme.colors.surface,
-  },
-  messageTextThem: {
-    color: theme.colors.ink,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: '#EAE6DC',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
+const s = StyleSheet.create({
+  flex: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  icon: { width: theme.touchTarget.min, height: theme.touchTarget.min, alignItems: 'center', justifyContent: 'center' },
+  who: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, minHeight: theme.touchTarget.min },
+  name: { fontSize: theme.typography.fontSize.md, fontWeight: theme.typography.fontWeight.semibold, color: theme.colors.ink },
+  list: { padding: theme.spacing.base, gap: theme.spacing.sm },
+  origin: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.media, padding: theme.spacing.base, gap: theme.spacing.xs, marginBottom: theme.spacing.md },
+  originPrompt: { fontSize: theme.typography.fontSize.sm, color: theme.colors.muted },
+  originComment: { fontSize: theme.typography.fontSize.base, color: theme.colors.ink, fontStyle: 'italic' },
+  bubble: { maxWidth: '80%', paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm + 2, borderRadius: 18 },
+  mine: { alignSelf: 'flex-end', backgroundColor: theme.colors.ink, borderBottomRightRadius: 4 },
+  theirs: { alignSelf: 'flex-start', backgroundColor: theme.colors.surface, borderBottomLeftRadius: 4 },
+  text: { fontSize: theme.typography.fontSize.base, color: theme.colors.ink },
+  textMine: { color: theme.colors.onDark },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.sm, padding: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
   input: {
     flex: 1,
     minHeight: theme.touchTarget.min,
-    backgroundColor: '#FAF8F5',
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-    borderRadius: theme.radius.control,
-    paddingHorizontal: theme.spacing.md,
+    maxHeight: 120,
+    borderRadius: theme.radius.card,
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: theme.spacing.base,
+    paddingVertical: theme.spacing.md,
     fontSize: theme.typography.fontSize.base,
     color: theme.colors.ink,
   },
-  sendBtn: {
-    minHeight: theme.touchTarget.min,
-    paddingHorizontal: theme.spacing.lg,
-    backgroundColor: theme.colors.brand,
-    borderRadius: theme.radius.control,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendBtnDisabled: {
-    opacity: 0.5,
-  },
-  sendBtnText: {
-    color: theme.colors.surface,
-    fontWeight: '600',
-    fontSize: theme.typography.fontSize.base,
-  },
+  send: { width: theme.touchTarget.min, height: theme.touchTarget.min, borderRadius: theme.touchTarget.min / 2, backgroundColor: theme.colors.brand, alignItems: 'center', justifyContent: 'center' },
+  sendOff: { opacity: 0.4 },
 });

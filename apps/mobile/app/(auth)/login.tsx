@@ -1,154 +1,79 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import { theme } from '../../src/theme';
-import { PrimaryButton } from '../../src/components/PrimaryButton';
-import { useAuthStore } from '../../src/stores/authStore';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { LogInInput, LogInInputSchema } from '@perspective/contracts';
 import { router } from 'expo-router';
+import React from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { ScrollView, StyleSheet } from 'react-native';
+import { Button } from '../../src/components/ui/Button';
+import { Screen } from '../../src/components/ui/Screen';
+import { TextField } from '../../src/components/ui/TextField';
+import { Muted, Title } from '../../src/components/ui/Text';
+import { useToast } from '../../src/components/ui/Toast';
+import { useLogIn } from '../../src/features/hooks';
+import { errorMessage } from '../../src/lib/errors';
+import { theme } from '../../src/theme';
 
-export default function LoginScreen() {
-  const [contact, setContact] = useState('');
-  const [isAdultConfirmed, setIsAdultConfirmed] = useState(false);
-  const { login, setAgeVerified } = useAuthStore();
+export default function LogIn() {
+  const logIn = useLogIn();
+  const toast = useToast();
+  const { control, handleSubmit, formState } = useForm<LogInInput>({
+    resolver: zodResolver(LogInInputSchema),
+    defaultValues: { email: '', password: '' },
+  });
 
-  const handleContinue = () => {
-    if (!isAdultConfirmed) {
-      Alert.alert('Age Verification Required', 'Perspective is an 18+ community only.');
-      return;
+  const submit = handleSubmit(async (values) => {
+    try {
+      await logIn.run(values);
+      router.replace('/');
+    } catch (err) {
+      toast(errorMessage(err), 'error');
     }
-    if (!contact.trim()) {
-      Alert.alert('Contact Required', 'Please enter your phone number or email.');
-      return;
-    }
-
-    setAgeVerified(true);
-    login();
-    router.replace('/(tabs)/explore');
-  };
+  });
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.brand}>Perspective</Text>
-        <Text style={styles.tagline}>
-          See yourself through other people's eyes—and connect through what you notice.
-        </Text>
-
-        <View style={styles.form}>
-          <Text style={styles.label}>PHONE NUMBER OR EMAIL</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="+91 98765 43210 or you@domain.com"
-            placeholderTextColor={theme.colors.muted}
-            value={contact}
-            onChangeText={setContact}
-            autoCapitalize="none"
-          />
-
-          <TouchableOpacity
-            style={styles.ageGateRow}
-            onPress={() => setIsAdultConfirmed(!isAdultConfirmed)}
-          >
-            <View style={[styles.checkbox, isAdultConfirmed && styles.checkboxActive]} />
-            <Text style={styles.ageGateText}>
-              I confirm that I am 18 years of age or older.
-            </Text>
-          </TouchableOpacity>
-
-          <PrimaryButton
-            title="Continue to Perspective"
-            onPress={handleContinue}
-          />
-        </View>
-
-        <Text style={styles.disclaimer}>
-          By continuing, you agree to our Community Guidelines, constructive feedback policy, and Privacy Notice.
-        </Text>
-      </View>
-    </View>
+    <Screen edges={['top', 'bottom']}>
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <Title>Welcome back</Title>
+        <Controller
+          control={control}
+          name="email"
+          render={({ field }) => (
+            <TextField
+              label="Email"
+              value={field.value}
+              onChangeText={field.onChange}
+              onBlur={field.onBlur}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              error={formState.errors.email?.message}
+            />
+          )}
+        />
+        <Controller
+          control={control}
+          name="password"
+          render={({ field }) => (
+            <TextField
+              label="Password"
+              value={field.value}
+              onChangeText={field.onChange}
+              onBlur={field.onBlur}
+              secureTextEntry
+              autoComplete="password"
+              onSubmitEditing={() => void submit()}
+              error={formState.errors.password?.message}
+            />
+          )}
+        />
+        <Button title="Sign in" onPress={() => void submit()} loading={logIn.isPending} />
+        <Button title="Create an account instead" variant="ghost" onPress={() => router.replace('/(auth)/signup')} />
+        <Muted>Testing locally? Seed accounts like ravi@perspective.test use the password perspective123.</Muted>
+      </ScrollView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
-  },
-  content: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.xl,
-    borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-  },
-  brand: {
-    fontSize: theme.typography.fontSize.hero,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.ink,
-    textAlign: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  tagline: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.muted,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: theme.spacing.xl,
-  },
-  form: {
-    gap: theme.spacing.md,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: theme.colors.muted,
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: '#FAF8F5',
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-    borderRadius: theme.radius.control,
-    padding: theme.spacing.md,
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.ink,
-  },
-  ageGateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: theme.spacing.xs,
-    minHeight: 44,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#C7C4B8',
-    marginRight: theme.spacing.sm,
-  },
-  checkboxActive: {
-    backgroundColor: theme.colors.brand,
-    borderColor: theme.colors.brand,
-  },
-  ageGateText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.ink,
-    flex: 1,
-  },
-  disclaimer: {
-    fontSize: 11,
-    color: theme.colors.muted,
-    textAlign: 'center',
-    lineHeight: 16,
-    marginTop: theme.spacing.lg,
-  },
+const s = StyleSheet.create({
+  content: { padding: theme.spacing.lg, gap: theme.spacing.base },
 });

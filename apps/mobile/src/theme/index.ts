@@ -1,17 +1,4 @@
-import {
-  colors,
-  spacing,
-  radius,
-  touchTarget,
-  typography,
-} from '@perspective/design-tokens';
+import { colors, iconButton, radius, spacing, touchTarget, typography } from '@perspective/design-tokens';
 
-export const theme = {
-  colors,
-  spacing,
-  radius,
-  touchTarget,
-  typography,
-};
-
+export const theme = { colors, spacing, radius, touchTarget, iconButton, typography };
 export type Theme = typeof theme;

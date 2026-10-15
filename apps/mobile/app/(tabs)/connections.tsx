@@ -1,140 +1,70 @@
-import React from 'react';
-import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-} from 'react-native';
-import { useConnections } from '../../src/features/connections/useConnections';
-import { PersonHeader } from '../../src/components/PersonHeader';
-import { OriginContextCard } from '../../src/components/OriginContextCard';
-import { EmptyState } from '../../src/components/EmptyState';
-import { theme } from '../../src/theme';
 import { router } from 'expo-router';
+import React from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Avatar, VerifiedBadge } from '../../src/components/profile/Avatar';
+import { Screen } from '../../src/components/ui/Screen';
+import { EmptyState, ErrorState, LoadingState } from '../../src/components/ui/States';
+import { Title } from '../../src/components/ui/Text';
+import { useConnections } from '../../src/features/hooks';
+import { timeAgo } from '../../src/lib/labels';
+import { theme } from '../../src/theme';
 
-export default function ConnectionsScreen() {
-  const { data: connections, isLoading, isError, refetch } = useConnections();
+export default function Connections() {
+  const connections = useConnections();
 
-  if (isLoading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={theme.colors.brand} />
-        <Text style={styles.loadingText}>Loading mutual connections...</Text>
-      </View>
-    );
-  }
-
-  if (isError || !connections) {
-    return (
-      <View style={styles.centerContainer}>
-        <EmptyState
-          emoji="⚠️"
-          title="Could not load Connections"
-          description="Please check your connection and retry."
-          actionTitle="Retry"
-          onAction={() => refetch()}
-        />
-      </View>
-    );
-  }
+  if (connections.isLoading) return <LoadingState />;
+  if (connections.isError || !connections.data) return <ErrorState error={connections.error} onRetry={() => void connections.refetch()} />;
 
   return (
-    <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {connections.length === 0 ? (
+    <Screen>
+      <FlatList
+        data={connections.data}
+        keyExtractor={(c) => c.id}
+        contentContainerStyle={s.content}
+        refreshControl={<RefreshControl refreshing={connections.isRefetching} onRefresh={() => void connections.refetch()} />}
+        ListHeaderComponent={<Title style={s.title}>Connections</Title>}
+        ListEmptyComponent={
           <EmptyState
-            emoji="🤝"
-            title="No mutual connections yet"
-            description="When both you and another person express compatible interest on a perspective, your connection opens here."
+            icon="people-outline"
+            title="No connections yet"
+            description="Give someone a perspective and ask to connect. If they accept, your conversation starts here."
+            actionTitle="Go to Explore"
+            onAction={() => router.push('/(tabs)/explore')}
           />
-        ) : (
-          connections.map((conn) => (
-            <TouchableOpacity
-              key={conn.id}
-              style={styles.connectionCard}
-              onPress={() => router.push(`/chat/${conn.id}`)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.topRow}>
-                <PersonHeader profile={conn.partner} fallbackName="Partner" />
-                <View style={styles.modeBadge}>
-                  <Text style={styles.modeBadgeText}>{conn.mode.toUpperCase()}</Text>
-                </View>
+        }
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}
+            accessibilityRole="button"
+            accessibilityLabel={`Conversation with ${item.partner.displayName}`}
+            style={({ pressed }) => [s.row, pressed && s.pressed]}
+          >
+            <Avatar name={item.partner.displayName} url={item.partner.primaryPhotoUrl} size={56} />
+            <View style={s.body}>
+              <View style={s.nameRow}>
+                <Text style={s.name}>{item.partner.displayName}</Text>
+                {item.partner.verified ? <VerifiedBadge size={14} /> : null}
+                <Text style={s.time}>{timeAgo(item.lastMessage?.createdAt ?? item.createdAt)}</Text>
               </View>
-
-              <OriginContextCard origin={conn.origin} />
-
-              <View style={styles.footerRow}>
-                <Text style={styles.openChatPrompt}>Open conversation →</Text>
-              </View>
-            </TouchableOpacity>
-          ))
+              <Text style={s.preview} numberOfLines={1}>
+                {item.lastMessage ? item.lastMessage.text : `Connected over: “${item.origin.postPrompt}”`}
+              </Text>
+            </View>
+          </Pressable>
         )}
-      </ScrollView>
-    </View>
+      />
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    padding: theme.spacing.lg,
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing.xl,
-    backgroundColor: theme.colors.background,
-  },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    color: theme.colors.muted,
-    fontSize: theme.typography.fontSize.sm,
-  },
-  connectionCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  modeBadge: {
-    backgroundColor: '#FAF8F5',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.brand,
-  },
-  modeBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: theme.colors.brand,
-  },
-  footerRow: {
-    marginTop: theme.spacing.sm,
-    alignItems: 'flex-end',
-  },
-  openChatPrompt: {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: '600',
-    color: theme.colors.brand,
-  },
+const s = StyleSheet.create({
+  content: { padding: theme.spacing.base, gap: theme.spacing.sm, flexGrow: 1 },
+  title: { marginBottom: theme.spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, backgroundColor: theme.colors.surface, borderRadius: theme.radius.media, padding: theme.spacing.md, minHeight: 72 },
+  pressed: { opacity: 0.7 },
+  body: { flex: 1, gap: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  name: { fontSize: theme.typography.fontSize.base, fontWeight: theme.typography.fontWeight.semibold, color: theme.colors.ink },
+  time: { marginLeft: 'auto', fontSize: theme.typography.fontSize.xs, color: theme.colors.muted },
+  preview: { fontSize: theme.typography.fontSize.sm, color: theme.colors.muted },
 });

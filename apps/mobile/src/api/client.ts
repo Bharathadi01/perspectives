@@ -1,5 +1,16 @@
-import { InMemoryPerspectiveClient, PerspectiveApiClient } from '@perspective/api-client';
+import { createApiClient } from '@perspective/api-client';
+import * as Crypto from 'expo-crypto';
+import { tokenStore } from '../session/tokenStore';
+import { useSession } from '../session/sessionStore';
 
-// In v1 development / independent mobile testing, the client runs against the
-// production-parity in-memory adapter seeded with authentic fixtures.
-export const apiClient: PerspectiveApiClient = new InMemoryPerspectiveClient();
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
+
+/** The only way the app talks to the server. Components never call fetch or storage directly. */
+export const api = createApiClient({
+  baseUrl: API_URL,
+  tokens: tokenStore,
+  newIdempotencyKey: () => Crypto.randomUUID(),
+  onSessionExpired: () => useSession.getState().setStatus('signedOut'),
+});
+
+export const newKey = (): string => Crypto.randomUUID();

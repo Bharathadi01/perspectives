@@ -4,8 +4,7 @@
     "slug": "perspective",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "resizeMode": "contain",
@@ -25,7 +24,21 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Perspective uses your photos so you can add them to your profile.",
+          "cameraPermission": "Perspective uses the camera for selfie verification and profile photos."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Perspective uses the microphone so you can record a short voice post."
+        }
+      ]
     ],
     "scheme": "perspective"
   }

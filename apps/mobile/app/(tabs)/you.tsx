@@ -1,289 +1,101 @@
+import { DELETE_ACCOUNT_PHRASE, MyProfile, PublicProfile } from '@perspective/contracts';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
-import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  TextInput,
-} from 'react-native';
-import { useProfile } from '../../src/features/profile/useProfile';
-import { PersonHeader } from '../../src/components/PersonHeader';
-import { ProfileCompletenessMeter } from '../../src/components/ProfileCompletenessMeter';
-import { PromptBlock } from '../../src/components/PromptBlock';
-import { LensChip } from '../../src/components/LensChip';
-import { PrimaryButton } from '../../src/components/PrimaryButton';
-import { SecondaryButton } from '../../src/components/SecondaryButton';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { ProfileView } from '../../src/components/profile/ProfileView';
+import { Button } from '../../src/components/ui/Button';
+import { Screen } from '../../src/components/ui/Screen';
+import { Sheet } from '../../src/components/ui/Sheet';
+import { ErrorState, LoadingState } from '../../src/components/ui/States';
+import { Label, Muted, Title } from '../../src/components/ui/Text';
+import { TextField } from '../../src/components/ui/TextField';
+import { useToast } from '../../src/components/ui/Toast';
+import { useDeleteAccount, useLogOut, useMe } from '../../src/features/hooks';
+import { errorMessage } from '../../src/lib/errors';
 import { theme } from '../../src/theme';
 
-export default function YouScreen() {
-  const { data: userProfile, isLoading, isError, refetch, deleteAccount } = useProfile();
+/** How others see you. Only a live profile has every basic set. */
+function asPublic(me: MyProfile): PublicProfile | null {
+  if (!me.displayName || !me.gender || !me.heightCm || !me.orientation || !me.city) return null;
+  return {
+    id: me.id,
+    displayName: me.displayName,
+    age: me.age,
+    gender: me.gender,
+    heightCm: me.heightCm,
+    orientation: me.orientation,
+    city: me.city,
+    verified: me.selfieStatus === 'verified',
+    posts: me.posts,
+  };
+}
 
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [deletePhrase, setDeletePhrase] = useState('');
+export default function You() {
+  const me = useMe();
+  const logOut = useLogOut();
+  const del = useDeleteAccount();
+  const toast = useToast();
+  const [deleting, setDeleting] = useState(false);
+  const [password, setPassword] = useState('');
+  const [phrase, setPhrase] = useState('');
 
-  if (isLoading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={theme.colors.brand} />
-      </View>
-    );
-  }
+  if (me.isLoading) return <LoadingState />;
+  if (me.isError || !me.data) return <ErrorState error={me.error} onRetry={() => void me.refetch()} />;
+  const profile = asPublic(me.data);
 
-  if (isError || !userProfile) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>Could not load profile.</Text>
-        <SecondaryButton title="Retry" onPress={() => refetch()} />
-      </View>
-    );
-  }
-
-  const profile = userProfile.publicProfile;
-
-  const handleDeleteAccount = async () => {
-    if (deletePhrase !== 'DELETE MY ACCOUNT') {
-      Alert.alert('Phrase Mismatch', 'Please type DELETE MY ACCOUNT exactly to confirm.');
-      return;
-    }
-
+  const confirmDelete = async () => {
     try {
-      await deleteAccount('DELETE MY ACCOUNT');
-      setDeleteModalVisible(false);
-      Alert.alert(
-        'Account Deleted',
-        'Your profile, active requests, responses, and sessions have been permanently deleted.'
-      );
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+      await del.run(password);
+      router.replace('/(auth)/welcome');
+    } catch (err) {
+      toast(errorMessage(err), 'error');
     }
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <PersonHeader profile={profile} />
+    <Screen>
+      <ScrollView contentContainerStyle={s.content}>
+        <Title>You</Title>
+        <Muted>This is how your profile looks to others.</Muted>
+        {profile ? <ProfileView profile={profile} /> : null}
 
-      {/* Profile Completeness Meter */}
-      <ProfileCompletenessMeter profile={profile} />
-
-      {/* Bio */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>BIO</Text>
-        <Text style={styles.bioText}>{profile.bio}</Text>
-      </View>
-
-      {/* Perspective Lenses */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>PERSPECTIVE LENSES OFFERED</Text>
-        <View style={styles.lensesRow}>
-          {profile.lenses.map((lens) => (
-            <LensChip key={lens} label={lens} />
-          ))}
-        </View>
-      </View>
-
-      {/* Prompts */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>PROFILE PROMPTS</Text>
-        {profile.prompts.map((p) => (
-          <PromptBlock key={p.promptId} question={p.question} answer={p.answer} />
-        ))}
-      </View>
-
-      {/* Allowed Connection Modes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>CONNECTION MODES OPEN TO YOU</Text>
-        <View style={styles.modesRow}>
-          {profile.connectionModes.map((m) => (
-            <View key={m} style={styles.modeBadge}>
-              <Text style={styles.modeBadgeText}>{m.toUpperCase()}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Privacy & Safety Controls */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>PRIVACY & DATA CONTROLS</Text>
-        <View style={styles.controlBox}>
-          <Text style={styles.controlTitle}>Digital Data Protection (DPDP Compliant)</Text>
-          <Text style={styles.controlDesc}>
-            Your email, phone, and exact birthday are never shared publicly. Only coarse city and age-band are visible.
-          </Text>
+        <View style={s.section}>
+          <Label>Profile</Label>
+          <Button title="Edit basics" variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'basics' } })} />
+          <Button title="Who sees you" variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'audience' } })} />
+          <Button title="Perspectives you gave" variant="secondary" onPress={() => router.push('/me/given')} />
         </View>
 
-        <View style={styles.deleteBtnContainer}>
-          <SecondaryButton
-            title="Delete Account & Data"
-            onPress={() => setDeleteModalVisible(true)}
-            variant="outline"
-          />
+        <View style={s.section}>
+          <Label>Privacy & account</Label>
+          <Muted>Your email, exact birthday, exact location and selfie are never shown to anyone.</Muted>
+          <Button title="Sign out" variant="secondary" onPress={() => void logOut.run(undefined).then(() => router.replace('/(auth)/welcome'))} />
+          <Button title="Delete account" variant="ghost" onPress={() => setDeleting(true)} />
         </View>
-      </View>
+      </ScrollView>
 
-      {/* Delete Account Modal */}
-      <Modal
-        visible={deleteModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDeleteModalVisible(false)}
+      <Sheet
+        visible={deleting}
+        onClose={() => setDeleting(false)}
+        title="Delete your account?"
+        subtitle="This permanently deletes your profile, posts, perspectives, connections and messages. It can’t be undone."
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Delete Account Permanently</Text>
-            <Text style={styles.modalText}>
-              In accordance with Google Play, Apple App Store, and DPDP regulations, this action immediately revokes all sessions, hides your profile, and cascades complete deletion of your requests, responses, and messages.
-            </Text>
-            <Text style={styles.modalInstruction}>
-              Type <Text style={{ fontWeight: 'bold' }}>DELETE MY ACCOUNT</Text> to proceed:
-            </Text>
-
-            <TextInput
-              style={styles.modalInput}
-              value={deletePhrase}
-              onChangeText={setDeletePhrase}
-              placeholder="DELETE MY ACCOUNT"
-              autoCapitalize="characters"
-            />
-
-            <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
-              <PrimaryButton
-                title="Confirm Account Deletion"
-                onPress={handleDeleteAccount}
-              />
-              <SecondaryButton
-                title="Cancel"
-                onPress={() => setDeleteModalVisible(false)}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
+        <TextField label={`Type ${DELETE_ACCOUNT_PHRASE}`} value={phrase} onChangeText={setPhrase} autoCapitalize="characters" />
+        <Button
+          title="Delete my account"
+          variant="danger"
+          disabled={phrase !== DELETE_ACCOUNT_PHRASE || password.length === 0}
+          loading={del.isPending}
+          onPress={() => void confirmDelete()}
+        />
+        <Button title="Cancel" variant="secondary" onPress={() => setDeleting(false)} />
+      </Sheet>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  content: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl * 2,
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing.xl,
-    backgroundColor: theme.colors.background,
-  },
-  errorText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.danger,
-    marginBottom: theme.spacing.md,
-  },
-  section: {
-    marginVertical: theme.spacing.md,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: theme.colors.muted,
-    letterSpacing: 0.5,
-    marginBottom: theme.spacing.xs,
-  },
-  bioText: {
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.ink,
-    lineHeight: 22,
-  },
-  lensesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 4,
-  },
-  modesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.xs,
-    marginTop: 4,
-  },
-  modeBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: theme.radius.pill,
-    backgroundColor: '#FAF8F5',
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-  },
-  modeBadgeText: {
-    fontSize: 11,
-    color: theme.colors.brand,
-    fontWeight: 'bold',
-  },
-  controlBox: {
-    backgroundColor: '#FAF8F5',
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.control,
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-    marginBottom: theme.spacing.md,
-  },
-  controlTitle: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: 'bold',
-    color: theme.colors.ink,
-    marginBottom: 4,
-  },
-  controlDesc: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.muted,
-    lineHeight: 18,
-  },
-  deleteBtnContainer: {
-    marginTop: theme.spacing.sm,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: theme.radius.card,
-    borderTopRightRadius: theme.radius.card,
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
-  },
-  modalTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.danger,
-    marginBottom: theme.spacing.sm,
-  },
-  modalText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.ink,
-    lineHeight: 20,
-    marginBottom: theme.spacing.md,
-  },
-  modalInstruction: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.xs,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#EAE6DC',
-    borderRadius: theme.radius.control,
-    padding: theme.spacing.md,
-    fontSize: theme.typography.fontSize.base,
-    backgroundColor: '#FAF8F5',
-    color: theme.colors.ink,
-  },
+const s = StyleSheet.create({
+  content: { padding: theme.spacing.base, gap: theme.spacing.base, paddingBottom: theme.spacing.xxl },
+  section: { gap: theme.spacing.sm, marginTop: theme.spacing.lg },
 });
