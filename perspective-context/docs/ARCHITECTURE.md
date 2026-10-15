@@ -60,3 +60,7 @@ Only `EXPO_PUBLIC_*` may enter the mobile bundle, and none may be secret. Server
 | CLOUDINARY_API_KEY | api | Yes | server operations |
 | CLOUDINARY_API_SECRET | api | Yes | signing operations |
 | EXPO_ACCESS_TOKEN | api/CI | Yes | push/build operations |
+| MEDIA_SIGNING_SECRET | api | Yes | signs short-lived media URLs |
+| MEDIA_STORAGE_DIR | api | No | development media storage folder |
+| TEST_DATABASE_URL | api tests | Yes | database truncated by e2e tests |
+| APP_TIMEZONE, DAILY_MANDATORY_COUNT, DAILY_BATCH_SIZE, CONNECT_DECLINE_COOLDOWN_DAYS, MAX_CONNECT_REQUESTS_PER_DAY, MAX_PERSPECTIVES_RECEIVED_PER_DAY, SKIP_HIDE_DAYS, BOOST_LOOKBACK_DAYS | api | No | product configuration (see `.env.example`); empty caps mean unlimited |

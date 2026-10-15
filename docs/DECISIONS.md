@@ -13,7 +13,7 @@ Status: accepted. Do not carry both S3 and Cloudinary during v1.
 Status: accepted. Redis, FastAPI, custom ML, active pgvector ranking, microservices, and Turborepo require a new ADR with evidence.
 
 ## ADR-005: Client boundary and in-memory test harness
-Status: accepted. All mobile mutations route through the typed `PerspectiveApiClient` interface. An in-memory client backed by authentic fixtures guarantees that the mobile skeleton compiles, runs, and tests independently of active database or backend containers.
+Status: superseded by ADR-012 (the in-memory client was removed; mobile uses the typed HTTP client, and tests use a real PostgreSQL database). All mobile mutations route through the typed `PerspectiveApiClient` interface. An in-memory client backed by authentic fixtures guarantees that the mobile skeleton compiles, runs, and tests independently of active database or backend containers.
 
 ## ADR-006: Profile-first model with posts
 Status: accepted (product owner, 2026-10-16).
@@ -46,6 +46,19 @@ Status: accepted (product owner, 2026-10-16).
 Context: earlier docs forbade copying Hinge's visuals and pixel layouts.
 Decision: for initial development the UI looks and feels similar to Hinge in layout, structure, and interaction, using our own tokens and copy. It is a placeholder; the product owner will redesign the UI once all logic and algorithms are done. Still forbidden: Hinge's name or logo, claiming affiliation, and copying actual Hinge files (images, exported icons, fonts, sounds, animations).
 Consequences: keep UI code componentized with styling in design tokens so the redesign is mostly a restyle. The Hinge-like UI must be replaced before any public release or store submission.
+
+## ADR-012: v1 implementation choices
+Status: proposed (implemented on feature/jana01, 2026-10-16; confirm when the stack is settled).
+Context: the docs disagree on parts of the stack; the first build needed the simplest option that runs.
+Decision:
+- `packages/contracts` (Zod) is the single source of types; the API validates bodies with it and `packages/api-client` is a typed HTTP client that validates responses with it (no generated OpenAPI client yet).
+- PostgreSQL + Prisma only. No Redis, BullMQ, FastAPI, pgvector features, or pg-boss yet; nothing in v1 needs them.
+- Auth: email + password (scrypt), 15-minute JWT access tokens, rotating hashed refresh tokens with family revocation.
+- Media: base64 JSON upload to a `MediaStorage` interface with a local-disk implementation for development; delivery through short-lived HMAC-signed URLs. EXIF stripping and media moderation wait for the canonical provider (Cloudinary or S3, ADR-003).
+- Selfie verification and text moderation are stubs behind `SelfieVerifier` and `TextModerator` interfaces.
+- Chat is polled; Socket.IO comes later.
+- "Today" for the daily set is computed in `APP_TIMEZONE` (default Asia/Kolkata).
+Consequences: replacing storage, moderation, or verification touches one provider class each. Rate limiting is not implemented yet.
 
 ## ADR template
 - ID/title

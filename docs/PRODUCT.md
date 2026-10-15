@@ -128,6 +128,15 @@ Public scoring, followers, public comments, anonymous feedback, voice responses,
 ## Carried over from earlier docs, not re-decided
 Perspective lenses, response-style preferences (gentle, direct, and so on), languages, helpfulness tiers, and the earlier request-expiry concept were not part of the product-owner discussion. They are not part of the core model above. Decide them during development; do not assume they are required.
 
+## Implementation assumptions (to confirm with the product owner)
+These were not decided in the product discussion. They are implemented as stated and easy to change:
+- **Viewer filter:** your own audience also acts as your viewing filter, so two people only see each other when each is inside the other's audience. (Configured in `apps/api/src/domain/eligibility.ts`.)
+- **Lock rule:** received perspectives and connect requests stay hidden until you finish the set on the day they arrived (or a later day). Once revealed they stay visible.
+- **Numbers:** comment minimum 40 characters, up to 3 quick-pick chips, 1 to 3 focus areas per post, prompts 5 to 150 characters, finite Explore batch of 10 per day (mandatory set included), a skipped profile stays hidden for 7 days, "today" is computed in Asia/Kolkata time.
+- **Option lists:** genders (woman, man, non-binary), orientations (straight, gay, lesbian, bisexual, pansexual, queer, asexual, prefer not to say), the six categories and their focus areas, hints and chips in `packages/contracts/src/post.ts`.
+- **Connect edge case:** if the other person already asked you, a new request from you is refused and you are pointed to their request instead.
+- **Give-back:** you can always give a perspective back to someone who gave you one, even if they are outside your audience.
+
 ## North star
 Helpful Perspectives per Weekly Active Owner.
 

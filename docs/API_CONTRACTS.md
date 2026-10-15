@@ -1,7 +1,7 @@
 # API Contracts
 
 ## Authority
-NestJS DTOs generate OpenAPI. `packages/api-client` is generated and never manually edited. CI fails on OpenAPI/client drift.
+`packages/contracts` (Zod) is the single source of request/response types. The API validates every body with these schemas, and `packages/api-client` is a typed HTTP client that validates every response against the same schemas, so drift fails loudly at runtime and in typecheck. Swagger at `/docs` lists the routes, but its schemas are not generated from Zod yet (add `zod-to-openapi` or similar when an OpenAPI document becomes a deliverable).
 
 ## Conventions
 - Prefix `/v1`.
@@ -24,30 +24,30 @@ NestJS DTOs generate OpenAPI. `packages/api-client` is generated and never manua
 ```
 Client branches on stable `code`, not human `message`.
 
-Business error codes the contract must define (names are indicative, final names are set in `@perspective/contracts`): post not eligible, blocked pair, perspective-required-before-connect (the gate), connect cooldown active, already submitted, daily unlock not complete, selfie verification required, moderation failed, rate limited, and the usual unauthorized, forbidden, not found, and internal errors. Mutual-intent error codes belong to the removed intent model and should be dropped.
+Error codes are the `ErrorCode` enum in `packages/contracts/src/error.ts`. Notable business codes: `PERSPECTIVE_REQUIRED_BEFORE_CONNECT` (the gate), `CONNECT_COOLDOWN_ACTIVE` (with `details.availableAt`), `CONNECT_REQUEST_PENDING`, `ALREADY_CONNECTED`, `ALREADY_SUBMITTED`, `DAILY_UNLOCK_INCOMPLETE`, `SELFIE_VERIFICATION_REQUIRED`, `PROFILE_INCOMPLETE`, `PRIMARY_POST_REQUIRED`, `POST_LIMIT_REACHED`, `POST_NOT_ELIGIBLE`, `PROFILE_NOT_ELIGIBLE`, `BLOCKED_PAIR`, `MODERATION_FAILED`, `CAP_REACHED`, `IDEMPOTENCY_KEY_REQUIRED`. There are no intent or mode codes.
 
-## P0 endpoints
-The endpoint list follows `PRODUCT.md`. Paths below are the target; the skeleton's paths differ.
-- `POST /v1/auth/*`
-- `POST /v1/me/selfie-verification`
-- `GET/PATCH /v1/me` (basics, audience)
-- `POST /v1/media/sign` (photo and 15-second audio uploads)
-- `POST/GET/PATCH/DELETE /v1/me/posts` (1 to 6 posts)
-- `GET /v1/explore` (the daily batch, starting with the mandatory set)
-- `POST /v1/posts/:id/skip`
-- `POST /v1/posts/:id/perspectives` (required comment, optional chips; optional connect flag)
-- `GET /v1/inbox` (received perspectives, locked until the daily unlock, plus incoming connect requests)
-- `POST /v1/perspectives/:id/feedback` (helpful, not helpful with reason, thank privately)
-- `POST /v1/connect-requests` (requires a prior perspective to the receiver)
-- `POST /v1/connect-requests/:id/accept`
-- `POST /v1/connect-requests/:id/decline`
-- `GET /v1/connections`
-- `GET /v1/connections/:id/messages`
-- `POST /v1/reports`
-- `POST/DELETE /v1/blocks/:userId`
-- `POST /v1/account/deletion`
+## Endpoints (implemented)
+Every authenticated mutation needs an `Idempotency-Key` header (UUID); a retry with the same key returns the stored result.
 
-There are no connection-intent or connection-mode fields on any endpoint.
+**Auth (public):** `POST /v1/auth/signup` (email, password, birthDate, acceptTerms; 18+ enforced) · `POST /v1/auth/login` · `POST /v1/auth/refresh` (rotating; reuse revokes the family) · `POST /v1/auth/logout`
+
+**Me and posts:** `GET /v1/me` · `PATCH /v1/me` (basics, audience) · `POST /v1/me/selfie-verification` (`mediaId`) · `POST /v1/me/posts` · `PATCH /v1/me/posts/:id` · `DELETE /v1/me/posts/:id`
+
+**Media:** `POST /v1/media` (base64 JSON body: photo, or audio with `durationSec` ≤ 15) · `GET /v1/media/:id/content?exp&sig` (public but only via short-lived signed URLs placed in DTOs; selfie media is never served)
+
+**Explore (live profile required):** `GET /v1/explore` (daily status, one card, remaining batch) · `POST /v1/explore/skip` (`profileId`)
+
+**Profiles:** `GET /v1/profiles/:id` (public profile, relationship state for the Connect bar, posts already answered)
+
+**Perspectives and inbox:** `POST /v1/perspectives` (`postId`, `comment`, `chips`, `connect`) · `GET /v1/perspectives/given` · `POST /v1/perspectives/:id/feedback` (`helpful` / `not_helpful` + reason, `thankPrivately`) · `GET /v1/inbox` (daily status, `lockedCount`, perspectives grouped by post, incoming connect requests)
+
+**Connect and chat:** `POST /v1/connect-requests` (`receiverId`) · `POST /v1/connect-requests/:id/accept` · `POST /v1/connect-requests/:id/decline` · `GET /v1/connections` · `GET /v1/connections/:id/messages` (latest 200; cursor pagination is a follow-up) · `POST /v1/connections/:id/messages` · `DELETE /v1/connections/:id` (unmatch)
+
+**Safety:** `POST /v1/reports` · `POST /v1/blocks/:userId` · `DELETE /v1/blocks/:userId` · `POST /v1/account/deletion` (password + `DELETE MY ACCOUNT`)
+
+**Health:** `GET /health` (public)
+
+No endpoint has connection-intent or connection-mode fields.
 
 ## Realtime
-Socket handshake authenticates independently. Joining a connection room rechecks active membership and block status. Sending a message rechecks authorization; room membership alone is insufficient.
+v1 chat is polled (`GET /v1/connections/:id/messages` every few seconds); PostgreSQL is canonical. When Socket.IO is added: the socket handshake authenticates independently. Joining a connection room rechecks active membership and block status. Sending a message rechecks authorization; room membership alone is insufficient.

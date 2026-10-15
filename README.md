@@ -32,7 +32,7 @@ The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any
 ├── packages/
 │   ├── contracts/      # Zod validation schemas & shared TypeScript interfaces
 │   ├── design-tokens/  # Warm editorial design system tokens (colors, radius, spacing)
-│   ├── api-client/     # Typed client interface, mock adapter & authentic fixtures
+│   ├── api-client/     # Typed HTTP client, validated against the contracts
 │   └── config/         # Shared TypeScript base configuration
 ├── docs/               # Architecture, Product, Database, Security & Blueprint docs
 ├── perspective-context/# Context pack that mirrors docs/ (keep in sync; docs/PRODUCT.md wins)
@@ -45,45 +45,35 @@ The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any
 ## Quick Start & Local Development
 
 ### 1. Prerequisites
-- Node.js >= 20
-- pnpm >= 10 (`corepack enable pnpm`)
-- Docker & Docker Compose (for PostgreSQL & Redis)
+- Node.js >= 20 and pnpm (`corepack enable pnpm`)
+- PostgreSQL 16, either `brew install postgresql@16 && brew services start postgresql@16`, or `docker compose up -d postgres`
 
-### 2. Setup Dependencies
+### 2. Database and environment
 ```bash
-# Clone the repository
-git clone https://github.com/Bharathadi01/perspectives.git
-cd perspectives
+# Local role and databases (Homebrew Postgres; skip if you use docker compose and adjust DATABASE_URL)
+psql -d postgres -c "CREATE ROLE perspective LOGIN PASSWORD 'perspective' CREATEDB"
+createdb -O perspective perspective && createdb -O perspective perspective_test
 
-# Install dependencies
+cp .env.example apps/api/.env      # then replace the three secrets
 pnpm install
-
-# Build shared packages
-pnpm build
+pnpm build                          # builds tokens, contracts, api-client, api
+pnpm db:migrate                     # applies prisma/migrations
+pnpm db:seed                        # 7 verified test users, password: perspective123
 ```
 
-### 3. Run Tests
+### 3. Run
 ```bash
-# Run test suites across packages and apps
-pnpm test
+pnpm dev:api                        # http://localhost:3000 (Swagger at /docs)
+pnpm dev:mobile                     # Expo; press w for web, or scan the QR code with Expo Go
 ```
+Seed logins: `ravi@`, `meera@`, `asha@`, `kabir@`, `nisha@`, `priya@`, `arjun@perspective.test` (password `perspective123`). Ravi starts with yesterday's perspectives visible, one locked perspective plus a connect request from Priya, and a connection with Asha.
 
-### 4. Run the Mobile App
+On a phone with Expo Go, set `EXPO_PUBLIC_API_URL=http://<your-computer-LAN-IP>:3000` before `pnpm dev:mobile` so the phone can reach the API.
+
+### 4. Tests
 ```bash
-# Start Expo development server
-pnpm dev:mobile
-```
-
-### 5. Run the Backend API
-```bash
-# Start local Postgres + Redis
-docker compose up -d
-
-# Generate Prisma client
-pnpm --filter @perspective/api prisma:generate
-
-# Start NestJS in watch mode (Swagger at http://localhost:3000/docs)
-pnpm dev:api
+pnpm test        # unit tests (contracts, domain rules, api-client, mobile helpers)
+pnpm test:e2e    # API end-to-end tests against the perspective_test database
 ```
 
 ---

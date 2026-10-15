@@ -3,10 +3,12 @@
 ## Source of truth
 PostgreSQL is canonical. Use Prisma migrations and explicit repository/application boundaries.
 
-The business rules behind these tables are in `PRODUCT.md`. The names below describe the target model; the current Prisma schema is an earlier skeleton and needs additive migrations to reach it (see `DEVELOPMENT_PLAN.md`).
+The business rules behind these tables are in `PRODUCT.md`. The schema is `apps/api/prisma/schema.prisma`; the first migration is `20261016000000_core_loop_jana_init`. From now on, schema changes are additive forward migrations (see `jana_claude.md` rule 4.2).
 
-## Principal tables
-`users`, `auth_identities`, `refresh_token_families`, `profiles` (basics: gender, height, orientation/preference, city, birthdate), `profile_audience` (gender and age range, one per profile), `selfie_verifications`, `posts` (1 to 6 per profile; the earlier skeleton calls these `perspective_requests`), `post_media` (photo or audio, audio capped at 15 seconds), `post_focus_areas`, `post_categories`, `daily_assignments` (the mandatory set per user per day, including the boost slot), `daily_unlocks` (per user per day), `explore_impressions`, `post_skips`, `perspectives` (the earlier skeleton calls these `responses`), `perspective_feedback`, `connect_requests` (sender, receiver, attached perspective, status, decline cooldown), `connections`, `connection_members`, `messages`, `blocks`, `reports`, `moderation_cases`, `moderation_actions`, `device_tokens`, `notifications`, `idempotency_keys`, `audit_logs`, `deletion_jobs`, and `job` tables managed by pg-boss.
+## Tables (implemented)
+`users` (email, password hash, birth date, status) · `refresh_tokens` (hashed, rotating families) · `profiles` (basics, audience genders and age range, selfie status, `is_live`) · `media` (photo or audio, purpose `post` or `selfie`, storage key) · `posts` (1 to 6 active per profile; position 0 is the primary photo) · `perspectives` (comment, chips, status, owner feedback: verdict, reason, thanked; `received_day_key` drives the daily unlock) · `daily_progress` (required count and unlock time per user per day) · `daily_assignments` (the mandatory set, `boost` or `mandatory` slot, status) · `profile_skips` · `connect_requests` (sender, receiver, the perspective that earned it, status, response time) · `connections` (normalized pair, status, origin request) · `messages` · `blocks` · `reports` · `idempotency_keys` · `deletion_jobs` (no personal data).
+
+Not built yet: `notifications`, `device_tokens`, `moderation_cases`, `moderation_actions`, `audit_logs`, pg-boss job tables.
 
 Not in the model: connection intents or connection modes. A connection has no label.
 
@@ -20,7 +22,7 @@ Not in the model: connection intents or connection modes. A connection has no la
 - A connect request cannot be re-sent by the same sender to the same receiver within the decline cooldown (default 14 days, configurable).
 - One active connection per normalized user pair.
 - Chat opens only on an accepted connect request.
-- Received perspectives are visible to the owner only after that day's mandatory set is completed (or the user has given to every eligible profile available).
+- A received perspective or connect request is revealed once the owner has completed the daily set on the day it arrived or any later day (or gave to every eligible profile that day).
 - One idempotency result per `(actor_id, scope, key)`.
 - State changes occur through application services and validated transitions.
 - Messages require active connection membership at write time.

@@ -2,33 +2,21 @@
 
 Two developers, both working across the whole stack. Business rules are in `PRODUCT.md`. The phases below describe the product slices; who builds which slice is decided per task and declared in `ACTIVE_CHANGES.md`.
 
-## Where the skeleton is now
-A mock-backed skeleton exists. Mobile calls `InMemoryPerspectiveClient` directly, each NestJS service wraps its own separate in-memory client, the Prisma schema is not used, and auth is a stub. The skeleton reflects an earlier product (standalone requests, structured responses, intent-matched connections). The list below is what has to change to reach the product in `PRODUCT.md`.
+## Where the build is now (2026-10-16, branch feature/jana01)
+The core loop from `PRODUCT.md` is implemented end to end on PostgreSQL, and the legacy skeleton logic is gone:
+- **Contracts:** profiles, posts (photo or 15s audio, category, focus areas, spark hints, chips), perspectives, daily status, open Connect, chat, safety, error codes.
+- **API:** auth with rotating refresh tokens, default-deny guard, idempotency keys, profile completeness and selfie gate, posts, the daily mandatory set with boost slot and skip-replace, the daily unlock, perspectives with moderation, Inbox, feedback, the connect gate in both directions, accept/decline, 14-day cooldown, chat, unmatch, report, block, account deletion. Business rules are pure functions in `apps/api/src/domain`.
+- **Mobile:** Hinge-style interim UI for every tab, onboarding, composer, Inbox, profile view, chat, posts, You.
+- **Tests:** contracts 14, domain 19, api-client 6, mobile 6, end-to-end against PostgreSQL 17.
 
-## Skeleton to target: what changes
-**Contracts (`packages/contracts`)**
-- Remove `ConnectionMode` and every use of it: `allowedConnectionModes`, `allowsConnection`, `connectionIntent`, `connectionModes` on profiles, `MUTUAL_INTENT_REQUIRED`.
-- Profile: add gender, height, orientation/preference, birthdate-derived age, selfie-verification status, and profile-level audience (gender and age range). Lenses and helpfulness tiers are not part of the core model.
-- Replace the request with a post (photo or audio, prompt, category, focus areas); a profile holds 1 to 6; audio is at most 15 seconds.
-- Replace the structured response (first impression, reason, suggestion, tags, tone) with: required comment, optional quick-pick chips, text only.
-- Add connect requests (sender, receiver, attached perspective, status, cooldown) and the daily assignment and unlock types.
-- Update the error codes to match `API_CONTRACTS.md`.
-
-**API (`apps/api`)**
-- Real persistence in place of the per-service in-memory clients, and real authentication in place of the default `usr_me_001`.
-- Daily assignment, boost slot, mandatory count, and unlock logic.
-- The connect gate (must have given a perspective first), accept/decline, 14-day cooldown.
-- Selfie verification, audio upload, and moderation before delivery.
-- Config values for caps (connects per day, perspectives received per profile per day), defaulting to unlimited.
-- Replace the placeholder ranking formula with the three algorithms in `PRODUCT.md`.
-
-**Mobile (`apps/mobile`)**
-- Profile creation flow: selfie verification, basics, primary post with photo, audience.
-- Profile with up to six posts, audio recording and playback, and a profile view for givers.
-- Explore built around the mandatory set; locked Inbox until the daily unlock; incoming connect requests.
-- Perspective composer with required comment, optional chips, and per-post spark hints.
-- Replace `ConnectionIntentSheet` and the intent pickers in onboarding and Create with the open Connect flow.
-- Skeleton screens use some raw hex colors that must move to design tokens.
+### Stubs and gaps (next work)
+- Selfie verification and text moderation are stubs (`apps/api/src/moderation/moderation.ts`); no media moderation or EXIF stripping yet.
+- Media is stored on local disk (`MEDIA_STORAGE_DIR`); move to the canonical provider (ADR-003).
+- No push notifications, rate limiting, moderation operations, admin tools, analytics, or audit logs.
+- Chat is polled; messages are not cursor-paginated.
+- Algorithms are simple v1 versions with placeholder weights (`apps/api/src/domain/ranking.ts`); the mandatory count is fixed at 3 (`domain/daily.ts`).
+- No dark mode yet (tokens are light only), and the Hinge-like UI is temporary (ADR-011).
+- Post reordering and editing a post's media are not built.
 
 ## Phase 0 — Validate
 Prototype and user tests of the profile, give, and connect loop. Threat model and data map. Narrow launch community. Exit: profiles reliably receive useful perspectives, and people keep giving.

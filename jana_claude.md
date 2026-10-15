@@ -21,7 +21,7 @@
 
 ## 1. Core Mission & Product Boundaries
 
-> **Product source of truth:** `docs/PRODUCT.md`. The product has moved on from the skeleton described in section 2, so where this guide and `docs/PRODUCT.md` disagree, `docs/PRODUCT.md` wins. Section 2 describes what the skeleton contains today, not the target product; items marked *legacy* will change.
+> **Product source of truth:** `docs/PRODUCT.md`. Where this guide and `docs/PRODUCT.md` disagree, `docs/PRODUCT.md` wins. Section 2 describes the codebase as of 2026-10-16 (core loop implemented on `feature/jana01`).
 
 Perspective is a **privacy-first, selfie-verified (18+ only) platform** where people give each other honest, text-only perspectives on how they look, dress, sound, and show up, and can then connect. It is a dating app at its core with a unique hook (perspectives), marketed perspectives-first rather than as "a dating app"; the same open Connect also serves friends, gym buddies, and networking. Each profile has basics plus 1 to 6 posts (photo or 15-second audio with a prompt or question). Each day a user gives perspectives on a mandatory set of profiles to unlock the perspectives they received.
 
@@ -42,7 +42,7 @@ perspectives/
 ├── packages/
 │   ├── design-tokens/       # Central design system (colors, typography, spacing, radii)
 │   ├── contracts/           # Single source of truth for Zod schemas, types & DTOs
-│   ├── api-client/          # Typed SDK interface + authentic mock fixtures (Asha, Kabir, Meera)
+│   ├── api-client/          # Typed HTTP client validated against the contracts
 │   └── config/              # Shared tsconfig base configurations
 ├── apps/
 │   ├── mobile/              # React Native + Expo (Expo Router v4, TanStack Query, Zustand)
@@ -59,79 +59,38 @@ perspectives/
 
 #### A. `@perspective/design-tokens` (`packages/design-tokens`)
 - **Colors:**
-  - `bgPrimary`: `#F7F4EE` (warm editorial off-white background)
-  - `bgSurface`: `#FFFFFF` (card surfaces)
-  - `textPrimary`: `#17171B` (deep charcoal text)
-  - `textSecondary`: `#6E6C73` (subdued grey metadata)
-  - `accentPrimary`: `#5B4BDB` (editorial royal purple)
-  - `accentSuccess`: `#287A5B` (calm green)
-  - `accentWarning`: `#B86B20` (amber)
-  - `accentDanger`: `#B33A3A` (subdued crimson)
-- **Rules:** Never use inline raw hex values (`#fff`, `#000`) in UI code. Always import tokens: `import { tokens } from '@perspective/design-tokens'`.
+  - `background`: `#F7F4EE` (warm editorial off-white background)
+  - `surface`: `#FFFFFF` (card surfaces)
+  - `ink`: `#17171B` (deep charcoal text)
+  - `muted`: `#6E6C73` (subdued grey metadata)
+  - `brand`: `#5B4BDB` (editorial royal purple)
+  - `success`: `#287A5B` (calm green)
+  - `warning`: `#B86B20` (amber)
+  - `danger`: `#B33A3A` (subdued crimson)
+- **Rules:** Never use inline raw hex values (`#fff`, `#000`) in UI code. Use the tokens through `apps/mobile/src/theme` (`theme.colors.*`, `theme.spacing.*`, `theme.radius.*`). Interim Hinge-style tokens include `border`, `surfaceMuted`, `brandSoft`, `tabBar`, `photoScrim` and `radius.media`.
 - **Touch Targets:** Minimum 44–48px hit areas on all touchable elements.
 
 #### B. `@perspective/contracts` (`packages/contracts`)
-- **Zod Schemas & TypeScript Types:**
-  - `User`, `Profile`, `LensChip` (*legacy*, lenses are not part of the core model), `AgeBand`
-  - `PerspectiveRequest` (becomes a profile *post*), `RequestCategory`, `ResponseStyle` (*legacy*)
-  - `PerspectiveResponse` (becomes a text comment with optional chips; the structured first-impression, reason, suggestion, tags, and tone fields are *legacy*), `ToneCheck`, `ResponseFeedback`
-  - `Connection`, `ConnectionMode` (`friends`, `network`, `collaborate`, `date`, `chat`; *legacy*, to be removed because Connect is open with no intents), `ChatMessage`
-  - `ExploreBatchResponse`, `SafetyReport`, `AccountDeletionRequest`
-  - `ApiErrorEnvelope` (standardized error shape: `{ success: false, error: { code, message, details } }`)
-- **Rule:** Mobile and API **must** import types and schemas from this package. Never duplicate interfaces across apps!
+- **Zod schemas and types:** auth (signup with 18+ check, login, tokens), profiles (gender, orientation, audience, selfie status, public vs. private profile), posts (photo or 15s audio, category, focus areas, `CATEGORY_CATALOG` with spark hints and chips), media upload, explore (daily status, card, slot), perspectives (give, received, given, feedback), connect (requests, connections, relationship, inbox), chat, safety, `ErrorCode` and the error envelope `{ error: { code, message, requestId, details } }`.
+- **Rule:** mobile and API import types and schemas from this package. Never duplicate interfaces across apps.
 
 #### C. `@perspective/api-client` (`packages/api-client`)
-- **`PerspectiveApiClient` Interface:** Typed contract for all mobile queries and mutations.
-- **`InMemoryPerspectiveClient`:** Complete local mock client backed by authentic seed fixtures (`Asha`, `Kabir`, `Meera`). Allows the mobile app to be fully interactive offline or during independent UI development without needing a running database!
-- **Rule:** UI components must call the client interface, never raw `fetch()` or direct database connections.
+- `createApiClient({ baseUrl, tokens, newIdempotencyKey })`: typed HTTP client. Sends the bearer token and an `Idempotency-Key` on mutations, refreshes once on 401, maps errors to `ApiError` with a stable `code`, and validates every response against the contracts.
+- **Rule:** UI code calls this client (through hooks in `apps/mobile/src/features/hooks.ts`), never raw `fetch()`.
 
-#### D. Mobile Client (`apps/mobile`)
-- **Framework:** React Native 0.76 + Expo SDK 52 + Expo Router v4.
-- **Tab Shell (`apps/mobile/app/(tabs)`):**
-  - `explore.tsx`: One-card-at-a-time discovery feed with request prompt, context, audience tags, and skip/respond actions.
-  - `inbox.tsx`: Incoming perspective review with "Helpful", "Connect", and "Thank privately" interactions. (The connect step here uses the *legacy* intent sheet; the target is the open Connect flow with the perspective gate and accept/decline.)
-  - `create.tsx`: Request composer with category selectors, 200-char question limits, response style tags, and allowed connection mode toggles. (The connection-mode toggles and response-style tags are *legacy*; the target is adding or editing profile posts.)
-  - `connections.tsx`: Active mutual connections with origin perspective cards and direct message deep links. (Shows a connection-mode badge, which is *legacy*; Connect has no modes.)
-  - `you.tsx`: Deep profile view, completeness meter, lenses, and safety settings. (Lenses and connection modes are *legacy*; the target adds gender, height, orientation, selfie verification, audience, and up to six posts.)
-- **Dedicated Screens:**
-  - `apps/mobile/app/chat/[id].tsx`: Threaded messaging with persistent Origin Connection Card context.
-  - `apps/mobile/app/(auth)/login.tsx`: Phone/email authentication screen.
-  - `apps/mobile/app/onboarding/index.tsx`: 18+ age gate and terms acknowledgment.
-- **13 Core Accessible Components (`apps/mobile/src/components`):**
-  1. `PerspectiveRequestCard`: Single card displaying request, question, photo, context, and lenses. (Target: a profile post card; the lens display is *legacy*.)
-  2. `PersonHeader`: Avatar, verification badge (`✓`), age band, and city.
-  3. `LensChip`: Accessible pill tag representing identity or skill lens. (*Legacy*: lenses are not part of the core model; the pill style can be reused for chips and focus areas.)
-  4. `PromptBlock`: Question typography presentation.
-  5. `ResponseNote`: Render structured perspective notes with tone tags. (Target: render a text comment with optional chips; the structured fields and tone are *legacy*.)
-  6. `PrimaryButton`: 48px touch-target royal purple action button.
-  7. `SecondaryButton`: 48px touch-target neutral outline action button.
-  8. `ConnectionIntentSheet`: Bottom sheet modal for expressing private connection intent. (*Legacy*: Connect has no intents; this becomes a connect-request sheet with no intent picker.)
-  9. `EmptyState`: Calm zero-state illustration and explanatory text.
-  10. `ModerationStateBanner`: Informational banner when content is pending review.
-  11. `ProfileCompletenessMeter`: Visual progress tracker for profile setup.
-  12. `OriginContextCard`: Compact card displayed at the top of chat showing why two people connected.
-  13. `SafetyOverflowMenu`: Overflow modal providing Block, Report, and Safety controls.
+#### D. Mobile client (`apps/mobile`)
+- Expo SDK 52, Expo Router v4, TanStack Query, Zustand (session flag only), React Hook Form + Zod for auth forms.
+- **Routes:** `(auth)/welcome|login|signup`, `onboarding` (basics → audience → selfie → first photo post), tabs `explore`, `inbox`, `create` (your posts), `connections`, `you`; plus `profile/[id]`, `give/[postId]` (composer), `chat/[id]`, `post/new`, `me/edit`, `me/given`.
+- **Components:** `src/components/ui` (Button, IconButton, Chip, TextField, Toast, Sheet, Screen, States, Text), `profile` (ProfileView, PostCard with photo and voice cards, BasicsRow, Avatar), `perspective` (PerspectiveCard, DailyProgress), `forms` (BasicsForm, AudienceForm, SelfieStep, PostForm), `SafetyMenu`. Reuse these before creating new ones.
+- The UI is a temporary Hinge-like layout (ADR-011). No `Alert.alert` (it does not work on web); use the toast and sheets.
 
 #### E. Backend API (`apps/api`)
-- **Framework:** NestJS 10 + TypeScript + Prisma ORM.
-- **Modules:**
-  - `RequestsModule` (`requests/`): Create, list, rank, and expire requests. (Target: profile posts, 1 to 6 per profile, with no expiry.)
-  - `ResponsesModule` (`responses/`): Submit structured perspectives, give feedback (`helpful` / `unhelpful`). (Target: a required text comment with optional chips, unlocked daily.)
-  - `ExploreModule` (`explore/`): Cold-start and weighted ranking explore feed (`ExploreService`).
-  - `ConnectionsModule` (`connections/`): Mutual intent verification (*legacy*; the target is the perspective gate plus accept/decline), connection lifecycle, chat threads.
-  - `SafetyModule` (`safety/`): User reporting, blocking, DPDP data deletion jobs (`DeletionJob`).
-  - `HealthModule` (`health/`): `/health` probe.
-- **Cross-Cutting Concerns:**
-  - `AuthGuard` (`common/guards/auth.guard.ts`): Default-deny route protection with mock authentication support for testing.
-  - `ApiExceptionFilter` (`common/filters/api-exception.filter.ts`): Catches HTTP and Prisma errors, mapping them to the standard `ApiErrorEnvelope`.
-  - **Swagger OpenAPI:** Auto-generated interactive documentation available at `http://localhost:3000/docs`.
+- NestJS 10 + Prisma + PostgreSQL. Modules: `auth`, `profiles` (profiles and posts), `media`, `daily` (candidates, daily set, unlock), `explore`, `perspectives`, `connect` (requests, connections, chat), `safety`, `social` (people and blocks), `moderation` (stub verifier and moderator).
+- **Business rules** are pure functions in `src/domain` with unit tests. Global `AuthGuard` (default-deny, suspended accounts denied, `@RequiresLiveProfile()`), `IdempotencyInterceptor`, `ApiExceptionFilter`, `ZodPipe`.
+- Swagger at `http://localhost:3000/docs`. End-to-end tests in `test/e2e` run against PostgreSQL.
 
-#### F. AI Service (`apps/ai-service`)
-- **Framework:** Python 3.11 + FastAPI + Uvicorn.
-- **Endpoints:**
-  - `/moderate`: Text and media screening for harassment, NSFW, or PII.
-  - `/embeddings`: Semantic vector embeddings for future interest matching and category clustering.
-- **Isolation Boundary:** The AI service is stateless and isolated. It **never** mutates the database directly; it returns classification payloads for NestJS to validate.
+#### F. AI service (`apps/ai-service`)
+- Python FastAPI skeleton, not wired in v1 (ADR-012). Moderation and selfie checks are stubs inside the API until a provider is chosen.
 
 ---
 
@@ -187,10 +146,8 @@ When creating a Prisma migration:
    ```
 
 ### Rule 4.5: Deterministic Fixtures & Seed Isolation
-- When adding test fixtures or seeds, use deterministic UUIDs prefixed or namespaced so they do not clash:
-  - Bharath's fixtures: `usr_asha_001`, `req_style_001`
-  - Jana's fixtures: `usr_jana_test_001`, `req_jana_001`
-- Keep mock fixtures in `packages/api-client/src/fixtures.ts` synced with Prisma seed scripts.
+- Seeds live in `apps/api/prisma/seed.ts` and use deterministic UUIDs (`00000000-0000-4000-8000-0000000000NN`). Keep ranges separate so seeds do not clash: Jana uses 1–499, Bharath uses 500–999.
+- End-to-end tests create their own users and truncate the test database; never point them at the dev database.
 
 ---
 
@@ -358,11 +315,11 @@ pnpm --filter @perspective/api-client build
 # 3. Run all tests to ensure baseline health
 pnpm test
 
-# 4. Start backend backing services
-docker compose up -d postgres redis
+# 4. Start PostgreSQL (Homebrew service or docker compose)
+docker compose up -d postgres   # or: brew services start postgresql@16
 
-# 5. Run Prisma migrations and generate client
-pnpm --filter @perspective/api exec prisma migrate dev
+# 5. Apply migrations and seed test users (see README for creating the databases)
+pnpm db:migrate && pnpm db:seed
 
 # 6. Start the API server (Port 3000)
 pnpm dev:api
