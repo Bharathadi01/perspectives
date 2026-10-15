@@ -1,3 +1,5 @@
+// Perspective data model. Business rules: docs/PRODUCT.md. Table notes: docs/DATABASE.md.
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -7,219 +9,435 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id                                  String    @id @default(uuid())
-  phoneNumber                         String?   @unique
-  email                               String?   @unique
-  status                              String    @default("active") // active, suspended, deleted
-  termsAcceptedVersion                String    @default("1.0")
-  communityGuidelinesAcceptedVersion  String    @default("1.0")
-  privacyConsentAcceptedVersion       String    @default("1.0")
-  createdAt                           DateTime  @default(now())
-  updatedAt                           DateTime  @updatedAt
+enum UserStatus {
+  active
+  suspended
+}
 
-  profile             Profile?
-  requests            PerspectiveRequest[]
-  responses           PerspectiveResponse[]
-  blocksInitiated     Block[]               @relation("Blocker")
-  blocksReceived      Block[]               @relation("Blocked")
-  reportsFiled        Report[]              @relation("Reporter")
-  idempotencyRecords  IdempotencyRecord[]
-  deletionJobs        DeletionJob[]
+enum Gender {
+  woman
+  man
+  non_binary
+}
+
+enum Orientation {
+  straight
+  gay
+  lesbian
+  bisexual
+  pansexual
+  queer
+  asexual
+  prefer_not_to_say
+}
+
+enum SelfieStatus {
+  unverified
+  verified
+  rejected
+}
+
+enum MediaKind {
+  photo
+  audio
+}
+
+enum MediaPurpose {
+  post
+  selfie
+}
+
+enum PostKind {
+  photo
+  audio
+}
+
+enum PostCategory {
+  style
+  fitness
+  looks
+  voice
+  vibe
+  other
+}
+
+enum PostStatus {
+  pending_moderation
+  active
+  paused
+  removed
+  archived
+}
+
+enum PerspectiveStatus {
+  submitted
+  pending_moderation
+  delivered
+  helpful
+  archived
+  reported
+  removed
+}
+
+enum FeedbackVerdict {
+  helpful
+  not_helpful
+}
+
+enum NotHelpfulReason {
+  vague
+  irrelevant
+  insulting
+  sexual
+  spam
+  unsafe
+}
+
+enum AssignmentSlot {
+  boost
+  mandatory
+}
+
+enum AssignmentStatus {
+  pending
+  given
+  skipped
+  replaced
+}
+
+enum ConnectRequestStatus {
+  pending
+  accepted
+  declined
+  cancelled
+}
+
+enum ConnectionStatus {
+  active
+  unmatched
+  blocked
+}
+
+enum ReportTargetType {
+  profile
+  post
+  perspective
+  message
+}
+
+enum ReportReason {
+  nudity_sexual
+  body_shaming
+  harassment_hate
+  threat_violence
+  self_harm
+  scam_impersonation
+  underage
+  spam
+  other
+}
+
+enum ReportStatus {
+  unreviewed
+  human_review
+  allowed
+  removed
+}
+
+enum DeletionJobStatus {
+  pending
+  completed
+  failed
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique
+  passwordHash    String
+  birthDate       DateTime   @db.Date
+  status          UserStatus @default(active)
+  termsAcceptedAt DateTime
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  profile           Profile?
+  refreshTokens     RefreshToken[]
+  media             Media[]
+  posts             Post[]
+  perspectivesGiven Perspective[]       @relation("Giver")
+  perspectivesOwned Perspective[]       @relation("Owner")
+  dailyProgress     DailyProgress[]
+  assignments       DailyAssignment[]   @relation("AssignmentViewer")
+  assignedTo        DailyAssignment[]   @relation("AssignmentTarget")
+  skipsMade         ProfileSkip[]       @relation("SkipViewer")
+  skipsReceived     ProfileSkip[]       @relation("SkipTarget")
+  requestsSent      ConnectRequest[]    @relation("RequestSender")
+  requestsReceived  ConnectRequest[]    @relation("RequestReceiver")
+  connectionsA      Connection[]        @relation("ConnectionA")
+  connectionsB      Connection[]        @relation("ConnectionB")
+  messages          Message[]
+  blocksMade        Block[]             @relation("Blocker")
+  blocksReceived    Block[]             @relation("Blocked")
+  reportsFiled      Report[]
+  idempotency       IdempotencyRecord[]
 
   @@map("users")
 }
 
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId  String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
 model Profile {
-  id              String    @id @default(uuid())
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName     String
-  birthYear       Int?
-  ageBand         String?
-  cityId          String?
-  bio             String    @default("")
-  photoUrls       String[]  @default([])
-  languages       String[]  @default(["en"])
-  lenses          String[]  @default([])
-  connectionModes String[]  @default(["friends", "network"])
-  contactVerified Boolean   @default(true)
-  selfieVerified  Boolean   @default(false)
-  helpfulnessTier String    @default("new") // new, active, trusted, expert
-  status          String    @default("active")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  userId          String       @id @db.Uuid
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName     String?
+  gender          Gender?
+  heightCm        Int?
+  orientation     Orientation?
+  city            String?
+  audienceGenders Gender[]     @default([])
+  audienceMinAge  Int?
+  audienceMaxAge  Int?
+  selfieStatus    SelfieStatus @default(unverified)
+  selfieMediaId   String?      @db.Uuid
+  selfieCheckedAt DateTime?
+  /// True when basics, audience, selfie, and a primary photo post are all in place.
+  isLive          Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  prompts         ProfilePrompt[]
-
+  @@index([isLive, gender])
   @@map("profiles")
 }
 
-model ProfilePrompt {
-  id        String   @id @default(uuid())
-  profileId String
-  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  promptId  String
-  question  String
-  answer    String
+model Media {
+  id          String       @id @default(uuid()) @db.Uuid
+  ownerId     String       @db.Uuid
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind        MediaKind
+  purpose     MediaPurpose @default(post)
+  mimeType    String
+  storageKey  String       @unique
+  byteSize    Int
+  durationSec Float?
+  createdAt   DateTime     @default(now())
+
+  post Post?
+
+  @@index([ownerId])
+  @@map("media")
+}
+
+model Post {
+  id         String       @id @default(uuid()) @db.Uuid
+  ownerId    String       @db.Uuid
+  owner      User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  position   Int
+  kind       PostKind
+  mediaId    String       @unique @db.Uuid
+  media      Media        @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  prompt     String
+  category   PostCategory
+  focusAreas String[]
+  status     PostStatus   @default(active)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  perspectives Perspective[]
+
+  @@index([ownerId, status, position])
+  @@map("posts")
+}
+
+model Perspective {
+  id               String            @id @default(uuid()) @db.Uuid
+  postId           String            @db.Uuid
+  post             Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  giverId          String            @db.Uuid
+  giver            User              @relation("Giver", fields: [giverId], references: [id], onDelete: Cascade)
+  /// Denormalized post owner, for inbox and gate queries.
+  ownerId          String            @db.Uuid
+  owner            User              @relation("Owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  comment          String
+  chips            String[]
+  status           PerspectiveStatus @default(delivered)
+  verdict          FeedbackVerdict?
+  notHelpfulReason NotHelpfulReason?
+  thankedAt        DateTime?
+  /// Day (app timezone) the perspective was received; drives the daily unlock.
+  receivedDayKey   String
+  createdAt        DateTime          @default(now())
+
+  connectRequests ConnectRequest[]
+
+  @@unique([postId, giverId], name: "one_perspective_per_giver_per_post")
+  @@index([ownerId, receivedDayKey])
+  @@index([giverId, ownerId])
+  @@map("perspectives")
+}
+
+model DailyProgress {
+  userId        String    @db.Uuid
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayKey        String
+  requiredCount Int
+  unlockedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@id([userId, dayKey])
+  @@map("daily_progress")
+}
+
+model DailyAssignment {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  user      User             @relation("AssignmentViewer", fields: [userId], references: [id], onDelete: Cascade)
+  dayKey    String
+  slotIndex Int
+  targetId  String           @db.Uuid
+  target    User             @relation("AssignmentTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  slot      AssignmentSlot
+  status    AssignmentStatus @default(pending)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, dayKey, targetId])
+  @@index([userId, dayKey, status])
+  @@map("daily_assignments")
+}
+
+model ProfileSkip {
+  id        String   @id @default(uuid()) @db.Uuid
+  viewerId  String   @db.Uuid
+  viewer    User     @relation("SkipViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+  targetId  String   @db.Uuid
+  target    User     @relation("SkipTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  dayKey    String
   createdAt DateTime @default(now())
 
-  @@map("profile_prompts")
+  @@index([viewerId, createdAt])
+  @@map("profile_skips")
 }
 
-model PerspectiveRequest {
-  id                     String    @id @default(uuid())
-  authorId               String
-  author                 User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  category               String    // style, fitness, dating_profile, career, etc.
-  question               String
-  context                String?
-  responseStyle          String    @default("direct")
-  status                 String    @default("active") // draft, pending_moderation, active, fulfilled, expired, removed, archived
-  moderationState        String    @default("allowed") // allowed, pending, removed
-  allowsConnection       Boolean   @default(true)
-  allowedConnectionModes String[]  @default(["friends", "network"])
-  audienceLanguages      String[]  @default(["en"])
-  audienceLenses         String[]  @default([])
-  responseCount          Int       @default(0)
-  helpfulCount           Int       @default(0)
-  expiresAt              DateTime
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+model ConnectRequest {
+  id             String               @id @default(uuid()) @db.Uuid
+  senderId       String               @db.Uuid
+  sender         User                 @relation("RequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId     String               @db.Uuid
+  receiver       User                 @relation("RequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  /// The perspective that earned this request (the gate).
+  perspectiveId  String               @db.Uuid
+  perspective    Perspective          @relation(fields: [perspectiveId], references: [id], onDelete: Cascade)
+  status         ConnectRequestStatus @default(pending)
+  receivedDayKey String
+  respondedAt    DateTime?
+  createdAt      DateTime             @default(now())
 
-  media                  RequestMedia[]
-  responses              PerspectiveResponse[]
+  connection Connection?
 
-  @@index([status, moderationState, createdAt])
-  @@index([authorId, status])
-  @@map("perspective_requests")
-}
-
-model RequestMedia {
-  id              String             @id @default(uuid())
-  requestId       String
-  request         PerspectiveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  type            String             @default("image") // image, text
-  storagePath     String
-  moderationState String             @default("allowed")
-  createdAt       DateTime           @default(now())
-
-  @@map("request_media")
-}
-
-model PerspectiveResponse {
-  id               String             @id @default(uuid())
-  requestId        String
-  request          PerspectiveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  authorId         String
-  author           User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  firstImpression  String
-  reason           String?
-  suggestion       String?
-  tags             String[]           @default([])
-  tone             String             @default("constructive")
-  connectionIntent String?            // chat, friends, date, collaborate, network
-  status           String             @default("delivered") // submitted, pending_moderation, delivered, helpful, archived, reported, removed
-  moderationState  String             @default("allowed")
-  createdAt        DateTime           @default(now())
-
-  feedback         ResponseFeedback[]
-
-  @@unique([requestId, authorId], name: "one_response_per_request_responder")
-  @@index([requestId, status])
-  @@index([authorId, createdAt])
-  @@map("responses")
-}
-
-model ResponseFeedback {
-  id              String              @id @default(uuid())
-  responseId      String
-  response        PerspectiveResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
-  rating          String              // helpful, not_helpful
-  unhelpfulReason String?             // vague, irrelevant, insulting, sexual, spam, unsafe
-  thankPrivately  Boolean             @default(false)
-  createdAt       DateTime            @default(now())
-
-  @@map("response_feedback")
+  @@index([receiverId, status])
+  @@index([senderId, receiverId, status])
+  @@map("connect_requests")
 }
 
 model Connection {
-  id               String    @id @default(uuid())
-  memberAId        String
-  memberBId        String
-  status           String    @default("active") // active, paused, unmatched, blocked
-  mode             String    // chat, friends, date, collaborate, network
-  originRequestId  String
-  originResponseId String
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String           @id @default(uuid()) @db.Uuid
+  /// Normalized pair: userAId < userBId.
+  userAId         String           @db.Uuid
+  userA           User             @relation("ConnectionA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId         String           @db.Uuid
+  userB           User             @relation("ConnectionB", fields: [userBId], references: [id], onDelete: Cascade)
+  status          ConnectionStatus @default(active)
+  originRequestId String           @unique @db.Uuid
+  originRequest   ConnectRequest   @relation(fields: [originRequestId], references: [id], onDelete: Cascade)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  messages         ChatMessage[]
+  messages Message[]
 
-  @@unique([memberAId, memberBId, mode])
-  @@index([memberAId, status])
-  @@index([memberBId, status])
+  @@unique([userAId, userBId])
+  @@index([userAId, status])
+  @@index([userBId, status])
   @@map("connections")
 }
 
-model ChatMessage {
-  id           String     @id @default(uuid())
-  connectionId String
+model Message {
+  id           String     @id @default(uuid()) @db.Uuid
+  connectionId String     @db.Uuid
   connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  senderId     String
+  senderId     String     @db.Uuid
+  sender       User       @relation(fields: [senderId], references: [id], onDelete: Cascade)
   text         String
   createdAt    DateTime   @default(now())
 
-  @@index([connectionId, createdAt])
+  @@index([connectionId, createdAt, id])
   @@map("messages")
 }
 
 model Block {
-  id        String   @id @default(uuid())
-  blockerId String
+  id        String   @id @default(uuid()) @db.Uuid
+  blockerId String   @db.Uuid
   blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  blockedId String
+  blockedId String   @db.Uuid
   blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
+  @@index([blockedId])
   @@map("blocks")
 }
 
 model Report {
-  id         String   @id @default(uuid())
-  reporterId String
-  reporter   User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  targetType String   // request, response, message, user
-  targetId   String
-  reason     String
+  id         String           @id @default(uuid()) @db.Uuid
+  /// Kept (as null) after the reporter deletes their account, for safety records.
+  reporterId String?          @db.Uuid
+  reporter   User?            @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+  targetType ReportTargetType
+  targetId   String           @db.Uuid
+  reason     ReportReason
   note       String?
-  status     String   @default("unreviewed") // unreviewed, machineAllowed, humanReview, allowed, removed
-  createdAt  DateTime @default(now())
+  status     ReportStatus     @default(unreviewed)
+  createdAt  DateTime         @default(now())
 
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
   @@map("reports")
 }
 
 model IdempotencyRecord {
-  id              String   @id @default(uuid())
-  actorId         String
-  actor           User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
-  scope           String
-  key             String
-  responsePayload Json?
-  createdAt       DateTime @default(now())
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String   @db.Uuid
+  actor        User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  scope        String
+  key          String
+  statusCode   Int
+  responseBody Json?
+  createdAt    DateTime @default(now())
 
   @@unique([actorId, scope, key])
   @@map("idempotency_keys")
 }
 
+/// Records that a deletion ran. Holds no personal data and no link to the deleted user.
 model DeletionJob {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String   @default("pending") // pending, running, completed, failed
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String            @id @default(uuid()) @db.Uuid
+  status      DeletionJobStatus @default(pending)
+  createdAt   DateTime          @default(now())
+  completedAt DateTime?
 
+  @@index([status, createdAt])
   @@map("deletion_jobs")
 }

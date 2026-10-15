@@ -1,18 +1,36 @@
 import { z } from 'zod';
-import { PerspectiveRequestSchema } from './request';
+import { DayKeySchema, IdSchema } from './common';
+import { PublicProfileSchema } from './profile';
 
-export const ExploreBatchSchema = z.object({
-  requests: z.array(PerspectiveRequestSchema),
-  impressionToken: z.string(),
-  dailyBatchCount: z.number().int(),
-  dailyBatchTotal: z.number().int(),
-  dailyHeadline: z.string(), // e.g. "8 thoughtful requests today"
+/** Progress on today's mandatory give-to-get set. */
+export const DailyStatusSchema = z.object({
+  dayKey: DayKeySchema,
+  /** How many perspectives must be given today (fewer when few eligible profiles exist). */
+  requiredCount: z.number().int().min(0),
+  givenCount: z.number().int().min(0),
+  unlocked: z.boolean(),
 });
-export type ExploreBatch = z.infer<typeof ExploreBatchSchema>;
+export type DailyStatus = z.infer<typeof DailyStatusSchema>;
 
-export const SkipRequestInputSchema = z.object({
-  requestId: z.string(),
-  reason: z.enum(['not_interested', 'wrong_category', 'not_qualified', 'other']).optional(),
-  idempotencyKey: z.string().uuid(),
+/** boost = low-response profile slot; mandatory = relevance slot; optional = after the set is done. */
+export const ExploreSlot = z.enum(['mandatory', 'boost', 'optional']);
+export type ExploreSlot = z.infer<typeof ExploreSlot>;
+
+export const ExploreCardSchema = z.object({
+  profile: PublicProfileSchema,
+  slot: ExploreSlot,
+  /** Posts on this profile the viewer has already given a perspective on. */
+  givenPostIds: z.array(IdSchema),
 });
-export type SkipRequestInput = z.infer<typeof SkipRequestInputSchema>;
+export type ExploreCard = z.infer<typeof ExploreCardSchema>;
+
+export const ExploreResponseSchema = z.object({
+  daily: DailyStatusSchema,
+  card: ExploreCardSchema.nullable(),
+  /** Profiles left in today's finite batch, including the current card. */
+  remainingInBatch: z.number().int().min(0),
+});
+export type ExploreResponse = z.infer<typeof ExploreResponseSchema>;
+
+export const SkipProfileInputSchema = z.object({ profileId: IdSchema });
+export type SkipProfileInput = z.infer<typeof SkipProfileInputSchema>;

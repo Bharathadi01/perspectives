@@ -1,43 +1,49 @@
-import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AuthModule } from './auth/auth.module';
+import { ApiExceptionFilter } from './common/api-exception.filter';
+import { AuthGuard } from './common/auth.guard';
+import { IdempotencyInterceptor } from './common/idempotency.interceptor';
+import { requestIdMiddleware } from './common/request-id.middleware';
+import { ConfigModule } from './config/config.module';
+import { ConnectModule } from './connect/connect.module';
+import { DailyModule } from './daily/daily.module';
+import { ExploreModule } from './explore/explore.module';
 import { HealthController } from './health/health.controller';
-import { ExploreController } from './explore/explore.controller';
-import { ExploreService } from './explore/explore.service';
-import { RequestsController } from './requests/requests.controller';
-import { RequestsService } from './requests/requests.service';
-import { ResponsesController } from './responses/responses.controller';
-import { ResponsesService } from './responses/responses.service';
-import { ConnectionsController } from './connections/connections.controller';
-import { ConnectionsService } from './connections/connections.service';
-import { SafetyController } from './safety/safety.controller';
-import { SafetyService } from './safety/safety.service';
-import { ApiExceptionFilter } from './common/filters/api-exception.filter';
-import { AuthGuard } from './common/guards/auth.guard';
+import { MediaModule } from './media/media.module';
+import { ModerationModule } from './moderation/moderation';
+import { PerspectivesModule } from './perspectives/perspectives.module';
+import { PrismaModule } from './prisma/prisma.service';
+import { MapperModule } from './profiles/mapper.module';
+import { ProfilesModule } from './profiles/profiles.module';
+import { SafetyModule } from './safety/safety.module';
+import { SocialModule } from './social/social.service';
 
 @Module({
-  imports: [],
-  controllers: [
-    HealthController,
-    ExploreController,
-    RequestsController,
-    ResponsesController,
-    ConnectionsController,
-    SafetyController,
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    AuthModule,
+    SocialModule,
+    ModerationModule,
+    MediaModule,
+    MapperModule,
+    DailyModule,
+    ConnectModule,
+    ProfilesModule,
+    ExploreModule,
+    PerspectivesModule,
+    SafetyModule,
   ],
+  controllers: [HealthController],
   providers: [
-    ExploreService,
-    RequestsService,
-    ResponsesService,
-    ConnectionsService,
-    SafetyService,
-    {
-      provide: APP_FILTER,
-      useClass: ApiExceptionFilter,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard,
-    },
+    { provide: APP_FILTER, useClass: ApiExceptionFilter },
+    { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(requestIdMiddleware).forRoutes('*');
+  }
+}

@@ -1,32 +1,45 @@
-import { Controller, Post, Body, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { SafetyService } from './safety.service';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import {
   CreateReportInput,
-  BlockUserInput,
+  CreateReportInputSchema,
   DeleteAccountInput,
+  DeleteAccountInputSchema,
 } from '@perspective/contracts';
+import { AuthUser, CurrentUser, SkipIdempotency } from '../common/decorators';
+import { UuidPipe, ZodPipe } from '../common/zod.pipe';
+import { SafetyService } from './safety.service';
 
-@ApiTags('Safety, Blocking & Deletion')
+@ApiTags('Safety')
 @Controller('v1')
 export class SafetyController {
-  constructor(private readonly safetyService: SafetyService) {}
+  constructor(private readonly safety: SafetyService) {}
 
   @Post('reports')
-  @ApiOperation({ summary: 'Report request, response, message or user with reason code' })
-  async createReport(@Req() req: any, @Body() body: CreateReportInput) {
-    return this.safetyService.report(req.user?.id || 'usr_me_001', body);
+  report(@CurrentUser() user: AuthUser, @Body(new ZodPipe(CreateReportInputSchema)) body: CreateReportInput): Promise<{ reportId: string }> {
+    return this.safety.report(user.id, body);
   }
 
-  @Post('blocks')
-  @ApiOperation({ summary: 'Block user bidirectionally across discovery, inbox, and chat' })
-  async blockUser(@Req() req: any, @Body() body: BlockUserInput) {
-    return this.safetyService.block(req.user?.id || 'usr_me_001', body);
+  @Post('blocks/:userId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async block(@CurrentUser() user: AuthUser, @Param('userId', UuidPipe) userId: string): Promise<void> {
+    await this.safety.block(user.id, userId);
   }
 
+  @Delete('blocks/:userId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unblock(@CurrentUser() user: AuthUser, @Param('userId', UuidPipe) userId: string): Promise<void> {
+    await this.safety.unblock(user.id, userId);
+  }
+
+  /** Naturally idempotent: once deleted, a retry is unauthenticated. */
+  @SkipIdempotency()
   @Post('account/deletion')
-  @ApiOperation({ summary: 'Request permanent DPDP-compliant account and data deletion' })
-  async deleteAccount(@Req() req: any, @Body() body: DeleteAccountInput) {
-    return this.safetyService.deleteAccount(req.user?.id || 'usr_me_001', body);
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAccount(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodPipe(DeleteAccountInputSchema)) body: DeleteAccountInput,
+  ): Promise<void> {
+    await this.safety.deleteAccount(user.id, body);
   }
 }

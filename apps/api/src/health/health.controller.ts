@@ -1,17 +1,17 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
+import { Public } from '../common/decorators';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('Health')
+@Public()
 @Controller('health')
 export class HealthController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Get()
-  @ApiOperation({ summary: 'API and database health check' })
-  check() {
-    return {
-      status: 'ok',
-      service: 'perspective-api',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-    };
+  async check(): Promise<{ status: 'ok'; database: 'ok'; timestamp: string }> {
+    await this.prisma.$queryRaw`SELECT 1`;
+    return { status: 'ok', database: 'ok', timestamp: new Date().toISOString() };
   }
 }

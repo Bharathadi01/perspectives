@@ -1,36 +1,35 @@
 import { z } from 'zod';
+import { IdSchema } from './common';
+
+export const ReportTargetType = z.enum(['profile', 'post', 'perspective', 'message']);
+export type ReportTargetType = z.infer<typeof ReportTargetType>;
 
 export const ReportReason = z.enum([
-  'sexual_content',
+  'nudity_sexual',
+  'body_shaming',
   'harassment_hate',
   'threat_violence',
   'self_harm',
   'scam_impersonation',
-  'doxxing_privacy',
-  'minor_context',
-  'spam_irrelevant',
+  'underage',
+  'spam',
   'other',
 ]);
 export type ReportReason = z.infer<typeof ReportReason>;
 
 export const CreateReportInputSchema = z.object({
-  targetType: z.enum(['request', 'response', 'message', 'user']),
-  targetId: z.string(),
+  targetType: ReportTargetType,
+  targetId: IdSchema,
   reason: ReportReason,
-  note: z.string().max(500).optional(),
-  idempotencyKey: z.string().uuid(),
+  note: z.string().trim().max(500).optional(),
 });
 export type CreateReportInput = z.infer<typeof CreateReportInputSchema>;
 
-export const BlockUserInputSchema = z.object({
-  blockedUserId: z.string(),
-  idempotencyKey: z.string().uuid(),
-});
-export type BlockUserInput = z.infer<typeof BlockUserInputSchema>;
+export const DELETE_ACCOUNT_PHRASE = 'DELETE MY ACCOUNT';
 
 export const DeleteAccountInputSchema = z.object({
-  confirmationPhrase: z.literal('DELETE MY ACCOUNT'),
-  reason: z.string().max(200).optional(),
-  idempotencyKey: z.string().uuid(),
+  /** Recent authentication is required for deletion. */
+  password: z.string().min(1),
+  confirmationPhrase: z.literal(DELETE_ACCOUNT_PHRASE),
 });
 export type DeleteAccountInput = z.infer<typeof DeleteAccountInputSchema>;

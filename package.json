@@ -10,7 +10,10 @@
     "build": "pnpm -r run build",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm -r run test"
+    "test": "pnpm -r run test",
+    "test:e2e": "pnpm --filter @perspective/api test:e2e",
+    "db:migrate": "pnpm --filter @perspective/api prisma:migrate",
+    "db:seed": "pnpm --filter @perspective/api db:seed"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

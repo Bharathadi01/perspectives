@@ -1,28 +1,28 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { existsSync } from 'node:fs';
+import { AppModule } from './app.module';
+import { configureApp } from './bootstrap';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+async function bootstrap(): Promise<void> {
+  if (existsSync('.env')) process.loadEnvFile('.env');
 
-  app.enableCors();
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  configureApp(app);
 
   const config = new DocumentBuilder()
     .setTitle('Perspective API')
-    .setDescription(
-      'REST & OpenAPI contract for Perspective — structured human-feedback and mutual connection platform'
-    )
+    .setDescription('Perspective: honest perspectives and open Connect. Business rules: docs/PRODUCT.md')
     .setVersion('1.0')
-    .addTag('Perspective')
+    .addBearerAuth()
     .build();
+  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
-
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`Perspective API running on http://localhost:${port}`);
-  console.log(`Swagger documentation available at http://localhost:${port}/docs`);
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port, '0.0.0.0');
+  Logger.log(`Perspective API on http://localhost:${port} (docs at /docs)`, 'Bootstrap');
 }
 
-bootstrap();
+void bootstrap();

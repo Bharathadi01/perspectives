@@ -33,3 +33,6 @@ coverage/
 # Prisma
 # Keep migrations, ignore generated client
 node_modules/.prisma
+
+# Local media storage (development)
+.data/

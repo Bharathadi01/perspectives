@@ -1,23 +1,25 @@
-import { Controller, Get, Post, Body, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { ExploreResponse, SkipProfileInput, SkipProfileInputSchema } from '@perspective/contracts';
+import { AuthUser, CurrentUser, RequiresLiveProfile } from '../common/decorators';
+import { ZodPipe } from '../common/zod.pipe';
 import { ExploreService } from './explore.service';
-import { SkipRequestInput } from '@perspective/contracts';
 
 @ApiTags('Explore')
+@RequiresLiveProfile()
 @Controller('v1/explore')
 export class ExploreController {
-  constructor(private readonly exploreService: ExploreService) {}
+  constructor(private readonly explore: ExploreService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get finite daily batch with server-issued impression token' })
-  @ApiResponse({ status: 200, description: 'Finite ranked batch returned.' })
-  async getExploreBatch(@Req() req: any) {
-    return this.exploreService.getBatch(req.user?.id || 'usr_me_001');
+  next(@CurrentUser() user: AuthUser): Promise<ExploreResponse> {
+    return this.explore.next(user.id);
   }
 
+  /** Private skip, no notification. A skipped mandatory slot is replaced. */
   @Post('skip')
-  @ApiOperation({ summary: 'Skip an explore request without negative feedback' })
-  async skipRequest(@Req() req: any, @Body() body: SkipRequestInput) {
-    return this.exploreService.skip(req.user?.id || 'usr_me_001', body);
+  @HttpCode(HttpStatus.OK)
+  skip(@CurrentUser() user: AuthUser, @Body(new ZodPipe(SkipProfileInputSchema)) body: SkipProfileInput): Promise<ExploreResponse> {
+    return this.explore.skip(user.id, body.profileId);
   }
 }
