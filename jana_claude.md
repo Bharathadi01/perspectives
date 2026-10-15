@@ -21,13 +21,15 @@
 
 ## 1. Core Mission & Product Boundaries
 
-Perspective is a **privacy-first, structured human-feedback and mutual connection platform** (18+ adults only). Users post a "Perspective Request" (a question about an outfit, dating profile, career decision, or communication draft) and receive structured, calibrated perspectives from qualified peers. If and only if mutual compatible connection intent is expressed, private chat unlocks.
+> **Product source of truth:** `docs/PRODUCT.md`. The product has moved on from the skeleton described in section 2, so where this guide and `docs/PRODUCT.md` disagree, `docs/PRODUCT.md` wins. Section 2 describes what the skeleton contains today, not the target product; items marked *legacy* will change.
+
+Perspective is a **privacy-first, selfie-verified (18+ only) platform** where people give each other honest, text-only perspectives on how they look, dress, sound, and show up, and can then connect. It is a dating app at its core with a unique hook (perspectives), marketed perspectives-first rather than as "a dating app"; the same open Connect also serves friends, gym buddies, and networking. Each profile has basics plus 1 to 6 posts (photo or 15-second audio with a prompt or question). Each day a user gives perspectives on a mandatory set of profiles to unlock the perspectives they received.
 
 ### Non-Negotiable Product Rules (Never Violate):
-1. **No Public Vanity Metrics:** Never add public follower counts, like counts, numeric attractiveness scores, or public comment feeds. Feedback is subjective, structured, and private.
-2. **Mutual Intent Gate for Chat:** Chat (`/chat/:id`) is **never** initiated unilaterally. Both parties must select a compatible connection mode (`friends`, `network`, `collaborate`, `date`, `chat`) before a connection record is created.
-3. **Safety & DPDP Compliance as P0:** Strict 18+ age gate, reporting system (`/safety/report`), block system (`/safety/block`), and in-app DPDP-compliant account/data deletion (`/safety/delete-account`).
-4. **Strict PII Shielding:** Sensitive fields (phone, email, birth date, exact GPS coordinates, raw moderation scores) must **never** be exposed in public DTOs or client-facing responses.
+1. **No Public Vanity Metrics:** Never add public follower counts, like counts, numeric attractiveness scores, or public comment feeds. A perspective is private: visible only to the post owner and the giver.
+2. **Connect Gate for Chat:** Chat (`/chat/:id`) is **never** initiated unilaterally. A user may ask to connect only after giving the other person a perspective, and the other person must accept. Connect is open: there are **no connection intents or modes** (no `friends`, `date`, `network` labels). After a decline, the same sender cannot send another request to that person for 14 days (configurable).
+3. **Safety & DPDP Compliance as P0:** Strict 18+ age gate, selfie verification at profile creation, reporting system (`/safety/report`), block system (`/safety/block`), and in-app DPDP-compliant account/data deletion (`/safety/delete-account`).
+4. **Strict PII Shielding:** Sensitive fields (phone, email, birth date, exact GPS coordinates, raw moderation scores, selfie-verification media) must **never** be exposed in public DTOs or client-facing responses.
 
 ---
 
@@ -70,10 +72,10 @@ perspectives/
 
 #### B. `@perspective/contracts` (`packages/contracts`)
 - **Zod Schemas & TypeScript Types:**
-  - `User`, `Profile`, `LensChip`, `AgeBand`
-  - `PerspectiveRequest`, `RequestCategory`, `ResponseStyle`
-  - `PerspectiveResponse`, `ToneCheck`, `ResponseFeedback`
-  - `Connection`, `ConnectionMode` (`friends`, `network`, `collaborate`, `date`, `chat`), `ChatMessage`
+  - `User`, `Profile`, `LensChip` (*legacy*, lenses are not part of the core model), `AgeBand`
+  - `PerspectiveRequest` (becomes a profile *post*), `RequestCategory`, `ResponseStyle` (*legacy*)
+  - `PerspectiveResponse` (becomes a text comment with optional chips; the structured first-impression, reason, suggestion, tags, and tone fields are *legacy*), `ToneCheck`, `ResponseFeedback`
+  - `Connection`, `ConnectionMode` (`friends`, `network`, `collaborate`, `date`, `chat`; *legacy*, to be removed because Connect is open with no intents), `ChatMessage`
   - `ExploreBatchResponse`, `SafetyReport`, `AccountDeletionRequest`
   - `ApiErrorEnvelope` (standardized error shape: `{ success: false, error: { code, message, details } }`)
 - **Rule:** Mobile and API **must** import types and schemas from this package. Never duplicate interfaces across apps!
@@ -87,23 +89,23 @@ perspectives/
 - **Framework:** React Native 0.76 + Expo SDK 52 + Expo Router v4.
 - **Tab Shell (`apps/mobile/app/(tabs)`):**
   - `explore.tsx`: One-card-at-a-time discovery feed with request prompt, context, audience tags, and skip/respond actions.
-  - `inbox.tsx`: Incoming perspective review with "Helpful", "Connect", and "Thank privately" interactions.
-  - `create.tsx`: Request composer with category selectors, 200-char question limits, response style tags, and allowed connection mode toggles.
-  - `connections.tsx`: Active mutual connections with origin perspective cards and direct message deep links.
-  - `you.tsx`: Deep profile view, completeness meter, lenses, and safety settings.
+  - `inbox.tsx`: Incoming perspective review with "Helpful", "Connect", and "Thank privately" interactions. (The connect step here uses the *legacy* intent sheet; the target is the open Connect flow with the perspective gate and accept/decline.)
+  - `create.tsx`: Request composer with category selectors, 200-char question limits, response style tags, and allowed connection mode toggles. (The connection-mode toggles and response-style tags are *legacy*; the target is adding or editing profile posts.)
+  - `connections.tsx`: Active mutual connections with origin perspective cards and direct message deep links. (Shows a connection-mode badge, which is *legacy*; Connect has no modes.)
+  - `you.tsx`: Deep profile view, completeness meter, lenses, and safety settings. (Lenses and connection modes are *legacy*; the target adds gender, height, orientation, selfie verification, audience, and up to six posts.)
 - **Dedicated Screens:**
   - `apps/mobile/app/chat/[id].tsx`: Threaded messaging with persistent Origin Connection Card context.
   - `apps/mobile/app/(auth)/login.tsx`: Phone/email authentication screen.
   - `apps/mobile/app/onboarding/index.tsx`: 18+ age gate and terms acknowledgment.
 - **13 Core Accessible Components (`apps/mobile/src/components`):**
-  1. `PerspectiveRequestCard`: Single card displaying request, question, photo, context, and lenses.
+  1. `PerspectiveRequestCard`: Single card displaying request, question, photo, context, and lenses. (Target: a profile post card; the lens display is *legacy*.)
   2. `PersonHeader`: Avatar, verification badge (`✓`), age band, and city.
-  3. `LensChip`: Accessible pill tag representing identity or skill lens.
+  3. `LensChip`: Accessible pill tag representing identity or skill lens. (*Legacy*: lenses are not part of the core model; the pill style can be reused for chips and focus areas.)
   4. `PromptBlock`: Question typography presentation.
-  5. `ResponseNote`: Render structured perspective notes with tone tags.
+  5. `ResponseNote`: Render structured perspective notes with tone tags. (Target: render a text comment with optional chips; the structured fields and tone are *legacy*.)
   6. `PrimaryButton`: 48px touch-target royal purple action button.
   7. `SecondaryButton`: 48px touch-target neutral outline action button.
-  8. `ConnectionIntentSheet`: Bottom sheet modal for expressing private connection intent.
+  8. `ConnectionIntentSheet`: Bottom sheet modal for expressing private connection intent. (*Legacy*: Connect has no intents; this becomes a connect-request sheet with no intent picker.)
   9. `EmptyState`: Calm zero-state illustration and explanatory text.
   10. `ModerationStateBanner`: Informational banner when content is pending review.
   11. `ProfileCompletenessMeter`: Visual progress tracker for profile setup.
@@ -113,10 +115,10 @@ perspectives/
 #### E. Backend API (`apps/api`)
 - **Framework:** NestJS 10 + TypeScript + Prisma ORM.
 - **Modules:**
-  - `RequestsModule` (`requests/`): Create, list, rank, and expire requests.
-  - `ResponsesModule` (`responses/`): Submit structured perspectives, give feedback (`helpful` / `unhelpful`).
+  - `RequestsModule` (`requests/`): Create, list, rank, and expire requests. (Target: profile posts, 1 to 6 per profile, with no expiry.)
+  - `ResponsesModule` (`responses/`): Submit structured perspectives, give feedback (`helpful` / `unhelpful`). (Target: a required text comment with optional chips, unlocked daily.)
   - `ExploreModule` (`explore/`): Cold-start and weighted ranking explore feed (`ExploreService`).
-  - `ConnectionsModule` (`connections/`): Mutual intent verification, connection lifecycle, chat threads.
+  - `ConnectionsModule` (`connections/`): Mutual intent verification (*legacy*; the target is the perspective gate plus accept/decline), connection lifecycle, chat threads.
   - `SafetyModule` (`safety/`): User reporting, blocking, DPDP data deletion jobs (`DeletionJob`).
   - `HealthModule` (`health/`): `/health` probe.
 - **Cross-Cutting Concerns:**
@@ -176,7 +178,7 @@ When creating a Prisma migration:
    ```bash
    pnpm --filter @perspective/api exec prisma migrate dev --name <jira-or-task>_jana_<description>
    # Example:
-   pnpm --filter @perspective/api exec prisma migrate dev --name audio_lens_jana_add_audio_table
+   pnpm --filter @perspective/api exec prisma migrate dev --name audio_posts_jana_add_audio_table
    ```
 2. **Never edit an existing migration file in `prisma/migrations/` that has already been merged to `main`!**
 3. If your branch falls behind `main`, rebase your branch on `main` and run:
@@ -215,14 +217,14 @@ Deep research on collaborative multi-agent vibe coding reveals specific traps. H
 
 ### Manifest File Naming Convention:
 `sync-manifests/<developer>_<branch-name>_<YYYYMMDD_HHMM>.md`  
-*Example:* `sync-manifests/jana_feat-audio-perspectives_20261015_1430.md`
+*Example:* `sync-manifests/jana_feat-audio-posts_20261015_1430.md`
 
 ### Required Manifest Template:
 ```markdown
 # Sync Manifest: [Feature / Branch Name]
 
 - **Author / Agent:** [Jana / Jana's Agent]
-- **Branch:** [e.g., feat/audio-perspectives]
+- **Branch:** [e.g., feat/audio-posts]
 - **Date & Time:** [ISO timestamp or local date]
 - **Base Commit:** [Commit hash branched from]
 
@@ -241,7 +243,7 @@ Deep research on collaborative multi-agent vibe coding reveals specific traps. H
 - **Migration Name:** [e.g. `202610151430_jana_add_audio_bio`]
 
 ## 4. Contract & API Impact
-- **New Endpoints:** [e.g. POST /requests/:id/audio]
+- **New Endpoints:** [e.g. POST /v1/me/posts/:id/audio]
 - **DTO Updates:** [List changes made to @perspective/contracts]
 - **Breaking Changes:** [NONE - explain why backwards-compatible]
 

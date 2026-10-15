@@ -2,7 +2,11 @@
 
 > **“See yourself through other people’s eyes—and connect through what you notice.”**
 
-Perspective is an 18+ structured human-feedback and mutual-connection application. Users create a **Perspective Request** (a photo, situation, idea, profile element, or decision with a specific question); qualified users give structured perspectives; compatible mutual intent can open a private connection.
+Perspective is an 18+ app where selfie-verified users give each other honest, text-only perspectives on how they look, dress, sound, and show up, and can then connect. It is a dating app at its core with a unique hook (perspectives), marketed perspectives-first, and open Connect also serves friends, gym buddies, and networking.
+
+Each profile has basics plus 1 to 6 **posts** (a photo or a 15-second audio clip with a prompt or question). Each day, users give perspectives on a mandatory set of profiles to unlock the perspectives they received. You can ask to connect with someone only after giving them a perspective; they accept or decline; chat opens only on accept.
+
+The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any other doc.
 
 ---
 
@@ -31,7 +35,7 @@ Perspective is an 18+ structured human-feedback and mutual-connection applicatio
 │   ├── api-client/     # Typed client interface, mock adapter & authentic fixtures
 │   └── config/         # Shared TypeScript base configuration
 ├── docs/               # Architecture, Product, Database, Security & Blueprint docs
-├── perspective-context/# Upstream context pack source of truth
+├── perspective-context/# Context pack that mirrors docs/ (keep in sync; docs/PRODUCT.md wins)
 ├── docker-compose.yml  # Local PostgreSQL (pgvector) & Redis infrastructure
 └── pnpm-workspace.yaml
 ```
@@ -88,5 +92,6 @@ pnpm dev:api
 
 1. **Specific beats generic**: Every post must include a clear question.
 2. **Context beats score**: No public attractiveness scores, popularity leaderboards, or follower counts.
-3. **Mutuality before chat**: Private conversations only unlock when both users share compatible mutual intent (`friends`, `collaborate`, `network`, `date`, `chat`).
-4. **Safety & DPDP**: 3-tap reporting, instant bidirectional blocking, and in-app DPDP-compliant account deletion.
+3. **Mutuality before chat**: Connect is open and unlabeled. You can ask to connect only after giving the other person a perspective, and private chat opens only when they accept.
+4. **Give to get**: A daily mandatory set of perspectives unlocks the ones you received, and no profile is left without perspectives.
+5. **Safety & DPDP**: 3-tap reporting, instant bidirectional blocking, and in-app DPDP-compliant account deletion.

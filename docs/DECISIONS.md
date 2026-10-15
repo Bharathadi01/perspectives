@@ -15,6 +15,32 @@ Status: accepted. Redis, FastAPI, custom ML, active pgvector ranking, microservi
 ## ADR-005: Client boundary and in-memory test harness
 Status: accepted. All mobile mutations route through the typed `PerspectiveApiClient` interface. An in-memory client backed by authentic fixtures guarantees that the mobile skeleton compiles, runs, and tests independently of active database or backend containers.
 
+## ADR-006: Profile-first model with posts
+Status: accepted (product owner, 2026-10-16).
+Context: earlier docs centered on standalone Perspective Requests created from a Create tab.
+Decision: the unit is a profile with 1 to 6 posts (photo or 15-second audio plus a prompt or question). The primary post is required and has a photo. A giver answers one post. Audience (gender and age range) is set on the profile, not per post.
+Consequences: requests become posts owned by profiles; per-request audience rules and request expiry are not part of the core model. Skeleton names such as `PerspectiveRequest` may stay in code.
+
+## ADR-007: Open Connect with no intents
+Status: accepted (product owner, 2026-10-16).
+Context: earlier docs required compatible connection modes (chat, friends, date, collaborate, network) before chat. Labels feel creepy and narrow the product.
+Decision: Connect is open and unlabeled. A user may ask to connect only after giving the other person a perspective (the gate). It works in both directions: the giver ticks Connect while giving, or the owner gives a perspective back and then requests. The receiver accepts or declines. Chat opens only on accept. After a decline, the same sender cannot send another request to that person for 14 days (configurable).
+Consequences: the `ConnectionMode` enum, allowed-modes fields, intent pickers, and mutual-intent error codes are removed. Safety relies on the gate, accept/decline, the cooldown, configurable caps, and report/block.
+
+## ADR-008: Daily give-to-get and nobody-left-out
+Status: accepted (product owner, 2026-10-16).
+Context: users need a reason to give perspectives, and profiles that receive none cause churn.
+Decision: each day every user gets a mandatory set of profiles (default 3 different people) to give perspectives on. Doing so unlocks the perspectives they received that day. The set always includes one boost slot for a low-response profile that is eligible for the viewer. The mandatory count is decided per user by an algorithm (v1 fixed at 3 behind a function). Three tunable algorithms: feed ranking, daily assignment, mandatory count.
+Consequences: perspectives stay hidden until the owner's daily unlock. No caps on connects or perspectives received for now; build them as config values defaulting to unlimited.
+
+## ADR-009: Positioning
+Status: accepted (product owner, 2026-10-16).
+Decision: the product is a dating app at its core with a unique perspectives hook, marketed perspectives-first rather than as "a dating app." Open Connect also serves friends, gym buddies, and networking. Dating drives revenue, but nothing in the product is labeled dating. Monetization is excluded from v1 and will be designed around the connect economy.
+
+## ADR-010: Verified adults only
+Status: accepted (product owner, 2026-10-16).
+Decision: selfie verification is required at profile creation, so only verified 18+ users exist. Content rules: no nudity or sexual content; shirtless, gym, and swimwear photos are allowed; body shaming and abuse are not allowed in posts or perspectives.
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded

@@ -20,13 +20,15 @@ Original, warm, editorial, calm, and human. Hinge may inform interaction hierarc
 Tokens live only in `packages/design-tokens`. Raw repeated colors/spacing in feature code are prohibited.
 
 ## Core components
-PerspectiveRequestCard, PersonHeader, LensChip, PromptBlock, ResponseNote, PrimaryButton, SecondaryButton, SafetyMenu, ConnectionIntentSheet, EmptyState, ModerationBanner, ProfileCompletenessMeter, OriginContextCard.
+PerspectiveRequestCard (a post card), PersonHeader, PromptBlock, ResponseNote, PrimaryButton, SecondaryButton, SafetyMenu, EmptyState, ModerationBanner, ProfileCompletenessMeter, OriginContextCard (shows the perspective that led to a connection). LensChip is a legacy component; lenses are not part of the core model.
+
+Components the target product needs that the skeleton does not have yet: a profile post card with an audio player (15-second clips), a profile basics row, a spark-hints block under the comment box, quick-pick chips, a daily give progress indicator (mandatory set and unlock), a connect-request sheet (replaces ConnectionIntentSheet; it has no intent picker) and an incoming connect-request card with the attached perspective, and a selfie-verification flow.
 
 ## Content language
-Use “Give Perspective,” “Perspective Request,” “Helpful,” and “Connect.” Never say that a response is objective truth. Avoid “rate,” “score this person,” “hot,” or “value.”
+Use “Give Perspective,” “Perspective,” “Helpful,” and “Connect.” Never say that a response is objective truth. Avoid “rate,” “score this person,” “hot,” or “value.” Never label a connection with an intent such as “date,” “friends,” or “networking”; Connect is open.
 
 ## Required states
-Every async screen: loading, content, empty, recoverable error, offline, permission denied, blocked, suspended, and removed content.
+Every async screen: loading, content, empty, recoverable error, offline, permission denied, blocked, suspended, and removed content. Also: perspectives locked until the daily give is done, daily set completed, a profile with no perspectives yet, selfie verification pending or failed, and connect-request cooldown active.
 
 ## Accessibility
 Dynamic text, screen-reader labels, logical focus order, contrast validation, reduced motion, no color-only meaning, keyboard handling, and touch targets of at least 48 pixels.

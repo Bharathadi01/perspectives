@@ -1,7 +1,7 @@
 # Sync Manifest: [Feature / Branch Name]
 
 - **Author / Agent:** [Developer Name / Agent Name]
-- **Branch:** [e.g., feat/audio-perspectives]
+- **Branch:** [e.g., feat/audio-posts]
 - **Date & Time:** [ISO timestamp or local date]
 - **Base Commit:** [Commit hash branched from]
 

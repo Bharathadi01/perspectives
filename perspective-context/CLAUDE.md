@@ -1,9 +1,20 @@
 # Perspective Agent Contract
 
 ## Product
-Perspective is an 18+ structured human-feedback and mutual-connection app. Users publish a photo, situation, idea, profile element, or decision with a specific question; qualified users give structured perspectives; compatible mutual intent can open a private connection.
+Perspective is an 18+ app where selfie-verified users give each other honest, text-only perspectives on how they look, dress, sound, and show up, and can then connect. It is a dating app at its core with a unique hook (perspectives), marketed perspectives-first and not as "a dating app." Open Connect also serves friends, gym buddies, and networking.
 
-Hinge is an interaction reference only: deep profiles, one focused card at a time, responding to a specific element, incoming review, mutual consent before chat, and private outcome feedback. Never copy Hinge assets, strings, iconography, brand, visual identity, screenshots, animations, or pixel layouts.
+The canonical business rules are in `docs/PRODUCT.md`, which wins over any other doc. In brief: a profile has basics plus 1 to 6 posts (photo or 15-second audio plus a prompt or question). Each day a user gives perspectives on a mandatory set of profiles (default 3, including one boost slot for a low-response profile) to unlock the perspectives they received. Connect is open, with no intents, modes, or labels. A user may ask to connect only after giving the other person a perspective; the other person accepts or declines; chat opens only on accept. No nudity or sexual content (shirtless, gym, and swimwear photos are allowed). Perspectives are visible only to the post owner and the giver.
+
+Hinge is an interaction reference only: deep profiles of photos and prompts, audio prompts, one focused card at a time, responding to a specific element, incoming review, mutual consent before chat, and private outcome feedback. Never copy Hinge assets, strings, iconography, brand, visual identity, screenshots, animations, or pixel layouts.
+
+## Building on the skeleton (read before coding)
+The repo is a working skeleton of an earlier version of the product. Its shell and infrastructure are worth keeping; its business logic is not trusted. Build the product in `docs/PRODUCT.md` on top of it.
+- **Remove or replace legacy code; do not adapt or preserve it.** Anything that does not serve `docs/PRODUCT.md` goes: types, enums, contracts, fixtures and mock data, services, controllers, routes, screens, components, Prisma models, and the tests that assert old behavior. Examples: `ConnectionMode` and every intent picker, structured responses (first impression, reason, suggestion, tags, tone), lens-based qualification and ranking, standalone request expiry. No dead code, compatibility shims, deprecated aliases, or "legacy" branches.
+- **Keep what is still relevant:** the monorepo wiring, design tokens and theme, generic atoms (buttons, EmptyState, banners, safety menu), the Expo Router shell, the NestJS bootstrap, the error filter and the typed client boundary. Rework the auth guard and the in-memory clients, which are stubs.
+- **Work in vertical slices** in the order in `docs/DEVELOPMENT_PLAN.md`, deleting the legacy code each slice replaces. Keep build, typecheck, and tests green after every slice. Delete tests for removed behavior and write tests for the new rules (the connect gate, the 14-day cooldown, the daily unlock, the boost slot, selfie-verified access).
+- **Authorized for this work:** replacing `packages/contracts`, the Prisma schema, `packages/api-client`, and the mobile screens and components. No migrations exist yet, so the skeleton schema may be replaced wholesale; once the first migration is created, the additive-only rules in `jana_claude.md` apply. Adding a dependency is allowed when a `docs/PRODUCT.md` feature needs one (for example audio recording and playback, image picking, camera for selfie verification); pick Expo-compatible libraries, add them deliberately, and list them in the final report.
+- **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana).
+- **Baseline on 2026-10-16:** `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm typecheck`, and `pnpm test` all passed (16 tests). Re-check before starting.
 
 ## Authoritative v1 stack
 - React Native, Expo Development Builds, TypeScript, Expo Router

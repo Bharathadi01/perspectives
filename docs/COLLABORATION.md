@@ -1,9 +1,9 @@
 # Collaboration
 
-## Stable ownership
-- Developer A: mobile/product lead—Expo, screens, design system, accessibility, mobile tests.
-- Developer B: backend/data/security lead—NestJS, Prisma, auth, policies, jobs, media, API tests.
-- Shared changes require review: OpenAPI, database, design tokens, security policy, analytics, dependencies, CI, CLAUDE.md.
+## Ownership
+Two developers, Bharath and Jana, each working with their own Claude agent. **Both work across the whole stack** (mobile, API, database, contracts). There is no fixed mobile-versus-backend split; ownership is per task or feature, and is declared in `docs/ACTIVE_CHANGES.md` for shared files.
+- Shared changes require review by the other developer: OpenAPI, database, design tokens, security policy, analytics, dependencies, CI, CLAUDE.md.
+- The product owner is the final authority on business logic. `PRODUCT.md` is the source of truth.
 
 ## Contract-first sequence
 1. Merge feature brief and acceptance criteria.
