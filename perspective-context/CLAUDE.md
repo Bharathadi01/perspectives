@@ -18,7 +18,7 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-16 all passed: 45 unit and 17 end-to-end tests.
 
 ## Stack
-The stack table in `docs/ARCHITECTURE.md` ("Stack: built now vs planned", ADR-013) is the single source. Built now: Expo SDK 52 + Expo Router, TanStack Query, React Hook Form + Zod, minimal Zustand; NestJS + TypeScript; PostgreSQL + Prisma; pnpm workspaces. Planned and activated by ADR: Cloudinary, pg-boss, Socket.IO, Redis/BullMQ, pgvector, FastAPI, Development Builds, S3.
+The stack table in `docs/ARCHITECTURE.md` ("Stack: built now vs planned", ADR-013) is the single source. Built now: Expo SDK 58 + Expo Router, TanStack Query, React Hook Form + Zod, minimal Zustand; NestJS + TypeScript; PostgreSQL + Prisma; pnpm workspaces. Planned and activated by ADR: Cloudinary, pg-boss, Socket.IO, Redis/BullMQ, pgvector, FastAPI, Development Builds, S3.
 - When you add, switch on, or replace a stack item (dependency, service, provider), update the stack table in `docs/ARCHITECTURE.md` and add or amend an ADR in the same change.
 
 ## Required reading

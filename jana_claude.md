@@ -45,7 +45,7 @@ perspectives/
 │   ├── api-client/          # Typed HTTP client validated against the contracts
 │   └── config/              # Shared tsconfig base configurations
 ├── apps/
-│   ├── mobile/              # React Native + Expo (Expo Router v4, TanStack Query, Zustand)
+│   ├── mobile/              # React Native + Expo (Expo Router, TanStack Query, Zustand)
 │   ├── api/                 # NestJS modular monolith + Prisma + PostgreSQL + Swagger
 │   └── ai-service/          # Python 3.11 + FastAPI skeleton, not wired in v1
 ├── docs/                    # Architectural decisions, blueprint, database docs, security specs
@@ -79,7 +79,7 @@ perspectives/
 - **Rule:** UI code calls this client (through hooks in `apps/mobile/src/features/hooks.ts`), never raw `fetch()`.
 
 #### D. Mobile client (`apps/mobile`)
-- Expo SDK 52, Expo Router v4, TanStack Query, Zustand (session flag only), React Hook Form + Zod for auth forms.
+- Expo SDK 58, Expo Router, TanStack Query, Zustand (session flag only), React Hook Form + Zod for auth forms.
 - **Routes:** `(auth)/welcome|login|signup`, `onboarding` (basics → audience → selfie → first photo post), tabs `explore`, `inbox`, `create` (your posts), `connections`, `you`; plus `profile/[id]`, `give/[postId]` (composer), `chat/[id]`, `post/new`, `me/edit`, `me/given`.
 - **Components:** `src/components/ui` (Button, IconButton, Chip, TextField, Toast, Sheet, Screen, States, Text), `profile` (ProfileView, PostCard with photo and voice cards, BasicsRow, Avatar), `perspective` (PerspectiveCard, DailyProgress), `forms` (BasicsForm, AudienceForm, SelfieStep, PostForm), `SafetyMenu`. Reuse these before creating new ones.
 - The UI is a temporary Hinge-like layout (ADR-011). No `Alert.alert` (it does not work on web); use the toast and sheets.

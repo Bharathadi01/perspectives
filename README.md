@@ -12,9 +12,9 @@ The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any
 
 ## Stack
 
-**Built and used now:** pnpm workspaces and TypeScript; Expo SDK 52 with Expo Router, TanStack Query, Zustand, React Hook Form + Zod (run in Expo Go); NestJS 10 with Zod validation, Swagger, JWT auth; PostgreSQL 16 with Prisma 6; local-disk media, polled chat, and stub moderation and selfie verification.
+**Built and used now:** pnpm workspaces and TypeScript; Expo SDK 58 with Expo Router, TanStack Query, Zustand, React Hook Form + Zod (run in Expo Go); NestJS 10 with Zod validation, Swagger, JWT auth; PostgreSQL 16 with Prisma 6; local-disk media, polled chat, and stub moderation and selfie verification.
 
-**Planned, added by ADR when needed:** Cloudinary media, pg-boss jobs, Socket.IO chat, a moderation and liveness vendor, Redis (only with several API instances), pgvector, the FastAPI service, Development Builds, an Expo SDK upgrade.
+**Planned, added by ADR when needed:** Cloudinary media, pg-boss jobs, Socket.IO chat, a moderation and liveness vendor, Redis (only with several API instances), pgvector, the FastAPI service, Development Builds.
 
 The full table, with triggers, is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → Stack (ADR-013). It wins over any other stack mention.
 
@@ -67,12 +67,12 @@ pnpm dev:mobile                     # Expo; press w for web, or scan the QR code
 Seed logins: `ravi@`, `meera@`, `asha@`, `kabir@`, `nisha@`, `priya@`, `arjun@perspective.test` (password `perspective123`). Ravi starts with yesterday's perspectives visible, one locked perspective plus a connect request from Priya, and a connection with Asha.
 
 ### iOS Simulator (Xcode 27)
-Xcode 27 no longer includes a separate Simulator app (it's in `DeviceHub`), so `expo start --ios` can't auto-launch it. Until the Expo SDK is upgraded, use the **iOS 18.5** simulator: Expo Go for SDK 52 crashes on launch on iOS 27.x.
+Xcode 27 no longer includes a separate Simulator app (it's in `DeviceHub`), so `expo start --ios` can't auto-launch it. Install Expo Go into the simulator by hand (the SDK 58 build works on iOS 27).
 ```bash
-xcrun simctl list devices available            # pick an "iPhone 16 Pro" under iOS 18.5
+xcrun simctl list devices available            # pick an iPhone, for example "iPhone 17" under iOS 27.0
 xcrun simctl boot <device-id>
-# one-time: install Expo Go 2.32.18 (SDK 52) into the simulator
-curl -L -o expogo.tar.gz https://github.com/expo/expo-go-releases/releases/download/Expo-Go-2.32.18/Expo-Go-2.32.18.tar.gz
+# one-time: install Expo Go 58.0.4 (SDK 58) into the simulator
+curl -L -o expogo.tar.gz https://github.com/expo/expo-go-releases/releases/download/Expo-Go-58.0.4/Expo-Go-58.0.4.tar.gz
 mkdir "Expo Go.app" && tar -xzf expogo.tar.gz -C "Expo Go.app" && xcrun simctl install <device-id> "Expo Go.app"
 # every time: start the servers, then open the app in the simulator
 pnpm dev:api
@@ -81,7 +81,7 @@ xcrun simctl openurl <device-id> exp://localhost:8081   # then tap Open; view th
 ```
 The simulator has no camera, so the selfie step needs a real phone (on web and the simulator it falls back to choosing a photo).
 
-On a phone with Expo Go, set `EXPO_PUBLIC_API_URL=http://<your-computer-LAN-IP>:3000` before `pnpm dev:mobile` so the phone can reach the API.
+On a phone with Expo Go (the App Store version supports SDK 57 until Expo ships the SDK 58 build; until then use a development build), set `EXPO_PUBLIC_API_URL=http://<your-computer-LAN-IP>:3000` before `pnpm dev:mobile` so the phone can reach the API.
 
 ### 4. Tests
 ```bash

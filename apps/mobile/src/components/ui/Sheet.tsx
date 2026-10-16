@@ -34,7 +34,7 @@ export function Sheet({ visible, onClose, title, subtitle, children }: SheetProp
 
 const s = StyleSheet.create({
   flex: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.colors.overlay },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: theme.colors.overlay },
   sheet: {
     backgroundColor: theme.colors.surface,
     borderTopLeftRadius: theme.radius.card,

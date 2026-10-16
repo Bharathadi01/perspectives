@@ -12,7 +12,7 @@ This table is the single source for the stack. If README, CLAUDE.md, BLUEPRINT.m
 | Area | Built and used now | Planned (switch on by ADR when the trigger is met) |
 |---|---|---|
 | Monorepo | pnpm workspaces, TypeScript; `turbo.json` exists but scripts use `pnpm -r` | Turborepo only if build times need caching |
-| Mobile | Expo SDK 52, Expo Router 4, TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | SDK upgrade (deferred), Expo Development Builds before the first native feature (real selfie SDK, push) |
+| Mobile | Expo SDK 58 (React 19, React Native 0.88), Expo Router 58, expo-audio, TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | Expo Development Builds before the first native feature (real selfie SDK, push) |
 | API | NestJS 10, Zod validation (no class-validator), Swagger at `/docs`, JWT + rotating refresh tokens | Rate limiting: `@nestjs/throttler` in-process first; Redis-backed only with several API instances |
 | Database | PostgreSQL 16 + Prisma 6 (Homebrew or Docker) | pgvector only after a ranking experiment |
 | Media | Local disk behind `MediaStorage`, HMAC-signed URLs | Cloudinary (ADR-003) for signed upload and EXIF stripping; S3 + CDN only if cost or control demands |

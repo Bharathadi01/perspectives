@@ -68,6 +68,14 @@ Consequences: stack mentions elsewhere are labelled built or planned. Recommende
 Alternatives: keep the full original stack (rejected: infrastructure with no user today); drop the Python service entirely (deferred: it stays as an unwired skeleton).
 Activation/rollback criteria: see the trigger column in `ARCHITECTURE.md`.
 
+## ADR-014: Upgrade to Expo SDK 58
+Status: accepted (product owner, 2026-10-16).
+Context: SDK 52's Expo Go crashed on the iOS 27 simulator and could not open on a phone with the current App Store Expo Go. Fixing it later, with a bigger app, would cost more.
+Decision: upgrade to SDK 58 (React 19.3, React Native 0.88, Expo Router 58, TypeScript 6 in `apps/mobile`). `expo-av` is replaced by `expo-audio`. `newArchEnabled` is removed (always on) and the splash screen uses the `expo-splash-screen` plugin. The pnpm workspace file lists the newly released Expo packages under `minimumReleaseAgeExclude`.
+Consequences: Expo Go 58.0.4 runs on the iOS 27 simulator. The App Store Expo Go supports SDK 57 until the SDK 58 build ships, so a real phone needs that update or a development build. Other packages stay on TypeScript 5.
+Alternatives: SDK 57 (the App Store Expo Go works today, but needs an opt-in for Xcode 27 builds); staying on SDK 52 (rejected).
+Activation/rollback criteria: revert the `chore/jana01-expo-58` merge.
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded

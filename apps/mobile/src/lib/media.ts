@@ -1,5 +1,10 @@
 import { RULES } from '@perspective/contracts';
-import { Audio } from 'expo-av';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+} from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -65,7 +70,9 @@ export interface Recording extends PickedMedia {
 
 /** Records a voice post; stops automatically at the 15-second limit. */
 export function useVoiceRecorder() {
-  const recording = useRef<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const startedAt = useRef(0);
+  const active = useRef(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -79,40 +86,41 @@ export function useVoiceRecorder() {
 
   const stop = useCallback(async () => {
     clearTimer();
-    const current = recording.current;
-    recording.current = null;
+    if (!active.current) return;
+    active.current = false;
     setIsRecording(false);
-    if (!current) return;
     try {
-      const status = await current.stopAndUnloadAsync();
-      const uri = current.getURI();
+      const seconds = (Date.now() - startedAt.current) / 1000;
+      await recorder.stop();
+      const uri = recorder.uri;
       if (!uri) throw new Error('No recording');
-      const durationSec = Math.min(RULES.audioMaxSeconds, Math.max(0.5, (status.durationMillis ?? 0) / 1000));
+      const durationSec = Math.min(RULES.audioMaxSeconds, Math.max(0.5, seconds));
       const data = await uriToBase64(uri);
       const mimeType = data.mimeType === 'audio/x-m4a' || data.mimeType === '' ? 'audio/m4a' : data.mimeType;
       setResult({ ...data, mimeType, uri, durationSec });
     } catch {
       setError('Recording failed. Please try again.');
     }
-  }, []);
+  }, [recorder]);
 
   const start = useCallback(async () => {
     setError(null);
     setResult(null);
     try {
-      const permission = await Audio.requestPermissionsAsync();
+      const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setError('Microphone access is needed to record.');
         return;
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording: rec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      recording.current = rec;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      active.current = true;
+      startedAt.current = Date.now();
       setElapsed(0);
       setIsRecording(true);
-      const startedAt = Date.now();
       timer.current = setInterval(() => {
-        const secs = (Date.now() - startedAt) / 1000;
+        const secs = (Date.now() - startedAt.current) / 1000;
         setElapsed(secs);
         if (secs >= RULES.audioMaxSeconds) void stop();
       }, 200);
@@ -123,15 +131,9 @@ export function useVoiceRecorder() {
           : 'Could not start recording.',
       );
     }
-  }, [stop]);
+  }, [recorder, stop]);
 
-  useEffect(
-    () => () => {
-      clearTimer();
-      void recording.current?.stopAndUnloadAsync().catch((err: unknown) => console.warn('Voice recorder cleanup failed', err));
-    },
-    [],
-  );
+  useEffect(() => () => clearTimer(), []);
 
   return { start, stop, isRecording, elapsed, result, error, reset: () => setResult(null) };
 }

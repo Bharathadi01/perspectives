@@ -49,7 +49,7 @@ export default function TabsLayout() {
             title: t.title,
             tabBarAccessibilityLabel: t.title,
             tabBarBadge: t.name === 'inbox' ? inboxBadge : undefined,
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? t.iconActive : t.icon} size={26} color={color} />,
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? t.iconActive : t.icon} size={26} color={String(color)} />,
           }}
         />
       ))}

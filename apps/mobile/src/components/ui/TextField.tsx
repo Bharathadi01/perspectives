@@ -11,7 +11,10 @@ interface TextFieldProps extends TextInputProps {
   counter?: { min?: number; max: number };
 }
 
-export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+/** The native text input instance, for imperative focus. */
+export type TextFieldRef = React.ComponentRef<typeof TextInput>;
+
+export const TextField = forwardRef<TextFieldRef, TextFieldProps>(function TextField(
   { label, error, hint, counter, style, multiline, ...rest },
   ref,
 ) {

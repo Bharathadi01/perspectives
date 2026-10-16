@@ -5,11 +5,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#F7F4EE"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.perspective.app"
@@ -34,9 +29,18 @@
         }
       ],
       [
-        "expo-av",
+        "expo-audio",
         {
           "microphonePermission": "Perspective uses the microphone so you can record a short voice post."
+        }
+      ],
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F4EE",
+          "resizeMode": "contain"
         }
       ]
     ],

@@ -1,44 +1,45 @@
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { AudioPlayer, AudioStatus, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/** Plays one remote audio clip; unloads on unmount. */
+/** Plays one remote audio clip; releases the player on unmount. */
 export function useAudioPlayer(uri: string) {
-  const sound = useRef<Audio.Sound | null>(null);
+  const player = useRef<AudioPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(
     () => () => {
-      void sound.current?.unloadAsync();
-      sound.current = null;
+      player.current?.remove();
+      player.current = null;
     },
     [uri],
   );
 
-  const onStatus = useCallback((status: AVPlaybackStatus) => {
+  const onStatus = useCallback((status: AudioStatus) => {
     if (!status.isLoaded) return;
-    setPlaying(status.isPlaying);
-    if (status.durationMillis) setProgress(status.positionMillis / status.durationMillis);
+    setPlaying(status.playing);
+    if (status.duration) setProgress(Math.min(1, status.currentTime / status.duration));
     if (status.didJustFinish) {
       setPlaying(false);
       setProgress(0);
-      void sound.current?.setPositionAsync(0);
+      void player.current?.seekTo(0);
     }
   }, []);
 
   const toggle = useCallback(async () => {
     try {
       setError(null);
-      if (!sound.current) {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const { sound: created } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true }, onStatus);
-        sound.current = created;
+      if (!player.current) {
+        await setAudioModeAsync({ playsInSilentMode: true });
+        const created = createAudioPlayer({ uri });
+        created.addListener('playbackStatusUpdate', onStatus);
+        player.current = created;
+        created.play();
         return;
       }
-      const status = await sound.current.getStatusAsync();
-      if (status.isLoaded && status.isPlaying) await sound.current.pauseAsync();
-      else await sound.current.playAsync();
+      if (player.current.playing) player.current.pause();
+      else player.current.play();
     } catch {
       setError('Could not play this clip.');
       setPlaying(false);

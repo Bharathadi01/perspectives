@@ -50,3 +50,6 @@ Every shared file changed: `schema.prisma` and the migration, `packages/contract
 
 ## 8. Addendum: stack reconciliation (docs only)
 README, CLAUDE.md (both copies), `perspective-context/README.md`, `docs/ARCHITECTURE.md`, `docs/BLUEPRINT.md`, `docs/DECISIONS.md` (ADR-013, ADR-012 accepted), and `jana_claude.md` now point to one stack table in `docs/ARCHITECTURE.md`. `docker-compose.yml` only gained a comment; the Redis service is still there, unused. No code changed.
+
+## 9. Addendum: Expo SDK 58 upgrade
+`apps/mobile` moved from SDK 52 to SDK 58 (React 19.3, RN 0.88, Expo Router 58, TypeScript 6). Code changes: `useAudioPlayer.ts` and `lib/media.ts` use `expo-audio` instead of `expo-av`; a `TextFieldRef` type; `StyleSheet.absoluteFill`; `types: ["jest"]` in the mobile tsconfig; `app.json` plugins (`expo-audio`, `expo-font`, `expo-asset`, `expo-splash-screen`), no `newArchEnabled` or `splash`. Verified: `expo-doctor` 20/20, web and iOS bundles build, web flows pass, the app opens on the iOS 27.0 simulator in Expo Go 58.0.4. Not verified: recording a voice post (no microphone in the simulator), a real phone.
