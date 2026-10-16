@@ -192,6 +192,8 @@ export function createApiClient(options: ApiClientOptions) {
         call({ method: 'POST', path: '/v1/me/posts', body: input, schema: PostSchema, idempotencyKey }),
       update: (postId: string, input: UpdatePostInput, idempotencyKey?: string) =>
         call({ method: 'PATCH', path: `/v1/me/posts/${postId}`, body: input, schema: PostSchema, idempotencyKey }),
+      reorder: (postIds: string[], idempotencyKey?: string) =>
+        call({ method: 'PATCH', path: '/v1/me/posts/reorder', body: { postIds }, schema: z.array(PostSchema), idempotencyKey }),
       remove: (postId: string, idempotencyKey?: string) =>
         call({ method: 'DELETE', path: `/v1/me/posts/${postId}`, schema: NoContent, idempotencyKey }),
     },

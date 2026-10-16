@@ -4,6 +4,8 @@ import {
   CreatePostInput,
   CreatePostInputSchema,
   Post,
+  ReorderPostsInput,
+  ReorderPostsInputSchema,
   UpdatePostInput,
   UpdatePostInputSchema,
 } from '@perspective/contracts';
@@ -19,6 +21,15 @@ export class PostsController {
   @HttpPost()
   create(@CurrentUser() user: AuthUser, @Body(new ZodPipe(CreatePostInputSchema)) body: CreatePostInput): Promise<Post> {
     return this.posts.create(user.id, body);
+  }
+
+  @Patch('reorder')
+  @HttpCode(HttpStatus.OK)
+  reorder(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodPipe(ReorderPostsInputSchema)) body: ReorderPostsInput,
+  ): Promise<Post[]> {
+    return this.posts.reorder(user.id, body.postIds);
   }
 
   @Patch(':id')

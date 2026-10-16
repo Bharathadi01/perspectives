@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { Post } from '@perspective/contracts';
+import { CATEGORY_CATALOG, type Post } from '@perspective/contracts';
 import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { api } from '../../api/client';
@@ -41,6 +41,9 @@ export function PhotoPostCard({ post, onGive, alreadyGiven }: PostCardProps) {
         accessibilityIgnoresInvertColors
       />
       <View style={s.overlay} pointerEvents="none">
+        {post.category ? (
+          <Text style={s.categoryBadge}>{CATEGORY_CATALOG[post.category]?.label.toUpperCase()}</Text>
+        ) : null}
         <Text style={s.overlayText}>{post.prompt}</Text>
       </View>
       {onGive ? <GiveAction onGive={onGive} alreadyGiven={alreadyGiven} prompt={post.prompt} /> : null}
@@ -112,6 +115,13 @@ const s = StyleSheet.create({
     color: theme.colors.onDark,
     fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.semibold,
+  },
+  categoryBadge: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: theme.typography.fontSize.xs,
+    fontWeight: theme.typography.fontWeight.semibold,
+    letterSpacing: 0.8,
+    marginBottom: 2,
   },
   action: { position: 'absolute', right: theme.spacing.md, bottom: theme.spacing.md },
   audioCard: {

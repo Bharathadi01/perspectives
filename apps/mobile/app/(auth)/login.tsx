@@ -9,16 +9,19 @@ import { Screen } from '../../src/components/ui/Screen';
 import { TextField } from '../../src/components/ui/TextField';
 import { Muted, Title } from '../../src/components/ui/Text';
 import { useToast } from '../../src/components/ui/Toast';
-import { useLogIn } from '../../src/features/hooks';
+import { useLogIn, useSignUp } from '../../src/features/hooks';
 import { errorMessage } from '../../src/lib/errors';
 import { theme } from '../../src/theme';
 
 export default function LogIn() {
   const logIn = useLogIn();
+  const signUp = useSignUp();
   const toast = useToast();
-  const { control, handleSubmit, formState } = useForm<LogInInput>({
+  const { control, handleSubmit, setValue, formState } = useForm<LogInInput>({
     resolver: zodResolver(LogInInputSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: __DEV__
+      ? { email: 'ravi@perspective.test', password: 'perspective123' }
+      : { email: '', password: '' },
   });
 
   const submit = handleSubmit(async (values) => {
@@ -29,6 +32,11 @@ export default function LogIn() {
       toast(errorMessage(err), 'error');
     }
   });
+
+  const quickFill = (email: string) => {
+    setValue('email', email);
+    setValue('password', 'perspective123');
+  };
 
   return (
     <Screen edges={['top', 'bottom']}>
@@ -67,6 +75,39 @@ export default function LogIn() {
           )}
         />
         <Button title="Sign in" onPress={() => void submit()} loading={logIn.isPending} />
+        {__DEV__ ? (
+          <>
+            <Button
+              title="Quick Sign In as Ravi (Dev)"
+              variant="secondary"
+              onPress={() => {
+                quickFill('ravi@perspective.test');
+                void logIn.run({ email: 'ravi@perspective.test', password: 'perspective123' }).then(() => {
+                  router.replace('/');
+                });
+              }}
+            />
+            <Button
+              title="Test Fresh Onboarding (New Account)"
+              variant="secondary"
+              loading={signUp.isPending}
+              onPress={async () => {
+                const devEmail = `dev_${Date.now()}@perspective.test`;
+                try {
+                  await signUp.run({
+                    email: devEmail,
+                    password: 'perspective123',
+                    birthDate: '2000-01-01',
+                    acceptTerms: true,
+                  });
+                  router.replace('/onboarding');
+                } catch (err) {
+                  toast(errorMessage(err), 'error');
+                }
+              }}
+            />
+          </>
+        ) : null}
         <Button title="Create an account instead" variant="ghost" onPress={() => router.replace('/(auth)/signup')} />
         <Muted>Testing locally? Seed accounts like ravi@perspective.test use the password perspective123.</Muted>
       </ScrollView>

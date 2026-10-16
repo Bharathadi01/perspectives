@@ -61,6 +61,7 @@ export default function You() {
 
         <View style={s.section}>
           <Label>Profile</Label>
+          <Button title="Edit Profile & Live Preview" onPress={() => router.push('/me/edit')} />
           <Button title="Edit basics" variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'basics' } })} />
           <Button title="Who sees you" variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'audience' } })} />
           <Button title="Perspectives you gave" variant="secondary" onPress={() => router.push('/me/given')} />

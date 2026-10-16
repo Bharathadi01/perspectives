@@ -6,6 +6,7 @@ import type {
   LogInInput,
   PerspectiveFeedbackInput,
   SignUpInput,
+  UpdatePostInput,
   UpdateProfileInput,
   UploadMediaInput,
 } from '@perspective/contracts';
@@ -76,6 +77,36 @@ export function useCreatePost() {
   return useIdempotentMutation((input: CreatePostInput, key: string) => api.posts.create(input, key), {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me }),
   });
+}
+
+export function useUpdatePost() {
+  const qc = useQueryClient();
+  return useIdempotentMutation(
+    ({ postId, input }: { postId: string; input: UpdatePostInput }, key: string) =>
+      api.posts.update(postId, input, key),
+    {
+      onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me }),
+    },
+  );
+}
+
+export function useReorderPosts() {
+  const qc = useQueryClient();
+  return useIdempotentMutation(
+    (postIds: string[], key: string) => api.posts.reorder(postIds, key),
+    {
+      onSuccess: (newPosts) => {
+        qc.setQueryData(queryKeys.me, (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            posts: newPosts,
+          };
+        });
+        qc.invalidateQueries({ queryKey: queryKeys.me });
+      },
+    },
+  );
 }
 
 export function useRemovePost() {

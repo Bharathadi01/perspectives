@@ -10,7 +10,7 @@ export default function Index() {
   const me = useMe(status === 'signedIn');
 
   if (status === 'loading') return <LoadingState />;
-  if (status === 'signedOut') return <Redirect href="/(auth)/welcome" />;
+  if (status === 'signedOut') return <Redirect href="/(auth)/login" />;
   if (me.isLoading) return <LoadingState />;
   if (me.isError || !me.data) return <ErrorState error={me.error} onRetry={() => void me.refetch()} />;
   return <Redirect href={me.data.isLive ? '/(tabs)/explore' : '/onboarding'} />;

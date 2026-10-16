@@ -156,6 +156,11 @@ export const UpdatePostInputSchema = z
   .superRefine(focusAreasMatchCategory);
 export type UpdatePostInput = z.infer<typeof UpdatePostInputSchema>;
 
+export const ReorderPostsInputSchema = z.object({
+  postIds: z.array(IdSchema).min(RULES.minPosts).max(RULES.maxPosts),
+});
+export type ReorderPostsInput = z.infer<typeof ReorderPostsInputSchema>;
+
 export const PostSchema = z.object({
   id: IdSchema,
   ownerId: IdSchema,

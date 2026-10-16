@@ -62,6 +62,45 @@ export class PostsService {
     return this.mapper.post(updated);
   }
 
+  /**
+   * Reorder active posts. Position 0 is always the primary post and must be a photo.
+   * All active posts must be included in the list.
+   */
+  async reorder(userId: string, postIds: string[]): Promise<Post[]> {
+    const active = await this.prisma.post.findMany({
+      where: { ownerId: userId, status: 'active' },
+      include: POST_INCLUDE,
+    });
+    if (active.length !== postIds.length) {
+      throw new AppException('VALIDATION_FAILED', 'All active posts must be included in the reorder list.');
+    }
+    const activeMap = new Map(active.map((p) => [p.id, p]));
+    for (const id of postIds) {
+      if (!activeMap.has(id)) {
+        throw new AppException('VALIDATION_FAILED', `Invalid post in reorder list: ${id}`);
+      }
+    }
+    const firstPost = activeMap.get(postIds[0])!;
+    if (firstPost.kind !== 'photo') {
+      throw new AppException('PRIMARY_POST_REQUIRED', 'The featured item must be a photo.');
+    }
+    await this.prisma.$transaction(
+      postIds.map((id, index) =>
+        this.prisma.post.update({
+          where: { id },
+          data: { position: index },
+        }),
+      ),
+    );
+    await this.profiles.recomputeLive(userId);
+    const updated = await this.prisma.post.findMany({
+      where: { ownerId: userId, status: 'active' },
+      orderBy: { position: 'asc' },
+      include: POST_INCLUDE,
+    });
+    return updated.map((p) => this.mapper.post(p));
+  }
+
   /** Removing the primary photo promotes the next photo post; at least one post must remain. */
   async remove(userId: string, postId: string): Promise<void> {
     const post = await this.ownActivePost(userId, postId);

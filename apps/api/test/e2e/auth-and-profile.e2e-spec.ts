@@ -136,6 +136,37 @@ describe('auth, guards and profile (e2e)', () => {
       const res = await ravi.get(`/v1/profiles/${nisha.id}`).expect(403);
       expect(res.body.error.code).toBe('PROFILE_NOT_ELIGIBLE');
     });
+
+    it('reorders posts and enforces that position 0 must be a photo', async () => {
+      const c = await signUp(app, 'reorder@test.local');
+      const photo1 = await c
+        .post('/v1/me/posts', { kind: 'photo', mediaId: await uploadPhoto(c), prompt: 'First photo', category: 'looks', focusAreas: ['photo'] })
+        .expect(201);
+      const photo2 = await c
+        .post('/v1/me/posts', { kind: 'photo', mediaId: await uploadPhoto(c), prompt: 'Second photo', category: 'looks', focusAreas: ['photo'] })
+        .expect(201);
+      const audioMedia = await c
+        .post('/v1/media', { kind: 'audio', mimeType: 'audio/wav', dataBase64: 'UklGRiQAAABXQVZF', durationSec: 10 })
+        .expect(201);
+      const audioPost = await c
+        .post('/v1/me/posts', { kind: 'audio', mediaId: audioMedia.body.mediaId, prompt: 'How do I sound?', category: 'voice', focusAreas: ['tone'] })
+        .expect(201);
+
+      // Putting audio at position 0 should fail
+      const bad = await c
+        .patch('/v1/me/posts/reorder', { postIds: [audioPost.body.id, photo1.body.id, photo2.body.id] })
+        .expect(422);
+      expect(bad.body.error.code).toBe('PRIMARY_POST_REQUIRED');
+
+      // Reordering [photo2, audioPost, photo1] should succeed
+      const reordered = await c
+        .patch('/v1/me/posts/reorder', { postIds: [photo2.body.id, audioPost.body.id, photo1.body.id] })
+        .expect(200);
+      expect(reordered.body.map((p: any) => p.id)).toEqual([photo2.body.id, audioPost.body.id, photo1.body.id]);
+      expect(reordered.body[0].position).toBe(0);
+      expect(reordered.body[1].position).toBe(1);
+      expect(reordered.body[2].position).toBe(2);
+    });
   });
 });
 
