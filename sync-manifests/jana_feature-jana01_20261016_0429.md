@@ -47,3 +47,6 @@ Rewrote the product docs around the product owner's decisions (profile-first pos
 
 ## 7. Potential Overlap / Conflict Warning
 Every shared file changed: `schema.prisma` and the migration, `packages/contracts`, `packages/api-client`, `packages/design-tokens`, `pnpm-lock.yaml`, `CLAUDE.md`, `.env.example`, all `docs/`. Anyone branching from `main` before this merges should rebase onto it rather than merge; the old skeleton code no longer exists.
+
+## 8. Addendum: stack reconciliation (docs only)
+README, CLAUDE.md (both copies), `perspective-context/README.md`, `docs/ARCHITECTURE.md`, `docs/BLUEPRINT.md`, `docs/DECISIONS.md` (ADR-013, ADR-012 accepted), and `jana_claude.md` now point to one stack table in `docs/ARCHITECTURE.md`. `docker-compose.yml` only gained a comment; the Redis service is still there, unused. No code changed.

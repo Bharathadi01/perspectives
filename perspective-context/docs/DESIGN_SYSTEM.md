@@ -20,9 +20,9 @@ Target direction: original, warm, editorial, calm, and human. For initial develo
 Tokens live only in `packages/design-tokens`. Raw repeated colors/spacing in feature code are prohibited.
 
 ## Core components
-PerspectiveRequestCard (a post card), PersonHeader, PromptBlock, ResponseNote, PrimaryButton, SecondaryButton, SafetyMenu, EmptyState, ModerationBanner, ProfileCompletenessMeter, OriginContextCard (shows the perspective that led to a connection). LensChip is a legacy component; lenses are not part of the core model.
+Built (in `apps/mobile/src/components`): ui (Button, IconButton, Chip, TextField, Sheet, Toast, Screen, States, Text), profile (ProfileView, PostCard with photo and audio, BasicsRow, Avatar), perspective (PerspectiveCard, DailyProgress), forms (BasicsForm, AudienceForm, SelfieStep, PostForm), and SafetyMenu. Reuse these before creating new ones. They are a temporary Hinge-like look (ADR-011).
 
-Components the target product needs that the skeleton does not have yet: a profile post card with an audio player (15-second clips), a profile basics row, a spark-hints block under the comment box, quick-pick chips, a daily give progress indicator (mandatory set and unlock), a connect-request sheet (replaces ConnectionIntentSheet; it has no intent picker) and an incoming connect-request card with the attached perspective, and a selfie-verification flow.
+Not built yet: a dedicated spark-hints block and connect-request sheet (currently inside the composer and profile screens), a moderation banner, a profile completeness meter, a real selfie-camera flow (the simulator has no camera), and dark mode.
 
 ## Content language
 Use “Give Perspective,” “Perspective,” “Helpful,” and “Connect.” Never say that a response is objective truth. Avoid “rate,” “score this person,” “hot,” or “value.” Never label a connection with an intent such as “date,” “friends,” or “networking”; Connect is open.

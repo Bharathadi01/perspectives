@@ -34,25 +34,17 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-16 all passed: 45 unit and 17 end-to-end tests.
 
 ## Stack
-- React Native + TypeScript + Expo Development Builds
-- Expo Router for navigation
-- TanStack Query for server state; Zustand for minimal client state
-- React Hook Form + Zod for forms and runtime validation
-- NestJS + TypeScript modular monolith with REST/OpenAPI and Socket.IO gateways
-- Prisma + PostgreSQL + pgvector
-- Redis + BullMQ
-- S3-compatible storage or Cloudinary; use one canonical provider in v1
-- Python + FastAPI for isolated AI/ML, LLM, embeddings, moderation, and vision workloads
-- Docker Compose for local PostgreSQL, Redis, API, workers, and AI service
+The stack table in `docs/ARCHITECTURE.md` ("Stack: built now vs planned", ADR-013) is the single source. Built now: Expo SDK 52 + Expo Router, TanStack Query, Zustand, React Hook Form + Zod; NestJS + Prisma + PostgreSQL; Zod contracts; pnpm workspaces. Planned and not built: Cloudinary, pg-boss, Socket.IO, Redis/BullMQ, pgvector, FastAPI, Development Builds. Choose from this stack, and say so when you see a better alternative.
+- When you add, switch on, or replace a stack item (dependency, service, provider), update the stack table in `docs/ARCHITECTURE.md` and add or amend an ADR in the same change.
 
 ## Architecture
 Use these boundaries:
 - mobile presentation: Expo Router screens, feature components, hooks, typed API client
 - NestJS application: controllers/gateways, DTO validation, use-case services, domain events
-- infrastructure: Prisma repositories, Redis/BullMQ adapters, storage adapter, push adapter
-- FastAPI: model adapters and inference endpoints only; it does not authorize users or commit state
+- infrastructure: Prisma repositories, storage adapter, and later job, cache, and push adapters
+- FastAPI (planned, not wired): model adapters and inference endpoints only; it does not authorize users or commit state
 
-React components must not call storage, PostgreSQL, Redis, or AI providers directly.
+React components must not call storage, PostgreSQL, or AI providers directly.
 
 ## Code quality
 - Null-safe, formatted, analyzer-clean code.
@@ -73,7 +65,7 @@ React components must not call storage, PostgreSQL, Redis, or AI providers direc
 ## Security
 - Default-deny NestJS routes and WebSocket events, with explicit guards and policy checks.
 - Enforce ownership, participant membership, account status, block state, eligibility.
-- Use short-lived JWT access tokens, rotating hashed refresh tokens, Redis-backed rate limits.
+- Use short-lived JWT access tokens, rotating hashed refresh tokens, and rate limits (not built yet; see ARCHITECTURE.md).
 - Use signed, short-lived media uploads; strip EXIF and do not expose permanent public download URLs.
 - AI/ML outputs are untrusted inputs that NestJS must validate before changing canonical state.
 - Analytics must never contain UGC text, message text, phone, email, exact birthday, or raw moderation evidence.

@@ -2,7 +2,7 @@
 
 > **Operating System & Behavioral Guide for Jana's AI Coding Agent (Claude Code / Agentic CLI)**  
 > **Repository:** `https://github.com/Bharathadi01/perspectives.git`  
-> **Monorepo Architecture:** React Native (Expo Router) + NestJS (Prisma/PostgreSQL) + Python (FastAPI) + pnpm workspaces  
+> **Monorepo Architecture:** React Native (Expo Router) + NestJS (Prisma/PostgreSQL) + pnpm workspaces (FastAPI skeleton present, not wired; see ARCHITECTURE.md Stack)  
 > **Core Rule:** Never overwrite a teammate's work. Always take the union of features, reconcile conflicts cleanly, enforce database isolation, and generate a pre-push sync manifest.
 
 ---
@@ -46,11 +46,11 @@ perspectives/
 │   └── config/              # Shared tsconfig base configurations
 ├── apps/
 │   ├── mobile/              # React Native + Expo (Expo Router v4, TanStack Query, Zustand)
-│   ├── api/                 # NestJS modular monolith + Prisma + PostgreSQL/pgvector + Swagger
-│   └── ai-service/          # Python 3.11 + FastAPI skeleton for embeddings & text moderation
+│   ├── api/                 # NestJS modular monolith + Prisma + PostgreSQL + Swagger
+│   └── ai-service/          # Python 3.11 + FastAPI skeleton, not wired in v1
 ├── docs/                    # Architectural decisions, blueprint, database docs, security specs
 ├── sync-manifests/          # Mandatory pre-push agent changelogs
-├── docker-compose.yml       # PostgreSQL 16 + pgvector (5432) & Redis 7 (6379)
+├── docker-compose.yml       # Optional local PostgreSQL 16 (5432); Homebrew works too
 ├── pnpm-workspace.yaml      # Monorepo workspace configuration
 └── turbo.json               # Turbo build orchestration
 ```
@@ -98,9 +98,9 @@ perspectives/
 
 When running, developing, or testing, the following tools and ports are used:
 - **Node.js:** v20+ (managed via nvm or system)
-- **Package Manager:** `pnpm` (v9 or v12). Always run commands via `pnpm`, never `npm` or `yarn`.
-- **Database:** PostgreSQL 16 + `pgvector:v0.8.0` on port `5432` (`docker-compose.yml`).
-- **Cache / Queues:** Redis 7-alpine on port `6379` (`docker-compose.yml`).
+- **Package Manager:** `pnpm` (`packageManager` in the root `package.json`). Always run commands via `pnpm`, never `npm` or `yarn`.
+- **Database:** PostgreSQL 16 on port `5432` (Homebrew or `docker-compose.yml`).
+- **Cache / Queues:** none in v1 (Redis and a job queue are planned; see `docs/ARCHITECTURE.md`).
 - **NestJS API:** Port `3000` (Swagger UI at `http://localhost:3000/docs`).
 - **Expo / Metro Bundler:** Port `8081` (`exp://localhost:8081`).
 - **Android SDK:** `$ANDROID_HOME` located at `~/Library/Android/sdk` (macOS), with `adb` and `emulator` in `PATH`.
@@ -115,7 +115,7 @@ When two developers (Bharath and Jana) work concurrently on different branches, 
 ### Rule 4.1: Separate Local Database Instances
 - **Never share a remote dev database.** Bharath and Jana must run their own local Docker PostgreSQL container on their respective machines:
   ```bash
-  docker compose up -d postgres redis
+  docker compose up -d postgres   # or: brew services start postgresql@16
   ```
 - Your local migrations only affect your local database until merged to `main`.
 
@@ -126,10 +126,10 @@ When two developers (Bharath and Jana) work concurrently on different branches, 
   - This ensures that if Bharath’s code runs against Jana’s database (or vice versa), existing queries and inserts do not break!
 
 ### Rule 4.3: Table-Level Ownership & Namespace Strategy
-If both developers are working on features that touch the same table (e.g. `User`, `Profile`, or `PerspectiveRequest`):
+If both developers are working on features that touch the same table (e.g. `User`, `Profile`, or `Post`):
 1. **Coordinate Field Naming:** Before modifying a model, check `docs/ACTIVE_CHANGES.md` or announce the proposed field name.
 2. **Feature-Prefixed Experimental Columns:** If working on an unmerged experimental feature, prefix the column name with the feature scope (e.g., `audioPromptUrl` rather than a generic `mediaUrl` that could clash).
-3. **Sub-Tables for Complex Extensions:** Instead of bloating an existing shared model like `PerspectiveRequest`, create a 1-to-1 or 1-to-many child table (e.g., `RequestVoiceNote` or `RequestAudienceFilter`) linked via foreign key. This keeps the core table pristine and prevents merge conflicts!
+3. **Sub-Tables for Complex Extensions:** Instead of bloating an existing shared model like `Post`, create a 1-to-1 or 1-to-many child table (e.g., `PostVoiceNote`) linked via foreign key. This keeps the core table pristine and prevents merge conflicts!
 
 ### Rule 4.4: Migration Creation Protocol
 When creating a Prisma migration:
@@ -160,7 +160,7 @@ Deep research on collaborative multi-agent vibe coding reveals specific traps. H
 | **1. Lockfile Thrashing** | Agent runs `pnpm add <pkg>` without checking, causing massive `pnpm-lock.yaml` diffs and version mismatch. | Only install packages with explicit approval. Check root `package.json` first. Always run `pnpm install` without `--force`. |
 | **2. ESM / CJS Metro Breakage** | Installing pure ESM packages (e.g. `query-string` v9) that crash React Native/Metro with CommonJS errors. | In `apps/mobile`, verify new packages are React Native/Expo compatible. Prefer existing pinned libraries. |
 | **3. Hardcoded Hex & Style Drift** | Agent invents new colors (`#3b82f6`, `#ef4444`) instead of adhering to the design system. | Always import and use `tokens.colors.*` from `@perspective/design-tokens`. Reject any PR with raw hex colors! |
-| **4. Ad-Hoc UI Component Duplication** | Agent creates a new `CustomButton.tsx` or `Chip.tsx` instead of using existing atoms. | First inspect `apps/mobile/src/components/`. Reuse `PrimaryButton`, `LensChip`, `PromptBlock`, etc. |
+| **4. Ad-Hoc UI Component Duplication** | Agent creates a new `CustomButton.tsx` or `Chip.tsx` instead of using existing atoms. | First inspect `apps/mobile/src/components/`. Reuse `Button`, `Chip`, `TextField`, `Sheet`, `PostCard`, etc. |
 | **5. Port & Service Collisions** | Dev servers colliding on ports 3000, 5432, or 8081. | Docker and Metro use standard ports. If running simultaneously on the same host, use `.env` overrides (`PORT=3001`, `EXPO_PORT=8082`). |
 | **6. Expo Router Route Collisions** | Both devs creating files with the same name in `apps/mobile/app/`. | Keep route additions isolated to dedicated feature folders (e.g., `apps/mobile/app/profile/edit.tsx` vs `apps/mobile/app/(tabs)/you.tsx`). |
 | **7. Contract & DTO Drift** | Modifying an API response in NestJS without updating `@perspective/contracts`. | **Contract-First:** Edit `packages/contracts/src/` first, rebuild it (`pnpm --filter @perspective/contracts build`), then update NestJS and Mobile. |
@@ -190,8 +190,8 @@ Deep research on collaborative multi-agent vibe coding reveals specific traps. H
 
 ## 2. Modified & Created Files
 - `apps/mobile/src/components/NewComponent.tsx`: [Created component for X]
-- `apps/api/src/requests/requests.service.ts`: [Added method Y]
-- `packages/contracts/src/request.ts`: [Added optional field Z]
+- `apps/api/src/posts/posts.service.ts`: [Added method Y]
+- `packages/contracts/src/post.ts`: [Added optional field Z]
 
 ## 3. Database & Schema Changes
 - **Prisma Schema Modified:** [Yes / No]

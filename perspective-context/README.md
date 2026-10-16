@@ -10,6 +10,4 @@ Read in this order:
 5. `docs/COLLABORATION.md`
 6. `docs/DEVELOPMENT_PLAN.md`
 
-Authoritative v1 stack: React Native + Expo + TypeScript; NestJS + TypeScript; PostgreSQL + Prisma; Cloudinary; OpenAPI-generated API client; pnpm workspaces.
-
-Deferred until evidence justifies them: Redis, FastAPI, custom ML, active pgvector ranking, S3, microservices, multiple AI providers, and Turborepo.
+Stack: see `docs/ARCHITECTURE.md` → "Stack: built now vs planned" (ADR-013). Built now: Expo + React Native, NestJS, PostgreSQL + Prisma, Zod contracts, pnpm workspaces. Everything else (Cloudinary, pg-boss, Socket.IO, Redis, pgvector, FastAPI, S3, Turborepo) is planned and activated by ADR.

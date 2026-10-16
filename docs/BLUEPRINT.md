@@ -8,7 +8,9 @@ Perspective uses Hinge as its UI and structural reference. For initial developme
 
 The product is positioned as **“See yourself through other people’s eyes—and connect through what you notice.”** It is a dating app at its core with a unique hook: perspectives. It is not marketed as “a dating app.” It is marketed perspectives-first, and the same open Connect also leads to friends, gym buddies, collaborators, and networking. Dating is the business and the long-term revenue driver, but the product never labels a connection as dating, friends, or networking.
 
-The authoritative v1 stack is:
+The stack below is the initial idea. What is built now and what is planned lives in `ARCHITECTURE.md` → Stack (ADR-013); that table wins.
+
+Initial stack idea:
 - **Mobile**: React Native with TypeScript and Expo Development Builds, Expo Router
 - **Backend API**: Modular NestJS/Node.js TypeScript backend
 - **Database**: PostgreSQL with pgvector for canonical and vector data
@@ -178,7 +180,7 @@ Three server-side algorithms:
 - Quality prior
 - Penalties for reports and over-exposure
 
-No weights are decided. The skeleton's `ExploreService.calculateRankingScore` uses an earlier weighted formula (lens fit, language fit, and others). Treat it as a placeholder to replace, not as the product's formula.
+No weights are decided. The v1 code uses placeholder weights in `apps/api/src/domain/ranking.ts`. Treat them as a starting point to tune, not as the product's formula.
 
 ---
 

@@ -12,11 +12,14 @@ Status: accepted. Do not carry both S3 and Cloudinary during v1.
 ## ADR-004: Deferred complexity
 Status: accepted. Redis, FastAPI, custom ML, active pgvector ranking, microservices, and Turborepo require a new ADR with evidence.
 
+## ADR-005: Client boundary and in-memory test harness
+Status: superseded by ADR-012 (the in-memory client was removed; mobile uses the typed HTTP client, and tests use a real PostgreSQL database). All mobile mutations route through the typed `PerspectiveApiClient` interface. An in-memory client backed by authentic fixtures guarantees that the mobile skeleton compiles, runs, and tests independently of active database or backend containers.
+
 ## ADR-006: Profile-first model with posts
 Status: accepted (product owner, 2026-10-16).
 Context: earlier docs centered on standalone Perspective Requests created from a Create tab.
 Decision: the unit is a profile with 1 to 6 posts (photo or 15-second audio plus a prompt or question). The primary post is required and has a photo. A giver answers one post. Audience (gender and age range) is set on the profile, not per post.
-Consequences: requests become posts owned by profiles; per-request audience rules and request expiry are not part of the core model. Skeleton names such as `PerspectiveRequest` may stay in code.
+Consequences: requests become posts owned by profiles; per-request audience rules and request expiry are not part of the core model. The code uses `Post` (the old `PerspectiveRequest` name is gone).
 
 ## ADR-007: Open Connect with no intents
 Status: accepted (product owner, 2026-10-16).
@@ -45,7 +48,7 @@ Decision: for initial development the UI looks and feels similar to Hinge in lay
 Consequences: keep UI code componentized with styling in design tokens so the redesign is mostly a restyle. The Hinge-like UI must be replaced before any public release or store submission.
 
 ## ADR-012: v1 implementation choices
-Status: proposed (implemented on feature/jana01, 2026-10-16; confirm when the stack is settled).
+Status: accepted (implemented on feature/jana01, 2026-10-16; stack settled in ADR-013).
 Context: the docs disagree on parts of the stack; the first build needed the simplest option that runs.
 Decision:
 - `packages/contracts` (Zod) is the single source of types; the API validates bodies with it and `packages/api-client` is a typed HTTP client that validates responses with it (no generated OpenAPI client yet).
@@ -57,6 +60,14 @@ Decision:
 - "Today" for the daily set is computed in `APP_TIMEZONE` (default Asia/Kolkata).
 Consequences: replacing storage, moderation, or verification touches one provider class each. Rate limiting is not implemented yet.
 
+## ADR-013: Stack reconciliation
+Status: accepted (product owner, 2026-10-16).
+Context: README, CLAUDE.md, BLUEPRINT.md, jana_claude.md, and docker-compose.yml listed Redis, BullMQ, FastAPI, pgvector, and Socket.IO as required, while ADR-004, ADR-012, and the build use PostgreSQL and Prisma only. The initial tech list was a first idea, not a decision.
+Decision: `ARCHITECTURE.md` → "Stack: built now vs planned" is the single stack source. The lean stack is what we build on. Anything else is planned and activates through its own ADR when its trigger is met. The developers may choose the stack during development and must flag a better alternative when they see one.
+Consequences: stack mentions elsewhere are labelled built or planned. Recommended picks when needed: pg-boss for jobs, `@nestjs/throttler` for rate limits, Cloudinary for media, a moderation and liveness vendor instead of custom ML, Development Builds before the first native feature.
+Alternatives: keep the full original stack (rejected: infrastructure with no user today); drop the Python service entirely (deferred: it stays as an unwired skeleton).
+Activation/rollback criteria: see the trigger column in `ARCHITECTURE.md`.
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded
@@ -66,3 +77,4 @@ Consequences: replacing storage, moderation, or verification touches one provide
 - Alternatives
 - Activation/rollback criteria
 - Owners/date
+

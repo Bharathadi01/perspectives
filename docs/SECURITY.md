@@ -10,7 +10,7 @@ Short-lived access tokens; rotating refresh-token families; store only refresh-t
 Every endpoint/event that receives an object ID loads the object and evaluates action-specific policy. UUID unpredictability is not authorization. Test owner, non-owner, blocked, suspended, deleted, moderator, and anonymous cases. Perspectives are visible only to the post owner and the giver. A connect request is allowed only from a user who has already given the receiver a perspective, and only outside the decline cooldown. Received perspectives are locked until the owner's daily unlock is complete.
 
 ## Media
-API issues short-lived signed Cloudinary upload instructions. Constrain folder, type, size, count, duration (audio posts are capped at 15 seconds), and transformation. Use private/authenticated delivery where needed, remove metadata, moderate before activation, and verify webhook signatures and asset ownership.
+Planned (Cloudinary, ADR-003): API issues short-lived signed Cloudinary upload instructions. Today, uploads go through the API to local disk and are served by short-lived HMAC-signed URLs. Constrain folder, type, size, count, duration (audio posts are capped at 15 seconds), and transformation. Use private/authenticated delivery where needed, remove metadata, moderate before activation, and verify webhook signatures and asset ownership.
 
 ## Verification
 Selfie verification is required at profile creation. Only verified, 18+ users have an active profile. Verification media is private: never shown to other users, never in public DTOs, and kept only as long as the retention policy defined during implementation allows.

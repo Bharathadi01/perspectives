@@ -17,16 +17,9 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
 - **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-16 all passed: 45 unit and 17 end-to-end tests.
 
-## Authoritative v1 stack
-- React Native, Expo Development Builds, TypeScript, Expo Router
-- TanStack Query; React Hook Form + Zod; minimal Zustand
-- NestJS modular monolith, TypeScript, REST/OpenAPI, Socket.IO when chat ships
-- PostgreSQL + Prisma
-- Cloudinary for signed upload, transformation, delivery, and media workflow
-- pg-boss/PostgreSQL for durable background jobs
-- pnpm workspaces
-
-Deferred unless an approved ADR activates them: Redis, BullMQ, FastAPI, Python ML, active pgvector recommendations, S3, microservices, Turborepo, or extra AI SDKs.
+## Stack
+The stack table in `docs/ARCHITECTURE.md` ("Stack: built now vs planned", ADR-013) is the single source. Built now: Expo SDK 52 + Expo Router, TanStack Query, React Hook Form + Zod, minimal Zustand; NestJS + TypeScript; PostgreSQL + Prisma; pnpm workspaces. Planned and activated by ADR: Cloudinary, pg-boss, Socket.IO, Redis/BullMQ, pgvector, FastAPI, Development Builds, S3.
+- When you add, switch on, or replace a stack item (dependency, service, provider), update the stack table in `docs/ARCHITECTURE.md` and add or amend an ADR in the same change.
 
 ## Required reading
 Before coding, read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, and the relevant domain document. Read `docs/DATABASE.md` for schema work, `docs/API_CONTRACTS.md` for network work, `docs/SECURITY.md` for user/data operations, `docs/DESIGN_SYSTEM.md` for UI, and `docs/COLLABORATION.md` before changing shared files.

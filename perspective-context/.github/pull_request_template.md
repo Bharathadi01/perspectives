@@ -18,7 +18,7 @@
 ## Checklist
 - [ ] Format, lint, typecheck
 - [ ] Unit/integration/component tests
-- [ ] OpenAPI client regenerated or no drift
+- [ ] Contracts and api-client rebuilt, or no contract change
 - [ ] Migration reviewed or no schema change
 - [ ] No secrets or sensitive logging
 - [ ] Docs updated

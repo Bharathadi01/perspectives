@@ -10,7 +10,7 @@ Perspective is a dating app at its core, with one unique hook: perspectives. Peo
 
 ## Glossary
 - **Profile:** a verified adult's page, Hinge-style, made of basics and 1 to 6 posts.
-- **Post:** the unit that perspectives are given on. A post is a photo or an audio clip plus a prompt or question, a category, and focus areas. Earlier docs and the skeleton call this a "Perspective Request"; the code may keep that name.
+- **Post:** the unit that perspectives are given on. A post is a photo or an audio clip plus a prompt or question, a category, and focus areas. Earlier docs called this a "Perspective Request"; the code now uses `Post`.
 - **Perspective:** a text-only, honest comment that one user gives on one post of another user.
 - **Giver:** the user who writes a perspective. **Owner:** the user who owns the post.
 - **Connect:** an open request to start a private conversation. It has no intent, label, or mode.
@@ -76,7 +76,7 @@ Three server-side algorithms, each tunable without app changes:
 2. **Daily mandatory-set assignment:** which profiles you must give to today, including the boost slot.
 3. **Mandatory count:** how many perspectives a given user must give before unlocking their own.
 
-Ranking factors (weights are not decided; tune them in development): audience fit, category affinity, freshness, reciprocity need (how under-served a profile is), and a quality prior, minus penalties for reports and over-exposure. The skeleton's `ExploreService.calculateRankingScore` uses an earlier formula and is a placeholder.
+Ranking factors (weights are not decided; tune them in development): audience fit, category affinity, freshness, reciprocity need (how under-served a profile is), and a quality prior, minus penalties for reports and over-exposure. The v1 code uses placeholder weights in `apps/api/src/domain/ranking.ts`.
 
 ## Connect
 **Connect is open.** There are no intents, no modes, and no labels such as dating, friends, or networking. It works like following on Instagram: two people connect, and the relationship becomes whatever they make of it. Labels were rejected because they feel creepy.

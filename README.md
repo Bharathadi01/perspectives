@@ -10,15 +10,13 @@ The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any
 
 ---
 
-## Authoritative v1 Stack
+## Stack
 
-- **Mobile**: React Native, Expo (SDK 52+), TypeScript, Expo Router, TanStack Query, Zustand, React Hook Form + Zod.
-- **Backend API**: Modular NestJS monolith, TypeScript, REST/OpenAPI, Socket.IO.
-- **Database**: PostgreSQL with `pgvector` for canonical relational data and vector similarity.
-- **Cache & Queues**: Redis & BullMQ for rate limits, caching, and durable jobs.
-- **Media**: Signed Cloudinary media workflows.
-- **AI/ML Service**: Isolated Python/FastAPI service for vision, embeddings, and moderation adapters.
-- **Monorepo**: `pnpm` workspaces.
+**Built and used now:** pnpm workspaces and TypeScript; Expo SDK 52 with Expo Router, TanStack Query, Zustand, React Hook Form + Zod (run in Expo Go); NestJS 10 with Zod validation, Swagger, JWT auth; PostgreSQL 16 with Prisma 6; local-disk media, polled chat, and stub moderation and selfie verification.
+
+**Planned, added by ADR when needed:** Cloudinary media, pg-boss jobs, Socket.IO chat, a moderation and liveness vendor, Redis (only with several API instances), pgvector, the FastAPI service, Development Builds, an Expo SDK upgrade.
+
+The full table, with triggers, is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → Stack (ADR-013). It wins over any other stack mention.
 
 ---
 
@@ -28,7 +26,7 @@ The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any
 ├── apps/
 │   ├── mobile/         # Expo React Native mobile client (5-tab shell, design system)
 │   ├── api/            # NestJS modular monolith with REST & Swagger OpenAPI
-│   └── ai-service/     # FastAPI service for AI moderation & embeddings
+│   └── ai-service/     # FastAPI skeleton, not wired in v1
 ├── packages/
 │   ├── contracts/      # Zod validation schemas & shared TypeScript interfaces
 │   ├── design-tokens/  # Warm editorial design system tokens (colors, radius, spacing)
@@ -36,7 +34,7 @@ The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any
 │   └── config/         # Shared TypeScript base configuration
 ├── docs/               # Architecture, Product, Database, Security & Blueprint docs
 ├── perspective-context/# Context pack that mirrors docs/ (keep in sync; docs/PRODUCT.md wins)
-├── docker-compose.yml  # Local PostgreSQL (pgvector) & Redis infrastructure
+├── docker-compose.yml  # Optional local PostgreSQL (Homebrew works too)
 └── pnpm-workspace.yaml
 ```
 
@@ -67,6 +65,21 @@ pnpm dev:api                        # http://localhost:3000 (Swagger at /docs)
 pnpm dev:mobile                     # Expo; press w for web, or scan the QR code with Expo Go
 ```
 Seed logins: `ravi@`, `meera@`, `asha@`, `kabir@`, `nisha@`, `priya@`, `arjun@perspective.test` (password `perspective123`). Ravi starts with yesterday's perspectives visible, one locked perspective plus a connect request from Priya, and a connection with Asha.
+
+### iOS Simulator (Xcode 27)
+Xcode 27 no longer includes a separate Simulator app (it's in `DeviceHub`), so `expo start --ios` can't auto-launch it. Until the Expo SDK is upgraded, use the **iOS 18.5** simulator: Expo Go for SDK 52 crashes on launch on iOS 27.x.
+```bash
+xcrun simctl list devices available            # pick an "iPhone 16 Pro" under iOS 18.5
+xcrun simctl boot <device-id>
+# one-time: install Expo Go 2.32.18 (SDK 52) into the simulator
+curl -L -o expogo.tar.gz https://github.com/expo/expo-go-releases/releases/download/Expo-Go-2.32.18/Expo-Go-2.32.18.tar.gz
+mkdir "Expo Go.app" && tar -xzf expogo.tar.gz -C "Expo Go.app" && xcrun simctl install <device-id> "Expo Go.app"
+# every time: start the servers, then open the app in the simulator
+pnpm dev:api
+EXPO_PUBLIC_API_URL=http://localhost:3000 pnpm dev:mobile
+xcrun simctl openurl <device-id> exp://localhost:8081   # then tap Open; view the device in Xcode's DeviceHub app
+```
+The simulator has no camera, so the selfie step needs a real phone (on web and the simulator it falls back to choosing a photo).
 
 On a phone with Expo Go, set `EXPO_PUBLIC_API_URL=http://<your-computer-LAN-IP>:3000` before `pnpm dev:mobile` so the phone can reach the API.
 

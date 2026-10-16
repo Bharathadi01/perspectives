@@ -1,3 +1,4 @@
+# v1 only needs postgres. redis is not used by any code yet (see docs/ARCHITECTURE.md, ADR-013).
 version: '3.8'
 
 services:
