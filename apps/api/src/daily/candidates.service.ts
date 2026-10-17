@@ -4,7 +4,8 @@ import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { AssignmentCandidate } from '../domain/assignment';
 import { mutuallyVisible } from '../domain/eligibility';
 import {
-  categoryAffinity,
+  computeCompatibility,
+  datingIntentionCompatibility,
   freshness,
   qualityPrior,
   rankingScore,
@@ -15,10 +16,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PERSON_SELECT, Person, SocialService, toPerson } from '../social/social.service';
 
 /**
- * Finds profiles a viewer may be shown, and scores them with the v1 feed ranking.
- * Eligibility (docs/PRODUCT.md): live, verified, active, not the viewer, not blocked either way,
- * inside each other's audience, still has a post the viewer has not answered, and under the
- * optional daily received cap.
+ * Finds profiles a viewer may be shown, and scores them with the v2 feed ranking.
+ * Stage 1: Eligibility (docs/PRODUCT.md & docs/ONBOARDING_AND_MATCHING_RESEARCH.md):
+ * live, active, not viewer, not blocked, mutually inside audience, passes hard dealbreakers,
+ * has open post, under daily cap.
+ * Stage 2 & 3: Compatibility scoring & diversity ranking.
  */
 @Injectable()
 export class CandidatesService {
@@ -43,7 +45,21 @@ export class CandidatesService {
 
     const people = rows
       .map((row) => ({ person: toPerson(row, now), postIds: row.posts.map((p) => p.id) }))
-      .filter(({ person }) => !blocked.has(person.id) && !exclude.has(person.id) && mutuallyVisible(viewer, person));
+      .filter(({ person }) => {
+        if (blocked.has(person.id) || exclude.has(person.id) || !mutuallyVisible(viewer, person)) {
+          return false;
+        }
+        // Stage 1 Hard Dealbreaker: Dating Intentions
+        if (viewer.intentionDealbreaker) {
+          const comp = datingIntentionCompatibility(viewer.datingIntention, person.datingIntention);
+          if (!comp.compatible) return false;
+        }
+        if (person.intentionDealbreaker) {
+          const comp = datingIntentionCompatibility(person.datingIntention, viewer.datingIntention);
+          if (!comp.compatible) return false;
+        }
+        return true;
+      });
     if (people.length === 0) return [];
 
     const ids = people.map((p) => p.person.id);
@@ -88,14 +104,22 @@ export class CandidatesService {
     return pool.map(({ person }) => {
       const recentReceived = recentBy.get(person.id) ?? 0;
       const ageDays = (now.getTime() - person.createdAt.getTime()) / 86400000;
+      const compatibility = computeCompatibility(viewer, person);
       const score = rankingScore({
+        compatibility: compatibility.score,
         reciprocityNeed: reciprocityNeed(recentReceived),
         freshness: freshness(ageDays),
-        categoryAffinity: categoryAffinity(viewer.postCategories, person.postCategories),
         qualityPrior: qualityPrior(verdictCount(person.id, 'helpful'), verdictCount(person.id, 'not_helpful')),
         penalties: reportPenalty(reportsBy.get(person.id) ?? 0),
       });
-      return { id: person.id, recentReceived, score, createdAt: person.createdAt };
+      return {
+        id: person.id,
+        recentReceived,
+        score,
+        createdAt: person.createdAt,
+        compatibilityScore: compatibility.score,
+        matchReasons: compatibility.reasons,
+      };
     });
   }
 

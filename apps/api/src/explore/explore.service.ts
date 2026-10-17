@@ -7,6 +7,7 @@ import { DailyService } from '../daily/daily.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PROFILE_USER_INCLUDE, ProfileMapper } from '../profiles/profile.mapper';
 import { SocialService } from '../social/social.service';
+import { computeCompatibility } from '../domain/ranking';
 
 /**
  * Explore shows one profile at a time: first today's mandatory set (with its boost slot), then
@@ -60,10 +61,18 @@ export class ExploreService {
 
   private async card(viewerId: string, targetId: string, slot: ExploreSlot): Promise<ExploreCard> {
     const row = await this.prisma.user.findUniqueOrThrow({ where: { id: targetId }, include: PROFILE_USER_INCLUDE });
+    const [viewer, target] = await Promise.all([this.social.person(viewerId), this.social.person(targetId)]);
+    const comp = viewer && target ? computeCompatibility(viewer, target) : null;
     const given = await this.prisma.perspective.findMany({
       where: { giverId: viewerId, ownerId: targetId },
       select: { postId: true },
     });
-    return { profile: this.mapper.publicProfile(row), slot, givenPostIds: given.map((g) => g.postId) };
+    return {
+      profile: this.mapper.publicProfile(row),
+      slot,
+      givenPostIds: given.map((g) => g.postId),
+      compatibilityScore: comp ? Number(comp.score.toFixed(2)) : undefined,
+      matchReasons: comp?.reasons,
+    };
   }
 }

@@ -1,3 +1,5 @@
+import type { MatchReason } from '@perspective/contracts';
+
 export interface AssignmentCandidate {
   id: string;
   /** Perspectives received in the boost lookback window. */
@@ -6,6 +8,8 @@ export interface AssignmentCandidate {
   score: number;
   /** Used to break ties: longer-waiting profiles first. */
   createdAt: Date;
+  compatibilityScore?: number;
+  matchReasons?: MatchReason[];
 }
 
 export type SlotKind = 'boost' | 'mandatory';

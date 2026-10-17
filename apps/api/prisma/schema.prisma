@@ -31,6 +31,31 @@ enum Orientation {
   prefer_not_to_say
 }
 
+enum DatingIntention {
+  long_term
+  long_term_open
+  short_term_open
+  casual
+  friendship
+  figuring_out
+}
+
+enum LifestylePace {
+  early_bird
+  night_owl
+  balanced
+  active_adventurer
+  laid_back
+}
+
+enum SocialPreference {
+  introvert
+  extrovert
+  ambivert
+  small_groups
+  social_butterfly
+}
+
 enum SelfieStatus {
   unverified
   verified
@@ -207,17 +232,24 @@ model Profile {
   gender          Gender?
   heightCm        Int?
   orientation     Orientation?
-  city            String?
-  audienceGenders Gender[]     @default([])
-  audienceMinAge  Int?
-  audienceMaxAge  Int?
-  selfieStatus    SelfieStatus @default(unverified)
-  selfieMediaId   String?      @db.Uuid
-  selfieCheckedAt DateTime?
+  city                 String?
+  pronouns             String?
+  audienceGenders      Gender[]         @default([])
+  audienceMinAge       Int?
+  audienceMaxAge       Int?
+  datingIntention      DatingIntention?
+  intentionDealbreaker Boolean          @default(false)
+  interests            String[]         @default([])
+  lifestylePace        LifestylePace?
+  socialPreference     SocialPreference?
+  personalityPrompts   Json?
+  selfieStatus         SelfieStatus     @default(unverified)
+  selfieMediaId        String?          @db.Uuid
+  selfieCheckedAt      DateTime?
   /// True when basics, audience, selfie, and a primary photo post are all in place.
-  isLive          Boolean      @default(false)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  isLive               Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   @@index([isLive, gender])
   @@map("profiles")

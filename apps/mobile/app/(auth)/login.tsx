@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LogInInput, LogInInputSchema } from '@perspective/contracts';
-import { router } from 'expo-router';
-import React from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { ScrollView, StyleSheet } from 'react-native';
 import { Button } from '../../src/components/ui/Button';
@@ -17,6 +17,34 @@ export default function LogIn() {
   const logIn = useLogIn();
   const signUp = useSignUp();
   const toast = useToast();
+  const params = useLocalSearchParams<{ autoLogin?: string; step?: string }>();
+
+  useEffect(() => {
+    if (!__DEV__ || !params.autoLogin) return;
+    if (params.autoLogin === 'fresh') {
+      const devEmail = `dev_${Date.now()}@perspective.test`;
+      signUp
+        .run({
+          email: devEmail,
+          password: 'perspective123',
+          birthDate: '2000-01-01',
+          acceptTerms: true,
+        })
+        .then(() => {
+          const stepParam = params.step ? `?forceStep=${params.step}` : '';
+          router.replace(`/onboarding${stepParam}` as any);
+        })
+        .catch((err) => toast(errorMessage(err), 'error'));
+    } else if (params.autoLogin === 'ravi') {
+      logIn
+        .run({ email: 'ravi@perspective.test', password: 'perspective123' })
+        .then(() => {
+          const stepParam = params.step ? `?forceStep=${params.step}` : '';
+          router.replace(`/onboarding${stepParam}` as any);
+        })
+        .catch((err) => toast(errorMessage(err), 'error'));
+    }
+  }, [params.autoLogin, params.step]);
   const { control, handleSubmit, setValue, formState } = useForm<LogInInput>({
     resolver: zodResolver(LogInInputSchema),
     defaultValues: __DEV__

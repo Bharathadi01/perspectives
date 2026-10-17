@@ -71,6 +71,12 @@ export class ProfileMapper {
       heightCm: p.heightCm,
       orientation: p.orientation,
       city: p.city,
+      pronouns: p.pronouns ?? null,
+      datingIntention: p.datingIntention ?? null,
+      interests: p.interests ?? [],
+      lifestylePace: p.lifestylePace ?? null,
+      socialPreference: p.socialPreference ?? null,
+      personalityPrompts: (p.personalityPrompts as any) ?? [],
       verified: p.selfieStatus === 'verified',
       posts: row.posts.map((post) => this.post(post)),
     };

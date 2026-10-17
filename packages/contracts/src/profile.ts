@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DayKeySchema, IdSchema, RULES } from './common';
+import { DatingIntention, LifestylePace, PersonalityPromptAnswerSchema, SocialPreference } from './personality';
 import { PostSchema } from './post';
 
 /** assumption: gender options (not enumerated by the product owner) */
@@ -59,6 +60,12 @@ export const PublicProfileSchema = z.object({
   heightCm: z.number().int(),
   orientation: Orientation,
   city: z.string(),
+  pronouns: z.string().nullable().optional(),
+  datingIntention: DatingIntention.nullable().optional(),
+  interests: z.array(z.string()).default([]),
+  lifestylePace: LifestylePace.nullable().optional(),
+  socialPreference: SocialPreference.nullable().optional(),
+  personalityPrompts: z.array(PersonalityPromptAnswerSchema).default([]),
   verified: z.boolean(),
   posts: z.array(PostSchema),
 });
@@ -72,10 +79,17 @@ export const MyProfileSchema = z.object({
   age: z.number().int(),
   displayName: z.string().nullable(),
   gender: Gender.nullable(),
+  pronouns: z.string().nullable().optional(),
   heightCm: z.number().int().nullable(),
   orientation: Orientation.nullable(),
   city: z.string().nullable(),
   audience: AudienceSchema.nullable(),
+  datingIntention: DatingIntention.nullable().optional(),
+  intentionDealbreaker: z.boolean().default(false),
+  interests: z.array(z.string()).default([]),
+  lifestylePace: LifestylePace.nullable().optional(),
+  socialPreference: SocialPreference.nullable().optional(),
+  personalityPrompts: z.array(PersonalityPromptAnswerSchema).default([]),
   selfieStatus: SelfieStatus,
   posts: z.array(PostSchema),
   isLive: z.boolean(),
@@ -87,10 +101,17 @@ export const UpdateProfileInputSchema = z
   .object({
     displayName: z.string().trim().min(1).max(RULES.displayNameMaxLength),
     gender: Gender,
+    pronouns: z.string().trim().max(30).nullable(),
     heightCm: z.number().int().min(RULES.heightCmMin).max(RULES.heightCmMax),
     orientation: Orientation,
     city: z.string().trim().min(2).max(80),
     audience: AudienceSchema,
+    datingIntention: DatingIntention.nullable(),
+    intentionDealbreaker: z.boolean(),
+    interests: z.array(z.string()).max(10),
+    lifestylePace: LifestylePace.nullable(),
+    socialPreference: SocialPreference.nullable(),
+    personalityPrompts: z.array(PersonalityPromptAnswerSchema),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Nothing to update');

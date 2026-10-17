@@ -134,3 +134,77 @@ describe('error envelope', () => {
     expect(parsed.error.code).toBe('PERSPECTIVE_REQUIRED_BEFORE_CONNECT');
   });
 });
+
+describe('onboarding and matching contracts', () => {
+  it('validates selected interests (min 3, max 10, unique canonical IDs)', async () => {
+    const { SelectedInterestsSchema } = await import('../src/interests');
+    expect(SelectedInterestsSchema.safeParse(['cinema_film', 'specialty_coffee', 'books_reading']).success).toBe(true);
+    // Under 3
+    expect(SelectedInterestsSchema.safeParse(['cinema_film', 'specialty_coffee']).success).toBe(false);
+    // Duplicate
+    expect(SelectedInterestsSchema.safeParse(['cinema_film', 'specialty_coffee', 'cinema_film']).success).toBe(false);
+    // Invalid interest ID
+    expect(SelectedInterestsSchema.safeParse(['cinema_film', 'specialty_coffee', 'invalid_hobby']).success).toBe(false);
+  });
+
+  it('validates dating intentions and config completeness', async () => {
+    const { DatingIntention, DATING_INTENTION_CONFIG } = await import('../src/personality');
+    expect(DatingIntention.safeParse('long_term').success).toBe(true);
+    expect(DatingIntention.safeParse('casual').success).toBe(true);
+    expect(DatingIntention.safeParse('invalid_intention').success).toBe(false);
+
+    // Every enum value must have human-readable config
+    for (const key of Object.keys(DATING_INTENTION_CONFIG) as (keyof typeof DATING_INTENTION_CONFIG)[]) {
+      expect(DATING_INTENTION_CONFIG[key].label).toBeDefined();
+      expect(DATING_INTENTION_CONFIG[key].badge).toBeDefined();
+    }
+  });
+
+  it('validates personality prompt answers within bounds', async () => {
+    const { PersonalityPromptAnswerSchema } = await import('../src/personality');
+    expect(
+      PersonalityPromptAnswerSchema.safeParse({
+        promptId: 'ideal_sunday',
+        question: 'My ideal Sunday looks like...',
+        answer: 'Exploring bookstores and quiet cafes',
+      }).success,
+    ).toBe(true);
+    // Too short answer (< 2 chars)
+    expect(
+      PersonalityPromptAnswerSchema.safeParse({
+        promptId: 'ideal_sunday',
+        question: 'My ideal Sunday looks like...',
+        answer: 'a',
+      }).success,
+    ).toBe(false);
+    // Excessive length > 300
+    expect(
+      PersonalityPromptAnswerSchema.safeParse({
+        promptId: 'ideal_sunday',
+        question: 'My ideal Sunday looks like...',
+        answer: 'a'.repeat(301),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('validates profile update with new onboarding fields', async () => {
+    const { UpdateProfileInputSchema } = await import('../src/profile');
+    const parsed = UpdateProfileInputSchema.safeParse({
+      displayName: 'Maya',
+      pronouns: 'she/they',
+      datingIntention: 'long_term',
+      intentionDealbreaker: true,
+      interests: ['cinema_film', 'specialty_coffee', 'books_reading'],
+      lifestylePace: 'balanced',
+      socialPreference: 'ambivert',
+      personalityPrompts: [
+        {
+          promptId: 'ideal_sunday',
+          question: 'My ideal Sunday looks like...',
+          answer: 'Exploring bookstores and quiet cafes',
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
+});

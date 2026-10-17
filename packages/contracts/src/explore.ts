@@ -16,11 +16,19 @@ export type DailyStatus = z.infer<typeof DailyStatusSchema>;
 export const ExploreSlot = z.enum(['mandatory', 'boost', 'optional']);
 export type ExploreSlot = z.infer<typeof ExploreSlot>;
 
+export const MatchReasonSchema = z.object({
+  kind: z.enum(['shared_interest', 'dating_intention', 'category_resonance', 'lifestyle']),
+  text: z.string(),
+});
+export type MatchReason = z.infer<typeof MatchReasonSchema>;
+
 export const ExploreCardSchema = z.object({
   profile: PublicProfileSchema,
   slot: ExploreSlot,
   /** Posts on this profile the viewer has already given a perspective on. */
   givenPostIds: z.array(IdSchema),
+  compatibilityScore: z.number().min(0).max(1).optional(),
+  matchReasons: z.array(MatchReasonSchema).optional(),
 });
 export type ExploreCard = z.infer<typeof ExploreCardSchema>;
 

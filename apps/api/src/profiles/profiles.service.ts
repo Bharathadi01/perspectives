@@ -30,6 +30,7 @@ export class ProfilesService {
       age: ageFromBirthDate(isoDate(row.birthDate)),
       displayName: p?.displayName ?? null,
       gender: p?.gender ?? null,
+      pronouns: p?.pronouns ?? null,
       heightCm: p?.heightCm ?? null,
       orientation: p?.orientation ?? null,
       city: p?.city ?? null,
@@ -37,6 +38,12 @@ export class ProfilesService {
         p && p.audienceGenders.length > 0 && p.audienceMinAge !== null && p.audienceMaxAge !== null
           ? { genders: p.audienceGenders, minAge: p.audienceMinAge, maxAge: p.audienceMaxAge }
           : null,
+      datingIntention: p?.datingIntention ?? null,
+      intentionDealbreaker: p?.intentionDealbreaker ?? false,
+      interests: p?.interests ?? [],
+      lifestylePace: p?.lifestylePace ?? null,
+      socialPreference: p?.socialPreference ?? null,
+      personalityPrompts: (p?.personalityPrompts as any) ?? [],
       selfieStatus: p?.selfieStatus ?? 'unverified',
       posts: row.posts.map((post) => this.mapper.post(post)),
       isLive: missing.length === 0,
@@ -45,11 +52,12 @@ export class ProfilesService {
   }
 
   async update(userId: string, input: UpdateProfileInput): Promise<MyProfile> {
-    const { audience, ...basics } = input;
+    const { audience, personalityPrompts, ...basics } = input;
     await this.prisma.profile.update({
       where: { userId },
       data: {
         ...basics,
+        ...(personalityPrompts !== undefined ? { personalityPrompts: personalityPrompts as any } : {}),
         ...(audience
           ? { audienceGenders: audience.genders, audienceMinAge: audience.minAge, audienceMaxAge: audience.maxAge }
           : {}),

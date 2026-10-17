@@ -1,5 +1,5 @@
 import { Global, Injectable, Module } from '@nestjs/common';
-import type { Gender, PostCategory } from '@perspective/contracts';
+import type { DatingIntention, Gender, LifestylePace, PostCategory, SocialPreference } from '@perspective/contracts';
 import { ageFromBirthDate } from '@perspective/contracts';
 import { isoDate } from '../common/day';
 import { AudiencePerson } from '../domain/eligibility';
@@ -11,6 +11,13 @@ export interface Person extends AudiencePerson {
   isLive: boolean;
   createdAt: Date;
   postCategories: PostCategory[];
+  interests: string[];
+  datingIntention: DatingIntention | null;
+  intentionDealbreaker: boolean;
+  lifestylePace: LifestylePace | null;
+  socialPreference: SocialPreference | null;
+  heightCm: number | null;
+  city: string | null;
 }
 
 type PersonRow = {
@@ -23,6 +30,13 @@ type PersonRow = {
     audienceGenders: Gender[];
     audienceMinAge: number | null;
     audienceMaxAge: number | null;
+    interests: string[];
+    datingIntention: DatingIntention | null;
+    intentionDealbreaker: boolean;
+    lifestylePace: LifestylePace | null;
+    socialPreference: SocialPreference | null;
+    heightCm: number | null;
+    city: string | null;
     isLive: boolean;
     createdAt: Date;
   } | null;
@@ -40,6 +54,13 @@ export const PERSON_SELECT = {
       audienceGenders: true,
       audienceMinAge: true,
       audienceMaxAge: true,
+      interests: true,
+      datingIntention: true,
+      intentionDealbreaker: true,
+      lifestylePace: true,
+      socialPreference: true,
+      heightCm: true,
+      city: true,
       isLive: true,
       createdAt: true,
     },
@@ -61,6 +82,13 @@ export function toPerson(row: PersonRow, now: Date = new Date()): Person {
       maxAge: row.profile?.audienceMaxAge ?? null,
     },
     postCategories: row.posts.map((p) => p.category),
+    interests: row.profile?.interests ?? [],
+    datingIntention: row.profile?.datingIntention ?? null,
+    intentionDealbreaker: row.profile?.intentionDealbreaker ?? false,
+    lifestylePace: row.profile?.lifestylePace ?? null,
+    socialPreference: row.profile?.socialPreference ?? null,
+    heightCm: row.profile?.heightCm ?? null,
+    city: row.profile?.city ?? null,
   };
 }
 

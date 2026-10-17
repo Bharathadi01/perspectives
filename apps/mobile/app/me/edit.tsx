@@ -46,6 +46,12 @@ function asPublicProfile(me: MyProfile, customPosts?: Post[]): PublicProfile | n
     heightCm: me.heightCm,
     orientation: me.orientation,
     city: me.city,
+    pronouns: me.pronouns ?? null,
+    datingIntention: me.datingIntention ?? null,
+    interests: me.interests ?? [],
+    lifestylePace: me.lifestylePace ?? null,
+    socialPreference: me.socialPreference ?? null,
+    personalityPrompts: me.personalityPrompts ?? [],
     verified: me.selfieStatus === 'verified',
     posts: customPosts ?? me.posts,
   };

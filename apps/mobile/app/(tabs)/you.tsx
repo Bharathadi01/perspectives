@@ -20,12 +20,18 @@ function asPublic(me: MyProfile): PublicProfile | null {
   return {
     id: me.id,
     displayName: me.displayName,
+    pronouns: me.pronouns,
     age: me.age,
     gender: me.gender,
     heightCm: me.heightCm,
     orientation: me.orientation,
     city: me.city,
     verified: me.selfieStatus === 'verified',
+    datingIntention: me.datingIntention,
+    interests: me.interests ?? [],
+    lifestylePace: me.lifestylePace,
+    socialPreference: me.socialPreference,
+    personalityPrompts: me.personalityPrompts ?? [],
     posts: me.posts,
   };
 }

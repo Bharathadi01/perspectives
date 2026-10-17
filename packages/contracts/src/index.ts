@@ -9,3 +9,5 @@ export * from './perspective';
 export * from './connect';
 export * from './chat';
 export * from './safety';
+export * from './interests';
+export * from './personality';
