@@ -33,6 +33,16 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
 - **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-16 all passed: 45 unit and 17 end-to-end tests.
 
+## Working as two developers (read before every session)
+- **Branches:** work on your own branch (`jana` or `bharath`). Never push to `main` or `dev` directly. Merge your branch into `dev` by pull request, and the other developer reviews it. `main` is updated from `dev` by pull request when `dev` is stable.
+- **Start of every session:** make sure `git status` is clean, then `git pull origin dev`. After pulling, run `pnpm install`, `pnpm db:migrate`, and rebuild.
+- **Migrations ship with the schema.** Every change to `apps/api/prisma/schema.prisma` must come with its migration folder in the same commit (`prisma migrate dev --name <task>_<developer>_<description>`). Never use `prisma db push` for work you commit. Never commit a schema change without a migration.
+- **Do not change product rules on your own.** New profile fields, labels (for example relationship goals), matching factors, or renamed terms need a decision from Jana first (see `docs/PRODUCT.md`). If you think one is a good idea, write it up as a proposal and stop. Connect has no intents or labels. "Perspective" always means the feedback a giver writes on a post; the question attached to a post is called a "prompt" or "question".
+- **Docs and code must agree.** If you change behavior, update the matching doc in the same change (`docs/PRODUCT.md` only after Jana confirms) and the `perspective-context/` copy.
+- **Shared files:** `schema.prisma`, `packages/contracts/src/index.ts`, `packages/api-client/src/client.ts`, `apps/mobile/src/features/hooks.ts`, `pnpm-lock.yaml`. Add new files instead of editing old ones where you can, and add a row to `docs/ACTIVE_CHANGES.md` before touching `schema.prisma`. Never hand-merge the lockfile; run `pnpm install` after a merge.
+- **Before you push:** `pnpm build`, `pnpm typecheck`, `pnpm test` and `pnpm test:e2e` pass, and you wrote a sync manifest in `sync-manifests/`.
+- **Build tips:** stop the API before rebuilding (a running API locks `apps/api/dist`). If `pnpm build` is killed for lack of memory, run `pnpm -r --workspace-concurrency=1 run build`.
+
 ## Stack
 The stack table in `docs/ARCHITECTURE.md` ("Stack: built now vs planned", ADR-013) is the single source. Built now: Expo SDK 58 + Expo Router, TanStack Query, Zustand, React Hook Form + Zod; NestJS + Prisma + PostgreSQL; Zod contracts; pnpm workspaces. Planned and not built: Cloudinary, pg-boss, Socket.IO, Redis/BullMQ, pgvector, FastAPI, Development Builds. Choose from this stack, and say so when you see a better alternative.
 - When you add, switch on, or replace a stack item (dependency, service, provider), update the stack table in `docs/ARCHITECTURE.md` and add or amend an ADR in the same change.

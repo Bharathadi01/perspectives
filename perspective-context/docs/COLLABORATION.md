@@ -20,7 +20,7 @@ Each developer uses a separate Git worktree and one Claude session per issue. Ev
 `pnpm-lock.yaml`, Prisma schema/migrations, contracts, api-client, design tokens, `.env.example`, CI, and CLAUDE.md. Declare owner/branch in `docs/ACTIVE_CHANGES.md` before editing.
 
 ## Branches
-`feat/<issue>-<scope>`, `fix/<issue>-<scope>`, `chore/<issue>-<scope>`. Branches are short-lived, rebased before review, and never contain unrelated cleanup.
+Branches: `main` (released), `dev` (shared integration), `jana` and `bharath` (each developer's own branch). Work on your own branch, merge into `dev` by pull request reviewed by the other developer, and update `main` from `dev` by pull request. Short feature branches off your own branch are fine for large changes. Rebase only commits that nobody else has pulled. Branches never contain unrelated cleanup.
 
 ## PR gate
 One issue; human review; current main; format; lint; typecheck; tests; contract drift (contracts and api-client rebuilt and typechecked); migration validation; dependency audit; secret scan. Schema/contract/security changes require the other developer’s approval.
