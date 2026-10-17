@@ -1,6 +1,6 @@
 import { ApiError } from '@perspective/api-client';
 import { errorMessage } from '../src/lib/errors';
-import { formatDuration, formatHeight, timeAgo } from '../src/lib/labels';
+import { formatDuration, formatHeight, normalizeDigits, timeAgo } from '../src/lib/labels';
 import { theme } from '../src/theme';
 
 describe('design tokens', () => {
@@ -13,9 +13,16 @@ describe('design tokens', () => {
   });
 });
 
-describe('labels', () => {
+describe('labels and digits normalization', () => {
   it('formats height in feet and centimetres', () => {
     expect(formatHeight(178)).toBe(`5'10" · 178 cm`);
+  });
+
+  it('normalizes devanagari and international numerals to ascii digits', () => {
+    expect(normalizeDigits('१७५')).toBe('175');
+    expect(normalizeDigits('175 cm')).toBe('175');
+    expect(normalizeDigits('१८०')).toBe('180');
+    expect(normalizeDigits('abc')).toBe('');
   });
 
   it('formats short audio durations', () => {

@@ -39,6 +39,24 @@ export function formatHeight(cm: number): string {
   return `${Math.floor(totalInches / 12)}'${totalInches % 12}" · ${cm} cm`;
 }
 
+/** Normalizes any Unicode digits (Devanagari, Arabic-Indic, Fullwidth, etc.) to ASCII 0-9. */
+export function normalizeDigits(input: string): string {
+  return input
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/[\u0966-\u096F]/g, (d) => String(d.charCodeAt(0) - 0x0966))
+    .replace(/[\u09E6-\u09EF]/g, (d) => String(d.charCodeAt(0) - 0x09E6))
+    .replace(/[\u0A66-\u0A6F]/g, (d) => String(d.charCodeAt(0) - 0x0A66))
+    .replace(/[\u0AE6-\u0AEF]/g, (d) => String(d.charCodeAt(0) - 0x0AE6))
+    .replace(/[\u0B66-\u0B6F]/g, (d) => String(d.charCodeAt(0) - 0x0B66))
+    .replace(/[\u0BE6-\u0BEF]/g, (d) => String(d.charCodeAt(0) - 0x0BE6))
+    .replace(/[\u0C66-\u0C6F]/g, (d) => String(d.charCodeAt(0) - 0x0C66))
+    .replace(/[\u0CE6-\u0CEF]/g, (d) => String(d.charCodeAt(0) - 0x0CE6))
+    .replace(/[\u0D66-\u0D6F]/g, (d) => String(d.charCodeAt(0) - 0x0D66))
+    .replace(/[\uFF10-\uFF19]/g, (d) => String(d.charCodeAt(0) - 0xFF10))
+    .replace(/[^0-9]/g, '');
+}
+
 export function formatDuration(sec: number | null): string {
   if (sec === null) return '';
   const s = Math.round(sec);

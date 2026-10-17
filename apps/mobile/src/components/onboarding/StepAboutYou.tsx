@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gender, Orientation, RULES } from '@perspective/contracts';
-import { GENDER_LABEL, ORIENTATION_LABEL } from '../../lib/labels';
+import { GENDER_LABEL, ORIENTATION_LABEL, normalizeDigits } from '../../lib/labels';
 import { useOnboardingStore } from '../../session/onboardingStore';
 import { theme } from '../../theme';
 import { Button } from '../ui/Button';
@@ -75,21 +75,32 @@ export function StepAboutYou({ onNext }: { onNext: () => void }) {
       </View>
 
       {/* Height */}
-      <TextField
-        label="Height (cm)"
-        value={heightCm}
-        onChangeText={(v) => {
-          const digitsOnly = v.replace(/[^0-9]/g, '').slice(0, 3);
-          setField('heightCm', digitsOnly);
-        }}
-        keyboardType="number-pad"
-        inputMode="numeric"
-        autoCorrect={false}
-        spellCheck={false}
-        placeholder="e.g. 175"
-        hint={heightCm.length > 0 && heightCm.length < 3 ? 'Enter your full height in centimeters (e.g. 175)' : undefined}
-        error={heightCm.length >= 3 && !heightValid ? `Between ${RULES.heightCmMin} and ${RULES.heightCmMax} cm` : undefined}
-      />
+      <View style={s.group}>
+        <TextField
+          label="Height (cm)"
+          value={heightCm}
+          onChangeText={(v) => {
+            const digits = normalizeDigits(v).slice(0, 3);
+            setField('heightCm', digits);
+          }}
+          keyboardType="numeric"
+          inputMode="numeric"
+          autoCorrect={false}
+          spellCheck={false}
+          placeholder="e.g. 175"
+          hint="Standard range: 120 – 230 cm"
+        />
+        <View style={s.chipsRow}>
+          {[160, 165, 170, 175, 180, 185].map((h) => (
+            <Chip
+              key={h}
+              label={`${h} cm`}
+              selected={heightCm === String(h)}
+              onPress={() => setField('heightCm', String(h))}
+            />
+          ))}
+        </View>
+      </View>
 
       {/* Orientation */}
       <View style={s.group}>

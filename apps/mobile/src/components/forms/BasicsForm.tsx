@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useUpdateProfile } from '../../features/hooks';
 import { errorMessage } from '../../lib/errors';
-import { GENDER_LABEL, ORIENTATION_LABEL } from '../../lib/labels';
+import { GENDER_LABEL, ORIENTATION_LABEL, normalizeDigits } from '../../lib/labels';
 import { theme } from '../../theme';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
@@ -46,21 +46,32 @@ export function BasicsForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProfil
           ))}
         </View>
       </View>
-      <TextField
-        label="Height (cm)"
-        value={height}
-        onChangeText={(v) => {
-          const digitsOnly = v.replace(/[^0-9]/g, '').slice(0, 3);
-          setHeight(digitsOnly);
-        }}
-        keyboardType="number-pad"
-        inputMode="numeric"
-        autoCorrect={false}
-        spellCheck={false}
-        placeholder="e.g. 175"
-        hint={height.length > 0 && height.length < 3 ? 'Enter your full height in centimeters (e.g. 175)' : undefined}
-        error={height.length >= 3 && !heightValid ? `Between ${RULES.heightCmMin} and ${RULES.heightCmMax} cm` : undefined}
-      />
+      <View style={s.group}>
+        <TextField
+          label="Height (cm)"
+          value={height}
+          onChangeText={(v) => {
+            const digits = normalizeDigits(v).slice(0, 3);
+            setHeight(digits);
+          }}
+          keyboardType="numeric"
+          inputMode="numeric"
+          autoCorrect={false}
+          spellCheck={false}
+          placeholder="e.g. 175"
+          hint="Standard range: 120 – 230 cm"
+        />
+        <View style={s.chips}>
+          {[160, 165, 170, 175, 180, 185].map((h) => (
+            <Chip
+              key={h}
+              label={`${h} cm`}
+              selected={height === String(h)}
+              onPress={() => setHeight(String(h))}
+            />
+          ))}
+        </View>
+      </View>
       <View style={s.group}>
         <Label>Orientation</Label>
         <View style={s.chips}>
