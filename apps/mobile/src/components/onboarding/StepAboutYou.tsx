@@ -78,11 +78,17 @@ export function StepAboutYou({ onNext }: { onNext: () => void }) {
       <TextField
         label="Height (cm)"
         value={heightCm}
-        onChangeText={(v) => setField('heightCm', v.replace(/[^0-9]/g, ''))}
+        onChangeText={(v) => {
+          const digitsOnly = v.replace(/[^0-9]/g, '').slice(0, 3);
+          setField('heightCm', digitsOnly);
+        }}
         keyboardType="number-pad"
-        maxLength={3}
+        inputMode="numeric"
+        autoCorrect={false}
+        spellCheck={false}
         placeholder="e.g. 175"
-        error={heightCm.length > 0 && !heightValid ? `Between ${RULES.heightCmMin} and ${RULES.heightCmMax} cm` : undefined}
+        hint={heightCm.length > 0 && heightCm.length < 3 ? 'Enter your full height in centimeters (e.g. 175)' : undefined}
+        error={heightCm.length >= 3 && !heightValid ? `Between ${RULES.heightCmMin} and ${RULES.heightCmMax} cm` : undefined}
       />
 
       {/* Orientation */}

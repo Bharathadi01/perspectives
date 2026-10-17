@@ -58,7 +58,7 @@ const s = StyleSheet.create({
   },
   multiline: { minHeight: 120, textAlignVertical: 'top' },
   inputError: { borderColor: theme.colors.danger },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm, minHeight: 18 },
   hint: { fontSize: theme.typography.fontSize.xs, color: theme.colors.muted, flexShrink: 1 },
   error: { color: theme.colors.danger },
 });

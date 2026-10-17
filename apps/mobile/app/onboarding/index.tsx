@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StepAboutYou } from '../../src/components/onboarding/StepAboutYou';
 import { StepAudienceIntentions } from '../../src/components/onboarding/StepAudienceIntentions';
@@ -30,10 +30,15 @@ export default function Onboarding() {
   const me = useMe(status === 'signedIn');
   const { forceStep } = useLocalSearchParams<{ forceStep?: string }>();
 
-  const { stepIndex, setStepIndex, initializeFromProfile } = useOnboardingStore();
+  const stepIndex = useOnboardingStore((s) => s.stepIndex);
+  const setStepIndex = useOnboardingStore((s) => s.setStepIndex);
+  const initializeFromProfile = useOnboardingStore((s) => s.initializeFromProfile);
+
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (me.data) {
+    if (me.data && !initializedRef.current) {
+      initializedRef.current = true;
       initializeFromProfile(me.data);
     }
   }, [me.data, initializeFromProfile]);

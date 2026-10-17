@@ -49,10 +49,17 @@ export function BasicsForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProfil
       <TextField
         label="Height (cm)"
         value={height}
-        onChangeText={(v) => setHeight(v.replace(/[^0-9]/g, ''))}
+        onChangeText={(v) => {
+          const digitsOnly = v.replace(/[^0-9]/g, '').slice(0, 3);
+          setHeight(digitsOnly);
+        }}
         keyboardType="number-pad"
-        maxLength={3}
-        error={height.length > 0 && !heightValid ? `Between ${RULES.heightCmMin} and ${RULES.heightCmMax} cm` : undefined}
+        inputMode="numeric"
+        autoCorrect={false}
+        spellCheck={false}
+        placeholder="e.g. 175"
+        hint={height.length > 0 && height.length < 3 ? 'Enter your full height in centimeters (e.g. 175)' : undefined}
+        error={height.length >= 3 && !heightValid ? `Between ${RULES.heightCmMin} and ${RULES.heightCmMax} cm` : undefined}
       />
       <View style={s.group}>
         <Label>Orientation</Label>
