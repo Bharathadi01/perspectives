@@ -167,6 +167,49 @@ describe('auth, guards and profile (e2e)', () => {
       expect(reordered.body[1].position).toBe(1);
       expect(reordered.body[2].position).toBe(2);
     });
+
+    it('allows adding written perspective and voice perspective without a photo', async () => {
+      const c = await signUp(app, 'textandvoice@test.local');
+      const photo1 = await c
+        .post('/v1/me/posts', { kind: 'photo', mediaId: await uploadPhoto(c), prompt: 'First photo', category: 'looks', focusAreas: ['photo'] })
+        .expect(201);
+
+      // Add written perspective without mediaId
+      const textPost = await c
+        .post('/v1/me/posts', {
+          kind: 'text',
+          prompt: 'What kind of first impression does my writing style give?',
+          category: 'looks',
+          focusAreas: ['first_look'],
+        })
+        .expect(201);
+      expect(textPost.body.kind).toBe('text');
+      expect(textPost.body.mediaUrl).toBeNull();
+      expect(textPost.body.prompt).toBe('What kind of first impression does my writing style give?');
+
+      // Add voice perspective without a photo
+      const audioMedia = await c
+        .post('/v1/media', { kind: 'audio', mimeType: 'audio/wav', dataBase64: 'UklGRiQAAABXQVZF', durationSec: 8 })
+        .expect(201);
+      const audioPost = await c
+        .post('/v1/me/posts', {
+          kind: 'audio',
+          mediaId: audioMedia.body.mediaId,
+          prompt: 'What does my voice and accent sound like?',
+          category: 'voice',
+          focusAreas: ['tone'],
+        })
+        .expect(201);
+      expect(audioPost.body.kind).toBe('audio');
+
+      // Verify GET /v1/me returns all three posts
+      const me = await c.get('/v1/me').expect(200);
+      expect(me.body.posts.length).toBe(3);
+      expect(me.body.posts[0].kind).toBe('photo');
+      expect(me.body.posts[1].kind).toBe('text');
+      expect(me.body.posts[1].mediaUrl).toBeNull();
+      expect(me.body.posts[2].kind).toBe('audio');
+    });
   });
 });
 

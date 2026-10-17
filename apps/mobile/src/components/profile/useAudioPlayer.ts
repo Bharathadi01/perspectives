@@ -46,5 +46,10 @@ export function useAudioPlayer(uri: string) {
     }
   }, [uri, onStatus]);
 
-  return { playing, progress, error, toggle };
+  const pause = useCallback(() => {
+    player.current?.pause();
+    setPlaying(false);
+  }, []);
+
+  return { playing, progress, error, toggle, pause };
 }

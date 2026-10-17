@@ -29,24 +29,68 @@ function GiveAction({ onGive, alreadyGiven, prompt }: { onGive: () => void; alre
   );
 }
 
-/** Full-width photo with the prompt over it. */
+/** Full-width photo with prompt or interactive voice player caption beneath it. */
 export function PhotoPostCard({ post, onGive, alreadyGiven }: PostCardProps) {
+  const hasVoice = !!post.audioMediaUrl;
+  const player = useAudioPlayer(post.audioMediaUrl ? api.mediaUrl(post.audioMediaUrl) : '');
+
   return (
     <View style={s.photoCard}>
       <Image
-        source={{ uri: api.mediaUrl(post.mediaUrl) }}
+        source={{ uri: post.mediaUrl ? api.mediaUrl(post.mediaUrl) : '' }}
         style={s.photo}
         resizeMode="cover"
         accessibilityLabel={`Photo: ${post.prompt}`}
         accessibilityIgnoresInvertColors
       />
-      <View style={s.overlay} pointerEvents="none">
-        {post.category ? (
-          <Text style={s.categoryBadge}>{CATEGORY_CATALOG[post.category]?.label.toUpperCase()}</Text>
-        ) : null}
-        <Text style={s.overlayText}>{post.prompt}</Text>
-      </View>
-      {onGive ? <GiveAction onGive={onGive} alreadyGiven={alreadyGiven} prompt={post.prompt} /> : null}
+      {hasVoice ? (
+        <View style={s.voiceCaption}>
+          <View style={s.voiceCaptionHeader}>
+            <View style={s.voiceBadgePill}>
+              <Ionicons name="mic" size={11} color="#FFFFFF" style={{ marginRight: 3 }} />
+              <Text style={s.voiceBadgeText}>VOICE PERSPECTIVE</Text>
+            </View>
+            <Text style={s.voiceCaptionDuration}>
+              {formatDuration(post.audioDurationSec ?? post.durationSec ?? 0)}
+            </Text>
+          </View>
+
+          <Text style={s.voiceCaptionPrompt}>"{post.prompt}"</Text>
+
+          <View style={s.voicePlayerRow}>
+            <IconButton
+              icon={player.playing ? 'pause' : 'play'}
+              tone="brand"
+              size="small"
+              onPress={() => void player.toggle()}
+              accessibilityLabel={player.playing ? 'Pause voice perspective' : 'Play voice perspective'}
+            />
+            <Waveform seed={post.id} progress={player.progress} />
+            <Text style={s.duration}>{formatDuration(post.audioDurationSec ?? post.durationSec)}</Text>
+            {onGive ? (
+              <IconButton
+                icon={alreadyGiven ? 'checkmark' : 'chatbubble-ellipses-outline'}
+                tone={alreadyGiven ? 'dark' : 'brand'}
+                size="small"
+                disabled={alreadyGiven}
+                onPress={onGive}
+                accessibilityLabel={alreadyGiven ? `You already gave a perspective on: ${post.prompt}` : `Give perspective on: ${post.prompt}`}
+              />
+            ) : null}
+          </View>
+          {player.error ? <Text style={s.error}>{player.error}</Text> : null}
+        </View>
+      ) : (
+        <>
+          <View style={s.overlay} pointerEvents="none">
+            {post.category ? (
+              <Text style={s.categoryBadge}>{CATEGORY_CATALOG[post.category]?.label.toUpperCase()}</Text>
+            ) : null}
+            <Text style={s.overlayText}>{post.prompt}</Text>
+          </View>
+          {onGive ? <GiveAction onGive={onGive} alreadyGiven={alreadyGiven} prompt={post.prompt} /> : null}
+        </>
+      )}
     </View>
   );
 }
@@ -72,7 +116,7 @@ function Waveform({ seed, progress }: { seed: string; progress: number }) {
 
 /** Voice post: prompt, play button and waveform. */
 export function AudioPostCard({ post, onGive, alreadyGiven }: PostCardProps) {
-  const player = useAudioPlayer(api.mediaUrl(post.mediaUrl));
+  const player = useAudioPlayer(post.mediaUrl ? api.mediaUrl(post.mediaUrl) : '');
   return (
     <View style={s.audioCard}>
       <Text style={s.audioPrompt}>{post.prompt}</Text>
@@ -87,14 +131,44 @@ export function AudioPostCard({ post, onGive, alreadyGiven }: PostCardProps) {
         <Waveform seed={post.id} progress={player.progress} />
         <Text style={s.duration}>{formatDuration(post.durationSec)}</Text>
       </View>
-      {player.error ? <Text style={s.error}>{player.error}</Text> : null}
+      {onGive ? <GiveAction onGive={onGive} alreadyGiven={alreadyGiven} prompt={post.prompt} /> : null}
+    </View>
+  );
+}
+
+/** Standalone written perspective card without a photo. */
+export function TextPostCard({ post, onGive, alreadyGiven }: PostCardProps) {
+  return (
+    <View style={s.textCard}>
+      <View style={s.textCardHeader}>
+        <View style={s.writtenBadgePill}>
+          <Text style={s.writtenBadgeText}>
+            {CATEGORY_CATALOG[post.category]?.label.toUpperCase() || 'WRITTEN PERSPECTIVE'}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={s.textCardPrompt}>"{post.prompt}"</Text>
+
+      {post.focusAreas && post.focusAreas.length > 0 && (
+        <View style={s.focusChipsRow}>
+          {post.focusAreas.map((f) => (
+            <View key={f} style={s.focusChip}>
+              <Text style={s.focusChipText}>#{f}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       {onGive ? <GiveAction onGive={onGive} alreadyGiven={alreadyGiven} prompt={post.prompt} /> : null}
     </View>
   );
 }
 
 export function PostCard(props: PostCardProps) {
-  return props.post.kind === 'photo' ? <PhotoPostCard {...props} /> : <AudioPostCard {...props} />;
+  if (props.post.kind === 'photo') return <PhotoPostCard {...props} />;
+  if (props.post.kind === 'audio') return <AudioPostCard {...props} />;
+  return <TextPostCard {...props} />;
 }
 
 const s = StyleSheet.create({
@@ -138,4 +212,97 @@ const s = StyleSheet.create({
   barPlayed: { backgroundColor: theme.colors.brand },
   duration: { fontSize: theme.typography.fontSize.xs, color: theme.colors.muted, minWidth: 30 },
   error: { fontSize: theme.typography.fontSize.xs, color: theme.colors.danger },
+  voiceCaption: {
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.base,
+    paddingBottom: theme.spacing.base,
+    gap: theme.spacing.xs,
+    borderBottomLeftRadius: theme.radius.media,
+    borderBottomRightRadius: theme.radius.media,
+  },
+  voiceCaptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  voiceBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.brand,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: theme.radius.pill,
+  },
+  voiceBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  voiceCaptionDuration: {
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.muted,
+  },
+  voiceCaptionPrompt: {
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.ink,
+    marginVertical: 2,
+  },
+  voicePlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    marginTop: 2,
+  },
+  textCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.media,
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl + theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.md,
+  },
+  textCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  writtenBadgePill: {
+    backgroundColor: theme.colors.brandSoft,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.pill,
+  },
+  writtenBadgeText: {
+    color: theme.colors.brand,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  textCardPrompt: {
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.ink,
+    lineHeight: 26,
+  },
+  focusChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  focusChip: {
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.pill,
+  },
+  focusChipText: {
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.muted,
+    fontWeight: '600',
+  },
 });

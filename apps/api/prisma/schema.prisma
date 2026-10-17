@@ -75,6 +75,7 @@ enum MediaPurpose {
 enum PostKind {
   photo
   audio
+  text
 }
 
 enum PostCategory {
@@ -267,20 +268,23 @@ model Media {
   durationSec Float?
   createdAt   DateTime     @default(now())
 
-  post Post?
+  post      Post? @relation("PostMedia")
+  postAudio Post? @relation("PostAudioMedia")
 
   @@index([ownerId])
   @@map("media")
 }
 
 model Post {
-  id         String       @id @default(uuid()) @db.Uuid
-  ownerId    String       @db.Uuid
-  owner      User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  position   Int
-  kind       PostKind
-  mediaId    String       @unique @db.Uuid
-  media      Media        @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  id           String        @id @default(uuid()) @db.Uuid
+  ownerId      String        @db.Uuid
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  position     Int
+  kind         PostKind
+  mediaId      String?       @unique @db.Uuid
+  media        Media?        @relation("PostMedia", fields: [mediaId], references: [id], onDelete: Cascade)
+  audioMediaId String?       @unique @db.Uuid
+  audioMedia   Media?        @relation("PostAudioMedia", fields: [audioMediaId], references: [id], onDelete: SetNull)
   prompt     String
   category   PostCategory
   focusAreas String[]

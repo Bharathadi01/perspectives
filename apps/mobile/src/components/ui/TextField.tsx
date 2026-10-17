@@ -4,7 +4,7 @@ import { theme } from '../../theme';
 import { Label } from './Text';
 
 interface TextFieldProps extends TextInputProps {
-  label: string;
+  label?: string;
   error?: string;
   hint?: string;
   /** Shows "current/limit" under the field. */
@@ -15,17 +15,17 @@ interface TextFieldProps extends TextInputProps {
 export type TextFieldRef = React.ComponentRef<typeof TextInput>;
 
 export const TextField = forwardRef<TextFieldRef, TextFieldProps>(function TextField(
-  { label, error, hint, counter, style, multiline, ...rest },
+  { label, error, hint, counter, style, multiline, accessibilityLabel, ...rest },
   ref,
 ) {
   const length = typeof rest.value === 'string' ? rest.value.trim().length : 0;
   const belowMin = counter?.min !== undefined && length > 0 && length < counter.min;
   return (
     <View style={s.wrap}>
-      <Label>{label}</Label>
+      {label ? <Label>{label}</Label> : null}
       <TextInput
         ref={ref}
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel ?? label}
         placeholderTextColor={theme.colors.muted}
         multiline={multiline}
         style={[s.input, multiline && s.multiline, !!error && s.inputError, style]}

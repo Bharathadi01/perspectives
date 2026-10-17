@@ -21,6 +21,19 @@ function splitDataUri(dataUri: string): { mimeType: string; dataBase64: string }
   return match ? { mimeType: match[1], dataBase64: match[2] } : null;
 }
 
+function detectImageMime(base64: string, fallbackMime?: string | null): string {
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('iVBOR')) return 'image/png';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  if (fallbackMime) {
+    const clean = fallbackMime.split(';')[0].trim().toLowerCase();
+    if (clean === 'image/jpeg' || clean === 'image/jpg') return 'image/jpeg';
+    if (clean === 'image/png') return 'image/png';
+    if (clean === 'image/webp') return 'image/webp';
+  }
+  return 'image/jpeg';
+}
+
 async function uriToBase64(uri: string): Promise<{ dataBase64: string; mimeType: string }> {
   const blob = await (await fetch(uri)).blob();
   const dataUri = await new Promise<string>((resolve, reject) => {
@@ -58,10 +71,12 @@ export async function pickPhoto(source: 'library' | 'camera' = 'library'): Promi
   if (result.canceled || !result.assets[0]) return null;
   const asset = result.assets[0];
   if (asset.base64) {
-    return { dataBase64: asset.base64, mimeType: asset.mimeType ?? 'image/jpeg', uri: asset.uri };
+    const mimeType = detectImageMime(asset.base64, asset.mimeType);
+    return { dataBase64: asset.base64, mimeType, uri: asset.uri };
   }
   const fromUri = splitDataUri(asset.uri) ?? (await uriToBase64(asset.uri));
-  return { ...fromUri, uri: asset.uri };
+  const mimeType = detectImageMime(fromUri.dataBase64, fromUri.mimeType);
+  return { ...fromUri, mimeType, uri: asset.uri };
 }
 
 export interface Recording extends PickedMedia {
@@ -94,9 +109,9 @@ export function useVoiceRecorder() {
       await recorder.stop();
       const uri = recorder.uri;
       if (!uri) throw new Error('No recording');
-      const durationSec = Math.min(RULES.audioMaxSeconds, Math.max(0.5, seconds));
+      const durationSec = Math.min(RULES.audioMaxSeconds, Math.max(0.5, Number(seconds.toFixed(1))));
       const data = await uriToBase64(uri);
-      const mimeType = data.mimeType === 'audio/x-m4a' || data.mimeType === '' ? 'audio/m4a' : data.mimeType;
+      const mimeType = 'audio/m4a';
       setResult({ ...data, mimeType, uri, durationSec });
     } catch {
       setError('Recording failed. Please try again.');

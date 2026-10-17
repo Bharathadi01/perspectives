@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Post } from '@perspective/contracts';
+import { CATEGORY_CATALOG, Post } from '@perspective/contracts';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -11,12 +11,16 @@ import {
   Text,
   View,
 } from 'react-native';
+import { api } from '../../api/client';
+import { formatDuration } from '../../lib/labels';
 import { theme } from '../../theme';
 
 interface PhotoGridReorderProps {
-  photos: Post[];
+  photos?: Post[];
+  posts?: Post[];
   onReorder: (fromIndex: number, toIndex: number) => void;
-  onAddPhoto: (isPrimary: boolean) => void;
+  onAddPhoto?: (isPrimary: boolean) => void;
+  onAddSlot?: (slotIdx: number, isPrimary: boolean) => void;
   onEditPrompt: (post: Post) => void;
   onRemovePhoto: (post: Post) => void;
   onDragStart?: () => void;
@@ -33,13 +37,16 @@ const ITEM_HEIGHT = Math.floor(ITEM_WIDTH * 1.32);
 
 export function PhotoGridReorder({
   photos,
+  posts,
   onReorder,
   onAddPhoto,
+  onAddSlot,
   onEditPrompt,
   onRemovePhoto,
   onDragStart,
   onDragEnd,
 }: PhotoGridReorderProps) {
+  const items = posts ?? photos ?? [];
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
@@ -51,8 +58,8 @@ export function PhotoGridReorder({
   const pan = useRef(new Animated.ValueXY()).current;
   const draggingIndexRef = useRef<number | null>(null);
   const hoverIndexRef = useRef<number | null>(null);
-  const photosCountRef = useRef(photos.length);
-  photosCountRef.current = photos.length;
+  const itemsCountRef = useRef(items.length);
+  itemsCountRef.current = items.length;
 
   const onReorderRef = useRef(onReorder);
   onReorderRef.current = onReorder;
@@ -97,7 +104,7 @@ export function PhotoGridReorder({
   };
 
   const handleSwapWithNext = (idx: number) => {
-    if (idx < photos.length - 1) {
+    if (idx < items.length - 1) {
       onReorderRef.current(idx, idx + 1);
       // Keep switch arrows active on the photo at its new right slot for 2 more seconds
       showArrowsForSlot(idx + 1);
@@ -146,7 +153,7 @@ export function PhotoGridReorder({
           const targetRow = Math.min(1, Math.max(0, Math.floor(centerY / (ITEM_HEIGHT + GAP))));
 
           const targetSlot = targetRow * 3 + targetCol;
-          const validSlot = Math.min(photosCountRef.current - 1, Math.max(0, targetSlot));
+          const validSlot = Math.min(itemsCountRef.current - 1, Math.max(0, targetSlot));
 
           if (hoverIndexRef.current !== validSlot) {
             hoverIndexRef.current = validSlot;
@@ -201,7 +208,7 @@ export function PhotoGridReorder({
     <View style={s.container}>
       <View style={s.grid}>
         {Array.from({ length: TOTAL_SLOTS }).map((_, slotIdx) => {
-          const post = photos[slotIdx];
+          const post = items[slotIdx];
           const isDragging = draggingIndex === slotIdx;
           const isHovered = hoverIndex === slotIdx && draggingIndex !== slotIdx && draggingIndex !== null;
           const isShowingArrows = activeArrowSlot === slotIdx;
@@ -229,26 +236,99 @@ export function PhotoGridReorder({
                 ]}
                 {...responder.panHandlers}
               >
-                {/* Photo Image */}
-                <Image source={{ uri: post.mediaUrl }} style={s.photo} />
+                {/* 1. Main Card Visuals based on kind */}
+                {post.kind === 'photo' ? (
+                  <Image
+                    source={{ uri: post.mediaUrl ? api.mediaUrl(post.mediaUrl) : '' }}
+                    style={s.photo}
+                  />
+                ) : post.kind === 'audio' ? (
+                  <View style={s.audioGridCard}>
+                    <View style={s.audioGridTop}>
+                      <View style={s.audioPillBadge}>
+                        <Ionicons name="mic" size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
+                        <Text style={s.audioPillBadgeText}>VOICE</Text>
+                      </View>
+                      <Text style={s.audioDurationBadge}>
+                        {formatDuration(post.audioDurationSec ?? post.durationSec ?? 0)}
+                      </Text>
+                    </View>
+
+                    <View style={s.audioGridCenterIcon}>
+                      <View style={s.audioMicCircle}>
+                        <Ionicons name="mic" size={24} color="#FFFFFF" />
+                      </View>
+                    </View>
+
+                    <Pressable
+                      style={s.audioGridFooter}
+                      onPress={() => onEditPrompt(post)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit voice perspective: ${post.prompt}`}
+                    >
+                      <Text style={s.audioGridPrompt} numberOfLines={3}>
+                        "{post.prompt}"
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={s.textGridCard}>
+                    <View style={s.textGridTop}>
+                      <View style={s.writtenPillBadge}>
+                        <Text style={s.writtenPillBadgeText}>
+                          {CATEGORY_CATALOG[post.category]?.label.toUpperCase() || 'WRITTEN'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Pressable
+                      style={s.textGridCenter}
+                      onPress={() => onEditPrompt(post)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit written perspective: ${post.prompt}`}
+                    >
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={18}
+                        color={theme.colors.brand}
+                        style={{ marginBottom: 4 }}
+                      />
+                      <Text style={s.textGridPrompt} numberOfLines={3}>
+                        "{post.prompt}"
+                      </Text>
+                    </Pressable>
+
+                    <View style={s.textGridFooter}>
+                      <Text style={s.textGridTag} numberOfLines={1}>
+                        {post.focusAreas && post.focusAreas[0] ? `#${post.focusAreas[0]}` : 'Written'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
 
                 {/* Card Tap Target: triggers the 2-second switch arrows */}
                 <Pressable
                   style={StyleSheet.absoluteFill}
                   onPress={() => showArrowsForSlot(slotIdx)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Photo ${slotIdx + 1}${isTopPhoto ? ', Top Photo' : ''}. Tap to switch or rearrange.`}
+                  accessibilityLabel={`${post.kind === 'photo' ? 'Photo' : post.kind === 'audio' ? 'Voice perspective' : 'Written perspective'} ${slotIdx + 1}${isTopPhoto ? ', Top item' : ''}. Tap to switch or rearrange.`}
                 />
 
-                {/* Top Overlay: Remove "✕" Button */}
+                {/* Top Overlay: Mic Indicator & Remove "✕" Button */}
                 <View style={s.topControlsBar} pointerEvents="box-none">
-                  <View style={{ flex: 1 }} />
+                  {post.kind === 'photo' && post.audioMediaUrl ? (
+                    <View style={s.micBadge} accessibilityLabel="Voice perspective attached">
+                      <Ionicons name="mic" size={11} color="#FFFFFF" />
+                    </View>
+                  ) : (
+                    <View style={{ flex: 1 }} />
+                  )}
                   <Pressable
                     style={s.removeBtn}
                     hitSlop={10}
                     onPress={() => onRemovePhoto(post)}
                     accessibilityRole="button"
-                    accessibilityLabel="Remove photo"
+                    accessibilityLabel="Remove item"
                   >
                     <Ionicons name="close" size={13} color="#FFFFFF" />
                   </Pressable>
@@ -267,19 +347,19 @@ export function PhotoGridReorder({
                           hitSlop={8}
                           onPress={() => handleSwapWithPrevious(slotIdx)}
                           accessibilityRole="button"
-                          accessibilityLabel="Shift photo left"
+                          accessibilityLabel="Shift item left"
                         >
                           <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
                         </Pressable>
                       ) : null}
 
-                      {slotIdx < photos.length - 1 ? (
+                      {slotIdx < items.length - 1 ? (
                         <Pressable
                           style={s.arrowButton}
                           hitSlop={8}
                           onPress={() => handleSwapWithNext(slotIdx)}
                           accessibilityRole="button"
-                          accessibilityLabel="Shift photo right"
+                          accessibilityLabel="Shift item right"
                         >
                           <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                         </Pressable>
@@ -296,37 +376,42 @@ export function PhotoGridReorder({
                   </View>
                 ) : null}
 
-                {/* Bottom Pill Badge */}
-                <View style={s.bottomBadgeContainer} pointerEvents="box-none">
-                  {isTopPhoto ? (
-                    <View style={[s.pillBadge, s.topPhotoBadge]}>
-                      <Ionicons name="star" size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
-                      <Text style={s.topPhotoText}>Top Photo</Text>
-                    </View>
-                  ) : post.prompt ? (
+                {/* Bottom Overlay: Badge + Question Snippet (for photo posts) */}
+                {post.kind === 'photo' ? (
+                  <View style={s.bottomBadgeContainer} pointerEvents="box-none">
                     <Pressable
-                      style={[s.pillBadge, s.promptBadge]}
+                      style={s.promptOverlayCard}
                       onPress={() => onEditPrompt(post)}
                       accessibilityRole="button"
-                      accessibilityLabel="Edit attached perspective"
+                      accessibilityLabel={`Edit perspective: ${post.prompt}`}
                     >
-                      <Ionicons name="checkmark" size={11} color="#FFFFFF" style={{ marginRight: 2 }} />
-                      <Text style={s.pillBadgeText} numberOfLines={1}>
-                        Perspective
-                      </Text>
+                      <View style={s.badgePillRow}>
+                        {post.audioMediaUrl ? (
+                          <View style={[s.pillBadge, s.voiceBadge]}>
+                            <Ionicons name="mic" size={10} color="#FFFFFF" style={{ marginRight: 2 }} />
+                            <Text style={s.pillBadgeText}>
+                              {isTopPhoto ? 'Voice • Top' : 'Voice'}
+                            </Text>
+                          </View>
+                        ) : isTopPhoto ? (
+                          <View style={[s.pillBadge, s.topPhotoBadge]}>
+                            <Ionicons name="star" size={10} color="#FFFFFF" style={{ marginRight: 2 }} />
+                            <Text style={s.topPhotoText}>Top</Text>
+                          </View>
+                        ) : (
+                          <View style={[s.pillBadge, s.promptBadge]}>
+                            <Text style={s.pillBadgeText}>Perspective</Text>
+                          </View>
+                        )}
+                      </View>
+                      {post.prompt ? (
+                        <Text style={s.gridPromptSnippet} numberOfLines={2}>
+                          "{post.prompt}"
+                        </Text>
+                      ) : null}
                     </Pressable>
-                  ) : (
-                    <Pressable
-                      style={[s.pillBadge, s.addPromptBadge]}
-                      onPress={() => onEditPrompt(post)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Add perspective to photo"
-                    >
-                      <Ionicons name="add" size={12} color="#FFFFFF" style={{ marginRight: 2 }} />
-                      <Text style={s.pillBadgeText}>Perspective</Text>
-                    </Pressable>
-                  )}
-                </View>
+                  </View>
+                ) : null}
               </Animated.View>
             );
           }
@@ -340,9 +425,15 @@ export function PhotoGridReorder({
                 s.emptySlot,
                 hoverIndex === slotIdx && draggingIndex !== null && s.emptySlotHovered,
               ]}
-              onPress={() => onAddPhoto(slotIdx === 0)}
+              onPress={() => {
+                if (onAddSlot) {
+                  onAddSlot(slotIdx, slotIdx === 0);
+                } else if (onAddPhoto) {
+                  onAddPhoto(slotIdx === 0);
+                }
+              }}
               accessibilityRole="button"
-              accessibilityLabel={`Add photo to slot ${slotIdx + 1}`}
+              accessibilityLabel={`Add to slot ${slotIdx + 1}`}
             >
               <View style={s.addCircle}>
                 <Ionicons name="add" size={24} color={theme.colors.muted} />
@@ -352,7 +443,7 @@ export function PhotoGridReorder({
         })}
       </View>
 
-      <Text style={s.hintText}>Tap a photo to switch with arrows, or drag to reorder</Text>
+      <Text style={s.hintText}>Tap a card to switch with arrows, or drag to reorder</Text>
     </View>
   );
 }
@@ -462,18 +553,51 @@ const s = StyleSheet.create({
   },
   bottomBadgeContainer: {
     position: 'absolute',
-    bottom: 6,
-    left: 4,
-    right: 4,
-    alignItems: 'center',
+    bottom: 0,
+    left: 0,
+    right: 0,
     zIndex: 10,
+  },
+  promptOverlayCard: {
+    backgroundColor: 'rgba(23, 23, 27, 0.78)',
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    borderBottomLeftRadius: theme.radius.media,
+    borderBottomRightRadius: theme.radius.media,
+    gap: 3,
+  },
+  badgePillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gridPromptSnippet: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '600',
+    lineHeight: 12,
+  },
+  micBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
   pillBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: theme.radius.pill,
+  },
+  voiceBadge: {
+    backgroundColor: theme.colors.brand,
   },
   topPhotoBadge: {
     backgroundColor: '#17171B',
@@ -486,12 +610,12 @@ const s = StyleSheet.create({
   },
   topPhotoText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
   },
   pillBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
   },
   itemDragging: {
@@ -512,5 +636,117 @@ const s = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  audioGridCard: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#26164A',
+    borderRadius: theme.radius.media,
+    padding: 8,
+    justifyContent: 'space-between',
+  },
+  audioGridTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 26,
+  },
+  audioPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.brand,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: theme.radius.pill,
+  },
+  audioPillBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  audioDurationBadge: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  audioGridCenterIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  audioMicCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(91, 75, 219, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  audioGridFooter: {
+    backgroundColor: 'rgba(15, 10, 35, 0.8)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+  },
+  audioGridPrompt: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '600',
+    lineHeight: 12.5,
+  },
+  textGridCard: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.media,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    padding: 8,
+    justifyContent: 'space-between',
+  },
+  textGridTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 26,
+  },
+  writtenPillBadge: {
+    backgroundColor: theme.colors.brandSoft,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: theme.radius.pill,
+  },
+  writtenPillBadgeText: {
+    color: theme.colors.brand,
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  textGridCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+    marginVertical: 2,
+  },
+  textGridPrompt: {
+    color: theme.colors.ink,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 13,
+    textAlign: 'center',
+  },
+  textGridFooter: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+  },
+  textGridTag: {
+    color: theme.colors.muted,
+    fontSize: 8.5,
+    fontWeight: '700',
   },
 });

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { IdSchema, IsoDateTimeSchema, RULES } from './common';
 
-export const PostKind = z.enum(['photo', 'audio']);
+export const PostKind = z.enum(['photo', 'audio', 'text']);
 export type PostKind = z.infer<typeof PostKind>;
 
 /** Working category names; final wording is a product-copy task (docs/PRODUCT.md). */
@@ -135,7 +135,8 @@ function focusAreasMatchCategory(
 export const CreatePostInputSchema = z
   .object({
     kind: PostKind,
-    mediaId: IdSchema,
+    mediaId: IdSchema.optional().nullable(),
+    audioMediaId: IdSchema.optional().nullable(),
     prompt: PromptSchema,
     category: PostCategory,
     focusAreas: FocusAreasSchema,
@@ -146,6 +147,7 @@ export type CreatePostInput = z.infer<typeof CreatePostInputSchema>;
 export const UpdatePostInputSchema = z
   .object({
     prompt: PromptSchema.optional(),
+    audioMediaId: IdSchema.optional().nullable(),
     category: PostCategory.optional(),
     focusAreas: FocusAreasSchema.optional(),
   })
@@ -167,9 +169,11 @@ export const PostSchema = z.object({
   /** 0 is the primary post. */
   position: z.number().int().min(0),
   kind: PostKind,
-  /** Short-lived signed URL. */
-  mediaUrl: z.string(),
-  durationSec: z.number().nullable(),
+  /** Short-lived signed URL (null for text-only posts). */
+  mediaUrl: z.string().nullable().optional(),
+  durationSec: z.number().nullable().optional(),
+  audioMediaUrl: z.string().nullable().optional(),
+  audioDurationSec: z.number().nullable().optional(),
   prompt: z.string(),
   category: PostCategory,
   focusAreas: z.array(z.string()),
@@ -183,6 +187,7 @@ export const PostRefSchema = PostSchema.pick({
   id: true,
   kind: true,
   mediaUrl: true,
+  audioMediaUrl: true,
   prompt: true,
   category: true,
 });

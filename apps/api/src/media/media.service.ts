@@ -6,9 +6,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MediaStorage } from './media.storage';
 
 function looksLikeImage(buf: Buffer, mimeType: string): boolean {
-  if (mimeType === 'image/jpeg') return buf[0] === 0xff && buf[1] === 0xd8;
-  if (mimeType === 'image/png') return buf.subarray(0, 4).toString('hex') === '89504e47';
-  if (mimeType === 'image/webp') return buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP';
+  const norm = mimeType.toLowerCase();
+  if (norm === 'image/jpeg' || norm === 'image/jpg') return buf[0] === 0xff && buf[1] === 0xd8;
+  if (norm === 'image/png') return buf.subarray(0, 4).toString('hex') === '89504e47';
+  if (norm === 'image/webp') return buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP';
+  // Also check magic bytes directly in case MIME type is generic
+  if (buf[0] === 0xff && buf[1] === 0xd8) return true;
+  if (buf.subarray(0, 4).toString('hex') === '89504e47') return true;
+  if (buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP') return true;
   return false;
 }
 
@@ -33,13 +38,23 @@ export class MediaService {
     if (input.kind === 'photo' && !looksLikeImage(data, input.mimeType)) {
       throw new AppException('MEDIA_INVALID', 'That file is not a supported image.');
     }
+
+    let mimeType = input.mimeType.toLowerCase();
+    if (input.kind === 'photo') {
+      if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
+      else if (data[0] === 0xff && data[1] === 0xd8) mimeType = 'image/jpeg';
+      else if (data.subarray(0, 4).toString('hex') === '89504e47') mimeType = 'image/png';
+    } else if (input.kind === 'audio') {
+      if (mimeType === 'application/octet-stream' || mimeType === '') mimeType = 'audio/m4a';
+    }
+
     const storageKey = randomUUID();
     await this.storage.put(storageKey, data);
     const media = await this.prisma.media.create({
       data: {
         ownerId,
         kind: input.kind,
-        mimeType: input.mimeType,
+        mimeType,
         storageKey,
         byteSize: data.length,
         durationSec: input.kind === 'audio' ? (input.durationSec ?? null) : null,

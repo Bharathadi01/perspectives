@@ -23,7 +23,7 @@ interface PostFormProps {
  * question, a category, and the focus areas you want covered (they become the givers' hints).
  */
 export function PostForm({ photoOnly, onCreated }: PostFormProps) {
-  const [kind, setKind] = useState<PostKind>('photo');
+  const [kind, setKind] = useState<'photo' | 'audio'>('photo');
   const [photo, setPhoto] = useState<PickedMedia | null>(null);
   const recorder = useVoiceRecorder();
   const [prompt, setPrompt] = useState('');

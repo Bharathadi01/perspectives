@@ -57,8 +57,8 @@ export function normalizeDigits(input: string): string {
     .replace(/[^0-9]/g, '');
 }
 
-export function formatDuration(sec: number | null): string {
-  if (sec === null) return '';
+export function formatDuration(sec: number | null | undefined): string {
+  if (sec === null || sec === undefined) return '';
   const s = Math.round(sec);
   return `0:${s.toString().padStart(2, '0')}`;
 }

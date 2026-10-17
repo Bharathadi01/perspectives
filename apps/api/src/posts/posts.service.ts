@@ -26,17 +26,40 @@ export class PostsService {
     if (active === 0 && input.kind !== 'photo') {
       throw new AppException('PRIMARY_POST_REQUIRED', 'Your first post needs a photo.');
     }
-    const media = await this.prisma.media.findUnique({ where: { id: input.mediaId }, include: { post: true } });
-    if (!media || media.ownerId !== userId || media.purpose !== 'post' || media.post || media.kind !== input.kind) {
+    if (input.mediaId) {
+      const media = await this.prisma.media.findUnique({ where: { id: input.mediaId }, include: { post: true } });
+      if (!media || media.ownerId !== userId || media.purpose !== 'post' || media.post || media.kind !== input.kind) {
+        throw new AppException('MEDIA_INVALID', 'Upload the photo or audio for this post first.');
+      }
+    } else if (input.kind !== 'text') {
       throw new AppException('MEDIA_INVALID', 'Upload the photo or audio for this post first.');
     }
+
+    if (input.audioMediaId) {
+      const audioMedia = await this.prisma.media.findUnique({
+        where: { id: input.audioMediaId },
+        include: { post: true, postAudio: true },
+      });
+      if (
+        !audioMedia ||
+        audioMedia.ownerId !== userId ||
+        audioMedia.purpose !== 'post' ||
+        audioMedia.post ||
+        audioMedia.postAudio ||
+        audioMedia.kind !== 'audio'
+      ) {
+        throw new AppException('MEDIA_INVALID', 'Upload the voice audio for this post first.');
+      }
+    }
+
     await this.assertPromptAllowed(input.prompt);
     const post = await this.prisma.post.create({
       data: {
         ownerId: userId,
         position: active,
         kind: input.kind,
-        mediaId: input.mediaId,
+        mediaId: input.mediaId ?? null,
+        audioMediaId: input.audioMediaId ?? null,
         prompt: input.prompt,
         category: input.category,
         focusAreas: input.focusAreas,
@@ -54,9 +77,24 @@ export class PostsService {
       throw new AppException('VALIDATION_FAILED', 'Those focus areas do not belong to this category.');
     }
     if (input.prompt) await this.assertPromptAllowed(input.prompt);
+
+    if (input.audioMediaId) {
+      const audioMedia = await this.prisma.media.findUnique({
+        where: { id: input.audioMediaId },
+      });
+      if (!audioMedia || audioMedia.ownerId !== userId || audioMedia.purpose !== 'post' || audioMedia.kind !== 'audio') {
+        throw new AppException('MEDIA_INVALID', 'Upload the voice audio for this post first.');
+      }
+    }
+
     const updated = await this.prisma.post.update({
       where: { id: postId },
-      data: { prompt: input.prompt, category: input.category, focusAreas: input.focusAreas },
+      data: {
+        prompt: input.prompt,
+        audioMediaId: input.audioMediaId,
+        category: input.category,
+        focusAreas: input.focusAreas,
+      },
       include: POST_INCLUDE,
     });
     return this.mapper.post(updated);

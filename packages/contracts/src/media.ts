@@ -4,8 +4,8 @@ import { IdSchema, RULES } from './common';
 export const MediaKind = z.enum(['photo', 'audio']);
 export type MediaKind = z.infer<typeof MediaKind>;
 
-export const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
-export const AUDIO_MIME_TYPES = ['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/mpeg', 'audio/webm', 'audio/ogg', 'audio/wav'] as const;
+export const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'] as const;
+export const AUDIO_MIME_TYPES = ['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/mpeg', 'audio/webm', 'audio/ogg', 'audio/wav', 'application/octet-stream'] as const;
 
 /** 8 MB of binary data, base64-encoded. */
 export const MAX_MEDIA_BASE64_LENGTH = Math.ceil((8 * 1024 * 1024 * 4) / 3);

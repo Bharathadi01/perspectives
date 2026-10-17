@@ -21,11 +21,15 @@ import { theme } from '../../src/theme';
 function PostHeader({ post }: { post: PostRef }) {
   return (
     <View style={s.postHeader}>
-      {post.kind === 'photo' ? (
+      {post.kind === 'photo' && post.mediaUrl ? (
         <Image source={{ uri: api.mediaUrl(post.mediaUrl) }} style={s.thumb} accessibilityIgnoresInvertColors />
-      ) : (
+      ) : post.kind === 'audio' ? (
         <View style={[s.thumb, s.audioThumb]}>
           <Ionicons name="mic-outline" size={18} color={theme.colors.brand} />
+        </View>
+      ) : (
+        <View style={[s.thumb, s.audioThumb]}>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={theme.colors.brand} />
         </View>
       )}
       <Text style={s.postPrompt} numberOfLines={2}>

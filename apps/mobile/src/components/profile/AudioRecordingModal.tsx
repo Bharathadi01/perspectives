@@ -8,7 +8,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useCreatePost, useUploadMedia } from '../../features/hooks';
+import { api, newKey } from '../../api/client';
+import { useCreatePost, useMe, useUploadMedia } from '../../features/hooks';
 import { errorMessage } from '../../lib/errors';
 import { useVoiceRecorder } from '../../lib/media';
 import { theme } from '../../theme';
@@ -31,34 +32,46 @@ export function AudioRecordingModal({ visible, onClose, onSaved }: AudioRecordin
   const upload = useUploadMedia();
   const create = useCreatePost();
   const toast = useToast();
+  const me = useMe();
 
+  const [saving, setSaving] = useState(false);
   const player = useAudioPlayer(recorder.result?.uri ?? '');
-  const busy = upload.isPending || create.isPending;
+  const busy = saving || upload.isPending || create.isPending;
 
   const save = async () => {
-    if (!recorder.result) return;
+    if (!recorder.result || saving) return;
+    setSaving(true);
     try {
-      const { mediaId } = await upload.run({
-        kind: 'audio',
-        mimeType: recorder.result.mimeType,
-        dataBase64: recorder.result.dataBase64,
-        durationSec: recorder.result.durationSec,
-      });
+      const { mediaId } = await api.media.upload(
+        {
+          kind: 'audio',
+          mimeType: 'audio/m4a',
+          dataBase64: recorder.result.dataBase64,
+          durationSec: recorder.result.durationSec,
+        },
+        newKey(),
+      );
 
-      await create.run({
-        kind: 'audio',
-        mediaId,
-        prompt: prompt.trim(),
-        category: 'voice',
-        focusAreas: ['tone', 'warmth'],
-      });
+      await api.posts.create(
+        {
+          kind: 'audio',
+          mediaId,
+          prompt: prompt.trim(),
+          category: 'voice',
+          focusAreas: ['tone', 'warmth'],
+        },
+        newKey(),
+      );
 
       toast('Voice perspective saved to profile.', 'success');
       recorder.reset();
+      await me.refetch();
       onSaved();
       onClose();
     } catch (err) {
       toast(errorMessage(err), 'error');
+    } finally {
+      setSaving(false);
     }
   };
 

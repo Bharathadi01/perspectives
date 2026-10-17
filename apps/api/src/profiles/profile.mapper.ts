@@ -4,7 +4,10 @@ import { Post, PostRef, ProfileSummary, PublicProfile, ageFromBirthDate } from '
 import { isoDate } from '../common/day';
 import { MediaUrlSigner } from '../media/media-url.signer';
 
-export const POST_INCLUDE = { media: { select: { id: true, durationSec: true } } } as const;
+export const POST_INCLUDE = {
+  media: { select: { id: true, durationSec: true } },
+  audioMedia: { select: { id: true, durationSec: true } },
+} as const;
 export type PostRow = Prisma.PostGetPayload<{ include: typeof POST_INCLUDE }>;
 
 export const ACTIVE_POSTS = {
@@ -31,8 +34,10 @@ export class ProfileMapper {
       ownerId: row.ownerId,
       position: row.position,
       kind: row.kind,
-      mediaUrl: this.signer.sign(row.media.id),
-      durationSec: row.media.durationSec,
+      mediaUrl: row.media ? this.signer.sign(row.media.id) : null,
+      durationSec: row.media?.durationSec ?? null,
+      audioMediaUrl: row.audioMedia ? this.signer.sign(row.audioMedia.id) : null,
+      audioDurationSec: row.audioMedia?.durationSec ?? null,
       prompt: row.prompt,
       category: row.category,
       focusAreas: row.focusAreas,
@@ -43,7 +48,14 @@ export class ProfileMapper {
 
   postRef(row: PostRow): PostRef {
     const p = this.post(row);
-    return { id: p.id, kind: p.kind, mediaUrl: p.mediaUrl, prompt: p.prompt, category: p.category };
+    return {
+      id: p.id,
+      kind: p.kind,
+      mediaUrl: p.mediaUrl,
+      audioMediaUrl: p.audioMediaUrl,
+      prompt: p.prompt,
+      category: p.category,
+    };
   }
 
   summary(row: ProfileUserRow): ProfileSummary {
@@ -53,7 +65,7 @@ export class ProfileMapper {
       displayName: row.profile?.displayName ?? 'Member',
       age: ageFromBirthDate(isoDate(row.birthDate)),
       verified: row.profile?.selfieStatus === 'verified',
-      primaryPhotoUrl: primary ? this.signer.sign(primary.media.id) : null,
+      primaryPhotoUrl: primary && primary.media ? this.signer.sign(primary.media.id) : null,
     };
   }
 

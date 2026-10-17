@@ -10,6 +10,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { api } from '../../src/api/client';
 import { AudienceForm } from '../../src/components/forms/AudienceForm';
 import { BasicsForm } from '../../src/components/forms/BasicsForm';
 import { AudioRecordingModal } from '../../src/components/profile/AudioRecordingModal';
@@ -25,6 +27,8 @@ import { PhotoGridReorder } from '../../src/components/profile/PhotoGridReorder'
 import { PhotoUploadModal } from '../../src/components/profile/PhotoUploadModal';
 import { ProfileView } from '../../src/components/profile/ProfileView';
 import { PromptLibraryModal } from '../../src/components/profile/PromptLibraryModal';
+import { useAudioPlayer } from '../../src/components/profile/useAudioPlayer';
+import { WrittenPerspectiveModal } from '../../src/components/profile/WrittenPerspectiveModal';
 import { Button } from '../../src/components/ui/Button';
 import { Screen } from '../../src/components/ui/Screen';
 import { Sheet } from '../../src/components/ui/Sheet';
@@ -35,6 +39,121 @@ import { useMe, useRemovePost, useReorderPosts, useUpdatePost } from '../../src/
 import { errorMessage } from '../../src/lib/errors';
 import { formatDuration } from '../../src/lib/labels';
 import { theme } from '../../src/theme';
+
+function AttachedPerspectiveCard({
+  post,
+  index,
+  isTopPhoto,
+  onEdit,
+}: {
+  post: Post;
+  index: number;
+  isTopPhoto: boolean;
+  onEdit: () => void;
+}) {
+  const isAudioKind = post.kind === 'audio';
+  const isTextKind = post.kind === 'text';
+  const isPhotoKind = post.kind === 'photo';
+
+  const audioUrl = isAudioKind
+    ? (post.mediaUrl ? api.mediaUrl(post.mediaUrl) : '')
+    : (post.audioMediaUrl ? api.mediaUrl(post.audioMediaUrl) : '');
+  const hasVoice = !!audioUrl;
+  const player = useAudioPlayer(audioUrl);
+
+  return (
+    <View style={s.perspectiveCard}>
+      <View style={s.perspectiveCardTop}>
+        {isPhotoKind ? (
+          <Image
+            source={{ uri: post.mediaUrl ? api.mediaUrl(post.mediaUrl) : '' }}
+            style={s.perspectiveThumb}
+          />
+        ) : isAudioKind ? (
+          <View style={s.perspectiveVoiceThumb}>
+            <Ionicons name="mic" size={20} color="#FFFFFF" />
+          </View>
+        ) : (
+          <View style={s.perspectiveTextThumb}>
+            <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.colors.brand} />
+          </View>
+        )}
+
+        <View style={s.perspectiveMeta}>
+          <View style={s.perspectiveHeaderPillRow}>
+            <Text style={s.perspectivePhotoLabel}>
+              {isPhotoKind
+                ? `Photo ${index + 1}${isTopPhoto ? ' • Top Photo' : ''}`
+                : isAudioKind
+                ? `Voice Perspective`
+                : `Written Perspective`}
+            </Text>
+            {hasVoice ? (
+              <View style={s.voiceBadgePillSmall}>
+                <Ionicons name="mic" size={10} color="#FFFFFF" style={{ marginRight: 2 }} />
+                <Text style={s.voiceBadgeTextSmall}>VOICE PERSPECTIVE</Text>
+              </View>
+            ) : (
+              <View style={s.writtenBadgePillSmall}>
+                <Text style={s.writtenBadgeTextSmall}>
+                  {CATEGORY_CATALOG[post.category]?.label.toUpperCase() || 'WRITTEN'}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={s.perspectiveQuestionText}>"{post.prompt}"</Text>
+
+          {isTextKind && post.focusAreas && post.focusAreas.length > 0 && (
+            <View style={s.inlineFocusRow}>
+              {post.focusAreas.map((f) => (
+                <Text key={f} style={s.inlineFocusTag}>#{f}</Text>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <Pressable
+          onPress={onEdit}
+          style={s.editPromptBtn}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit perspective ${index + 1}`}
+        >
+          <Ionicons name="create-outline" size={15} color={theme.colors.brand} />
+          <Text style={s.editPromptBtnText}>Edit</Text>
+        </Pressable>
+      </View>
+
+      {/* If Voice: interactive audio playback bar */}
+      {hasVoice && (
+        <View style={s.inlineAudioRow}>
+          <Pressable
+            style={s.inlinePlayBtn}
+            onPress={() => void player.toggle()}
+            accessibilityRole="button"
+            accessibilityLabel={player.playing ? 'Pause recording' : 'Play recording'}
+          >
+            <Ionicons
+              name={player.playing ? 'pause' : 'play'}
+              size={15}
+              color="#FFFFFF"
+            />
+          </Pressable>
+          <View style={s.inlineWaveTrack}>
+            <View
+              style={[
+                s.inlineWaveFill,
+                { width: `${Math.round(player.progress * 100)}%` },
+              ]}
+            />
+          </View>
+          <Text style={s.inlineDurationText}>
+            {formatDuration(post.audioDurationSec ?? post.durationSec ?? 0)}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 function asPublicProfile(me: MyProfile, customPosts?: Post[]): PublicProfile | null {
   if (!me.displayName || !me.gender || !me.heightCm || !me.orientation || !me.city) return null;
@@ -77,10 +196,11 @@ export default function EditProfile() {
 
   // Modals state
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [showWrittenModal, setShowWrittenModal] = useState(false);
+  const [showAddChoiceSheet, setShowAddChoiceSheet] = useState(false);
   const [photoIsPrimary, setPhotoIsPrimary] = useState(false);
-  const [showAudioModal, setShowAudioModal] = useState(false);
   const [editPromptPost, setEditPromptPost] = useState<Post | null>(null);
-  const [showAddChoice, setShowAddChoice] = useState(false);
   const [topPhotoEnabled, setTopPhotoEnabled] = useState(true);
 
   // Local reorder draft state
@@ -105,7 +225,6 @@ export default function EditProfile() {
 
   const posts = localPosts;
   const photoPosts = posts.filter((p) => p.kind === 'photo');
-  const audioPosts = posts.filter((p) => p.kind === 'audio');
   const hasPrimaryPhoto = photoPosts.length > 0;
   const filledCount = posts.length;
   const progressPercent = Math.round((filledCount / RULES.maxPosts) * 100);
@@ -113,32 +232,41 @@ export default function EditProfile() {
   // Synchronized public profile representation
   const publicProfile = asPublicProfile(me.data, posts);
 
-  const handleReorderPhotos = async (fromIndex: number, toIndex: number) => {
+  const handleReorderPosts = async (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
-    if (fromIndex < 0 || fromIndex >= photoPosts.length) return;
-    if (toIndex < 0 || toIndex >= photoPosts.length) return;
+    if (fromIndex < 0 || fromIndex >= posts.length) return;
+    if (toIndex < 0 || toIndex >= posts.length) return;
 
-    const reorderedPhotos = [...photoPosts];
+    // Rule: Position 0 must always be a photo
+    const movingPost = posts[fromIndex];
+    if (toIndex === 0 && movingPost.kind !== 'photo') {
+      toast('The top card (slot 1) must be a photo to introduce yourself.', 'info');
+      return;
+    }
+
+    const reordered = [...posts];
     if (Math.abs(fromIndex - toIndex) === 1) {
-      const temp = reorderedPhotos[fromIndex];
-      reorderedPhotos[fromIndex] = reorderedPhotos[toIndex];
-      reorderedPhotos[toIndex] = temp;
+      const temp = reordered[fromIndex];
+      reordered[fromIndex] = reordered[toIndex];
+      reordered[toIndex] = temp;
     } else {
-      const [moved] = reorderedPhotos.splice(fromIndex, 1);
-      reorderedPhotos.splice(toIndex, 0, moved);
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
     }
 
-    // Combine photos with audio (audio follows photos or keeps its order)
-    const combined = [...reorderedPhotos, ...audioPosts];
-    const updated = combined.map((p, idx) => ({ ...p, position: idx }));
+    if (reordered[0]?.kind !== 'photo') {
+      toast('The top card (slot 1) must be a photo to introduce yourself.', 'info');
+      return;
+    }
 
+    const updated = reordered.map((p, idx) => ({ ...p, position: idx }));
     setLocalPosts(updated);
     setSaveStatus('saving');
 
     try {
       await reorderPosts.run(updated.map((p) => p.id));
       setSaveStatus('saved');
-      toast(toIndex === 0 ? 'Top photo updated.' : 'Photos rearranged.', 'success');
+      toast(toIndex === 0 ? 'Top photo updated.' : 'Cards rearranged.', 'success');
     } catch (err) {
       setSaveStatus('error');
       toast(errorMessage(err), 'error');
@@ -146,77 +274,20 @@ export default function EditProfile() {
     }
   };
 
-  const handleReorderAudio = async (fromIdx: number, toIdx: number) => {
-    if (fromIdx === toIdx) return;
-    if (fromIdx < 0 || fromIdx >= audioPosts.length) return;
-    if (toIdx < 0 || toIdx >= audioPosts.length) return;
-
-    const reorderedAudio = [...audioPosts];
-    const temp = reorderedAudio[fromIdx];
-    reorderedAudio[fromIdx] = reorderedAudio[toIdx];
-    reorderedAudio[toIdx] = temp;
-
-    // Photos ALWAYS stay on top (positions 0..photoPosts.length - 1)
-    // Perspectives only come next to / after the photos
-    const combined = [...photoPosts, ...reorderedAudio];
-    const updated = combined.map((p, idx) => ({ ...p, position: idx }));
-
-    setLocalPosts(updated);
-    setSaveStatus('saving');
-
-    try {
-      await reorderPosts.run(updated.map((p) => p.id));
-      setSaveStatus('saved');
-      toast('Voice perspectives rearranged.', 'success');
-    } catch (err) {
-      setSaveStatus('error');
-      toast(errorMessage(err), 'error');
-      if (me.data?.posts) setLocalPosts(me.data.posts);
-    }
-  };
-
-  const handleSwapWrittenPerspectives = async (fromIdx: number, toIdx: number) => {
-    const writtenPosts = photoPosts.filter((p) => !!p.prompt);
-    if (fromIdx === toIdx) return;
-    if (fromIdx < 0 || fromIdx >= writtenPosts.length) return;
-    if (toIdx < 0 || toIdx >= writtenPosts.length) return;
-
-    const postA = writtenPosts[fromIdx];
-    const postB = writtenPosts[toIdx];
-
-    const promptA = postA.prompt;
-    const catA = postA.category;
-    const focusA = postA.focusAreas;
-
-    const promptB = postB.prompt;
-    const catB = postB.category;
-    const focusB = postB.focusAreas;
-
-    // Optimistically update prompt questions between the photos
-    const updated = localPosts.map((p) => {
-      if (p.id === postA.id) return { ...p, prompt: promptB, category: catB, focusAreas: focusB };
-      if (p.id === postB.id) return { ...p, prompt: promptA, category: catA, focusAreas: focusA };
-      return p;
-    });
-
-    setLocalPosts(updated);
-    setSaveStatus('saving');
-
-    try {
-      await Promise.all([
-        updatePost.run({ postId: postA.id, input: { prompt: promptB, category: catB, focusAreas: focusB } }),
-        updatePost.run({ postId: postB.id, input: { prompt: promptA, category: catA, focusAreas: focusA } }),
-      ]);
-      setSaveStatus('saved');
-      toast('Written perspectives rearranged.', 'success');
-    } catch (err) {
-      setSaveStatus('error');
-      toast(errorMessage(err), 'error');
-      if (me.data?.posts) setLocalPosts(me.data.posts);
+  const handleAddSlot = (slotIdx: number, isPrimary: boolean) => {
+    if (posts.length === 0 || isPrimary) {
+      setPhotoIsPrimary(true);
+      setShowPhotoModal(true);
+    } else {
+      setShowAddChoiceSheet(true);
     }
   };
 
   const confirmDeletePost = (post: Post) => {
+    if (posts.length <= 1) {
+      toast('You must keep at least one card on your profile.', 'error');
+      return;
+    }
     if (post.kind === 'photo' && photoPosts.length <= 1) {
       toast('You must keep at least one photo on your profile.', 'error');
       return;
@@ -367,25 +438,60 @@ export default function EditProfile() {
         >
           {/* Section: My Photos & Videos / Perspectives */}
           <View style={s.sectionHeaderRow}>
-            <Text style={s.sectionTitle}>My Photos & Perspectives</Text>
+            <View style={s.sectionTitleGroup}>
+              <Text style={s.sectionTitle}>My Photos & Perspectives</Text>
+              {posts.length < RULES.maxPosts && (
+                <Pressable
+                  style={s.addPerspectiveHeaderBtn}
+                  onPress={() => {
+                    if (posts.length === 0) {
+                      setPhotoIsPrimary(true);
+                      setShowPhotoModal(true);
+                    } else {
+                      setShowAddChoiceSheet(true);
+                    }
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add photo or perspective"
+                >
+                  <Ionicons name="add" size={14} color={theme.colors.brand} />
+                  <Text style={s.addPerspectiveHeaderBtnText}>Add</Text>
+                </Pressable>
+              )}
+            </View>
             {saveStatus === 'saving' ? (
               <Text style={s.savingIndicator}>Saving…</Text>
             ) : null}
           </View>
 
-          {/* 3x2 Photo Grid with Drag Reorder & Tap-to-Swap */}
+          {/* 3x2 Grid with Drag Reorder & Tap-to-Swap for Photos, Voice, and Written Perspectives */}
           <PhotoGridReorder
-            photos={photoPosts}
-            onReorder={handleReorderPhotos}
-            onAddPhoto={(isPrimary) => {
-              setPhotoIsPrimary(isPrimary);
-              setShowPhotoModal(true);
-            }}
+            posts={posts}
+            onReorder={handleReorderPosts}
+            onAddSlot={handleAddSlot}
             onEditPrompt={(post) => setEditPromptPost(post)}
             onRemovePhoto={confirmDeletePost}
             onDragStart={() => setScrollEnabled(false)}
             onDragEnd={() => setScrollEnabled(true)}
           />
+
+          {/* Attached Perspectives List (Photos, Voice & Written) */}
+          {posts.length > 0 && (
+            <View style={s.perspectivesListSection}>
+              <Text style={s.perspectivesListTitle}>
+                Attached Perspectives ({posts.length})
+              </Text>
+              {posts.map((post, idx) => (
+                <AttachedPerspectiveCard
+                  key={post.id}
+                  post={post}
+                  index={idx}
+                  isTopPhoto={idx === 0}
+                  onEdit={() => setEditPromptPost(post)}
+                />
+              ))}
+            </View>
+          )}
 
           {/* Section: Top Photo Toggle */}
           <View style={s.cardRow}>
@@ -434,172 +540,6 @@ export default function EditProfile() {
               <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
             )}
           </Pressable>
-
-          {/* Section: Voice Perspectives */}
-          <View style={s.sectionHeaderRow}>
-            <Text style={s.sectionTitle}>
-              Voice Perspectives {audioPosts.length > 0 ? `(${audioPosts.length})` : ''}
-            </Text>
-            {posts.length < RULES.maxPosts ? (
-              <Pressable
-                onPress={() => setShowAudioModal(true)}
-                hitSlop={8}
-                style={s.addPerspectiveHeaderBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Add Voice Perspective"
-              >
-                <Ionicons name="add" size={16} color={theme.colors.brand} />
-                <Text style={s.addPerspectiveHeaderText}>Add Voice</Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          {audioPosts.length > 0 ? (
-            audioPosts.map((post, audioIdx) => (
-              <View key={post.id} style={s.voicePromptCard}>
-                <View style={s.voicePromptTop}>
-                  <View style={s.voicePromptIcon}>
-                    <Ionicons name="mic" size={20} color={theme.colors.brand} />
-                  </View>
-                  <View style={s.voicePromptMeta}>
-                    <Text style={s.voicePromptQuestion}>"{post.prompt}"</Text>
-                    <Text style={s.voicePromptDuration}>
-                      Voice Note • {formatDuration(post.durationSec ?? 0)}
-                    </Text>
-                  </View>
-                  <View style={s.perspectiveReorderRow}>
-                    {audioIdx > 0 ? (
-                      <Pressable
-                        style={s.perspectiveArrowBtn}
-                        onPress={() => handleReorderAudio(audioIdx, audioIdx - 1)}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel="Move voice perspective up"
-                      >
-                        <Ionicons name="arrow-up" size={14} color={theme.colors.ink} />
-                      </Pressable>
-                    ) : null}
-
-                    {audioIdx < audioPosts.length - 1 ? (
-                      <Pressable
-                        style={s.perspectiveArrowBtn}
-                        onPress={() => handleReorderAudio(audioIdx, audioIdx + 1)}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel="Move voice perspective down"
-                      >
-                        <Ionicons name="arrow-down" size={14} color={theme.colors.ink} />
-                      </Pressable>
-                    ) : null}
-
-                    <Pressable
-                      style={s.voiceRemoveBtn}
-                      onPress={() => confirmDeletePost(post)}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel="Remove voice perspective"
-                    >
-                      <Ionicons name="close" size={16} color={theme.colors.muted} />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={s.voicePromptActions}>
-                  <Pressable
-                    style={s.voiceActionLink}
-                    onPress={() => setEditPromptPost(post)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Edit voice perspective question"
-                  >
-                    <Ionicons name="create-outline" size={15} color={theme.colors.brand} />
-                    <Text style={s.voiceActionLinkText}>Edit Perspective</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Pressable
-              style={s.addVoicePromptBtn}
-              onPress={() => setShowAudioModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Add Voice Perspective"
-            >
-              <Ionicons name="mic-outline" size={20} color={theme.colors.brand} />
-              <Text style={s.addVoicePromptText}>+ Add Voice Perspective (Up to 15s)</Text>
-            </Pressable>
-          )}
-
-          {/* Section: Written Perspectives */}
-          <View style={s.sectionHeaderRow}>
-            <Text style={s.sectionTitle}>
-              Written Perspectives ({photoPosts.filter((p) => !!p.prompt).length})
-            </Text>
-          </View>
-
-          {photoPosts
-            .filter((p) => !!p.prompt)
-            .map((post, writtenIdx, arr) => (
-              <View key={`written-${post.id}`} style={s.writtenPromptCard}>
-                <View style={s.promptCardHeader}>
-                  <Text style={s.promptCategoryLabel}>
-                    {CATEGORY_CATALOG[post.category as keyof typeof CATEGORY_CATALOG]?.label.toUpperCase() || 'PERSPECTIVE'}
-                  </Text>
-                  <View style={s.perspectiveReorderRow}>
-                    {writtenIdx > 0 ? (
-                      <Pressable
-                        style={s.perspectiveArrowBtn}
-                        onPress={() => handleSwapWrittenPerspectives(writtenIdx, writtenIdx - 1)}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel="Move written perspective up"
-                      >
-                        <Ionicons name="arrow-up" size={14} color={theme.colors.ink} />
-                      </Pressable>
-                    ) : null}
-
-                    {writtenIdx < arr.length - 1 ? (
-                      <Pressable
-                        style={s.perspectiveArrowBtn}
-                        onPress={() => handleSwapWrittenPerspectives(writtenIdx, writtenIdx + 1)}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel="Move written perspective down"
-                      >
-                        <Ionicons name="arrow-down" size={14} color={theme.colors.ink} />
-                      </Pressable>
-                    ) : null}
-
-                    <Pressable
-                      style={s.promptRemoveBtn}
-                      onPress={() => setEditPromptPost(post)}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel="Edit written perspective"
-                    >
-                      <Ionicons name="create-outline" size={16} color={theme.colors.muted} />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <Text style={s.promptQuestionText}>"{post.prompt}"</Text>
-
-                <View style={s.promptCardFooter}>
-                  <View style={s.greatAnswerBadge}>
-                    <Ionicons name="checkmark" size={12} color={theme.colors.brand} />
-                    <Text style={s.greatAnswerText}>
-                      Attached to Photo {photoPosts.findIndex((p) => p.id === post.id) + 1}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() => setEditPromptPost(post)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Change written perspective"
-                  >
-                    <Text style={s.editPromptLink}>Change</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ))}
 
           {/* Section: Profile Details (Basics & Discovery) */}
           <View style={s.sectionHeaderRow}>
@@ -666,10 +606,19 @@ export default function EditProfile() {
       />
 
       <AudioRecordingModal
-        visible={showAudioModal}
-        onClose={() => setShowAudioModal(false)}
+        visible={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
         onSaved={async () => {
-          setShowAudioModal(false);
+          setShowVoiceModal(false);
+          await me.refetch();
+        }}
+      />
+
+      <WrittenPerspectiveModal
+        visible={showWrittenModal}
+        onClose={() => setShowWrittenModal(false)}
+        onSaved={async () => {
+          setShowWrittenModal(false);
           await me.refetch();
         }}
       />
@@ -683,6 +632,78 @@ export default function EditProfile() {
           await me.refetch();
         }}
       />
+
+      {/* Add Choice Bottom Sheet */}
+      <Sheet
+        visible={showAddChoiceSheet}
+        onClose={() => setShowAddChoiceSheet(false)}
+        title="Add to Profile"
+        subtitle="Choose how you would like to share your perspective"
+      >
+        <Pressable
+          style={s.choiceItem}
+          onPress={() => {
+            setShowAddChoiceSheet(false);
+            setPhotoIsPrimary(false);
+            setShowPhotoModal(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Photo with perspective"
+        >
+          <View style={[s.choiceIconContainer, { backgroundColor: theme.colors.brandSoft }]}>
+            <Ionicons name="camera-outline" size={22} color={theme.colors.brand} />
+          </View>
+          <View style={s.choiceTextContainer}>
+            <Text style={s.choiceItemTitle}>Photo with Perspective</Text>
+            <Text style={s.choiceItemSubtitle}>
+              Upload a photo with an attached question or voice note.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+        </Pressable>
+
+        <Pressable
+          style={s.choiceItem}
+          onPress={() => {
+            setShowAddChoiceSheet(false);
+            setShowVoiceModal(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Voice perspective without photo"
+        >
+          <View style={[s.choiceIconContainer, { backgroundColor: '#EDE9FE' }]}>
+            <Ionicons name="mic-outline" size={22} color="#7C3AED" />
+          </View>
+          <View style={s.choiceTextContainer}>
+            <Text style={s.choiceItemTitle}>Voice Perspective (No photo)</Text>
+            <Text style={s.choiceItemSubtitle}>
+              Record an audio answer to a question to share your voice.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+        </Pressable>
+
+        <Pressable
+          style={s.choiceItem}
+          onPress={() => {
+            setShowAddChoiceSheet(false);
+            setShowWrittenModal(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Written perspective without photo"
+        >
+          <View style={[s.choiceIconContainer, { backgroundColor: '#FEF3C7' }]}>
+            <Ionicons name="create-outline" size={22} color="#D97706" />
+          </View>
+          <View style={s.choiceTextContainer}>
+            <Text style={s.choiceItemTitle}>Written Perspective (No photo)</Text>
+            <Text style={s.choiceItemSubtitle}>
+              Select a question and focus hints for others to review.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+        </Pressable>
+      </Sheet>
     </Screen>
   );
 }
@@ -754,6 +775,11 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: theme.spacing.sm,
+  },
+  sectionTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sectionTitle: {
     fontSize: theme.typography.fontSize.base,
@@ -989,5 +1015,201 @@ const s = StyleSheet.create({
     color: theme.colors.muted,
     textAlign: 'center',
     marginBottom: 8,
+  },
+  perspectivesListSection: {
+    gap: theme.spacing.sm,
+    marginTop: 4,
+  },
+  perspectivesListTitle: {
+    fontSize: theme.typography.fontSize.xs,
+    fontWeight: '700',
+    color: theme.colors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  perspectiveCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.sm,
+  },
+  perspectiveCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  perspectiveThumb: {
+    width: 44,
+    height: 52,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  perspectiveMeta: {
+    flex: 1,
+    gap: 3,
+  },
+  perspectiveHeaderPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  perspectivePhotoLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.ink,
+  },
+  voiceBadgePillSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.brand,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: theme.radius.pill,
+  },
+  voiceBadgeTextSmall: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  writtenBadgePillSmall: {
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  writtenBadgeTextSmall: {
+    color: theme.colors.muted,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  perspectiveQuestionText: {
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: '600',
+    color: theme.colors.ink,
+  },
+  editPromptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.brandSoft,
+  },
+  editPromptBtnText: {
+    fontSize: theme.typography.fontSize.xs,
+    fontWeight: '600',
+    color: theme.colors.brand,
+  },
+  inlineAudioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    borderRadius: theme.radius.control,
+    gap: theme.spacing.sm,
+  },
+  inlinePlayBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineWaveTrack: {
+    flex: 1,
+    height: 5,
+    backgroundColor: theme.colors.border,
+    borderRadius: 2.5,
+    overflow: 'hidden',
+  },
+  inlineWaveFill: {
+    height: '100%',
+    backgroundColor: theme.colors.brand,
+  },
+  inlineDurationText: {
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.muted,
+    fontWeight: '600',
+    minWidth: 30,
+  },
+  perspectiveVoiceThumb: {
+    width: 44,
+    height: 52,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  perspectiveTextThumb: {
+    width: 44,
+    height: 52,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  inlineFocusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 2,
+  },
+  inlineFocusTag: {
+    fontSize: 10,
+    color: theme.colors.muted,
+    fontWeight: '600',
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addPerspectiveHeaderBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.brand,
+  },
+  choiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.md,
+  },
+  choiceIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choiceTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  choiceItemTitle: {
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: '700',
+    color: theme.colors.ink,
+  },
+  choiceItemSubtitle: {
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.muted,
+    lineHeight: 16,
   },
 });
