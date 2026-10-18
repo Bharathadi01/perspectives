@@ -43,7 +43,7 @@ export const PROMPT_LIBRARY: PromptItem[] = [
     category: 'first_impressions',
     postCategory: 'vibe',
     text: 'What kind of energy do I radiate here?',
-    defaultFocusAreas: ['energy', 'first_look'],
+    defaultFocusAreas: ['energy', 'impression'],
   },
 
   // Personality
@@ -157,5 +157,77 @@ export const PROMPT_LIBRARY: PromptItem[] = [
     postCategory: 'voice',
     text: 'What is your honest impression after hearing this clip?',
     defaultFocusAreas: ['confidence', 'tone'],
+  },
+
+  // Added for the newer post categories (grooming, personality, profile, interests, lifestyle)
+  {
+    id: 'fi_6',
+    category: 'first_impressions',
+    postCategory: 'grooming',
+    text: 'Does this haircut suit me?',
+    defaultFocusAreas: ['haircut'],
+  },
+  {
+    id: 'fi_7',
+    category: 'first_impressions',
+    postCategory: 'grooming',
+    text: 'Beard or clean-shaven: what works better for me?',
+    defaultFocusAreas: ['facial_hair', 'overall_grooming'],
+  },
+  {
+    id: 'per_5',
+    category: 'personality',
+    postCategory: 'personality',
+    text: 'Do I come across as funny or serious?',
+    defaultFocusAreas: ['humor', 'easygoing'],
+  },
+  {
+    id: 'per_6',
+    category: 'personality',
+    postCategory: 'personality',
+    text: 'What kind of friend do you think I would be?',
+    defaultFocusAreas: ['kindness', 'genuine'],
+  },
+  {
+    id: 'date_5',
+    category: 'dating',
+    postCategory: 'profile',
+    text: 'Does my profile feel like the real me?',
+    defaultFocusAreas: ['genuine', 'missing'],
+  },
+  {
+    id: 'date_6',
+    category: 'dating',
+    postCategory: 'profile',
+    text: 'What would you ask me after seeing my profile?',
+    defaultFocusAreas: ['curious', 'standout'],
+  },
+  {
+    id: 'int_5',
+    category: 'interests',
+    postCategory: 'interests',
+    text: 'Does this hobby make me seem interesting?',
+    defaultFocusAreas: ['comes_across', 'want_to_know'],
+  },
+  {
+    id: 'int_6',
+    category: 'interests',
+    postCategory: 'interests',
+    text: 'Would you want to try this with me?',
+    defaultFocusAreas: ['in_common', 'comes_across'],
+  },
+  {
+    id: 'int_7',
+    category: 'interests',
+    postCategory: 'lifestyle',
+    text: 'What does this place say about me?',
+    defaultFocusAreas: ['says_about', 'setting'],
+  },
+  {
+    id: 'int_8',
+    category: 'interests',
+    postCategory: 'lifestyle',
+    text: 'Does my weekend look fun to you?',
+    defaultFocusAreas: ['looks_fun', 'says_about'],
   },
 ];

@@ -80,10 +80,15 @@ enum PostKind {
 
 enum PostCategory {
   style
+  grooming
   fitness
   looks
   voice
   vibe
+  personality
+  profile
+  interests
+  lifestyle
   other
 }
 

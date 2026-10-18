@@ -1,4 +1,4 @@
-import { RULES } from '@perspective/contracts';
+import { PostCategory, RULES, focusAreaKeys } from '@perspective/contracts';
 import { PROMPT_LIBRARY } from '../src/lib/promptLibrary';
 
 describe('Prompt Library', () => {
@@ -16,6 +16,22 @@ describe('Prompt Library', () => {
       expect(prompt.text.trim().length).toBeGreaterThanOrEqual(RULES.promptMinLength);
       expect(prompt.text.trim().length).toBeLessThanOrEqual(RULES.promptMaxLength);
       expect(prompt.defaultFocusAreas.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('only uses focus areas that belong to each prompt’s post category', () => {
+    for (const prompt of PROMPT_LIBRARY) {
+      const allowed = focusAreaKeys(prompt.postCategory);
+      for (const key of prompt.defaultFocusAreas) {
+        expect(allowed).toContain(key);
+      }
+    }
+  });
+
+  it('offers at least one prompt for every post category except "other"', () => {
+    const covered = new Set(PROMPT_LIBRARY.map((p) => p.postCategory));
+    for (const c of PostCategory.options.filter((c) => c !== 'other')) {
+      expect(covered.has(c)).toBe(true);
     }
   });
 
