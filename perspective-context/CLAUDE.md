@@ -15,7 +15,7 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Schema:** the first migration exists, so schema changes are additive forward migrations only (`jana_claude.md` rule 4.2). Never edit an applied migration.
 - **Do not reintroduce** connection intents or modes, structured responses, lens-based qualification, public scores or comments.
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
-- **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-16 all passed: 45 unit and 17 end-to-end tests.
+- **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-18 all passed: 95 unit and 25 end-to-end tests.
 
 ## Working as two developers (read before every session)
 - **Branches:** work on your own branch (`jana` or `bharath`). Never push to `main` or `dev` directly. Merge your branch into `dev` by pull request, and the other developer reviews it. `main` is updated from `dev` by pull request when `dev` is stable.

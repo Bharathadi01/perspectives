@@ -33,7 +33,7 @@ Perspective is a dating app at its core, with one unique hook: perspectives. Peo
 - The first post is the primary post and is required. It requires a photo.
 - Other posts are a photo or an audio clip, each with a prompt or question.
 - Audio posts are limited to **15 seconds**.
-- Each post has a **category** (for example style, fitness/physique, voice, overall vibe) and **focus areas** the owner wants covered. The final wording of categories is a product-copy task for the developers, who may rework the working names.
+- Each post has one **category** and **focus areas** the owner wants covered. There are 11 categories (decided 2026-10-18): Style & outfit, Hair & grooming, Fitness & physique, Looks & photos, Voice, Overall vibe, Personality & humor, Profile & bio, Interests & hobbies, Lifestyle & places, Something else. A career or networking category was considered and left out. The wording of categories is a product-copy task for the developers, who may rework the working names.
 - A giver answers exactly one post per perspective.
 
 **Audience:** gender and age range (always 18+), set at the profile level. It is not set per post. A profile is shown only to people inside its audience.
@@ -93,6 +93,22 @@ Two ways to start a connection (both use the same accept/decline step):
 
 **Limits:** there is no daily cap on connect requests and no cap on perspectives a profile can receive, for now. Build these caps as server-side config values that default to unlimited, to be tuned after the app is developed.
 
+**Other ways in:** a person can also open a profile from their Inbox, a chat, or their list of given perspectives, and ask to connect from there once they have given that person a perspective. The list of given perspectives stays visible for now (decided 2026-10-18); a paid "see how they responded" option is a possible later idea for the business model, not built.
+
+### The connected moment (decided 2026-10-18)
+- When a connection is made, the person sees a short "You're connected" moment: our own chime (follows the phone's silent switch), a vibration, and both photos coming together. Then they go straight into that chat with the keyboard up; they can leave and write later.
+- The person who accepts sees it at once. The person who asked sees it the next time the app knows: when they open it, bring it back to the foreground, or within 15 seconds while it is open (until push notifications exist). If several connections were made while they were away, the moment says how many and then opens the Connections list; with one, it opens that chat.
+- It shows once per connection, and never interrupts someone writing a perspective, a post or a message.
+- An empty chat shows a few **conversation ideas** chosen by the category of the post that started it and by role (the giver or the post's owner), for example "Ask what got them into it". They are guidance, not ready-made messages: tapping does not fill the message box, and they disappear after the first message. They are hard-coded; no AI reads the perspective.
+
+### Quiet connections (decided 2026-10-18)
+Connections close on their own when they go quiet, so the list stays meaningful:
+- **Nobody writes:** a reminder on day 2, closed on day 3.
+- **One person writes and the other does not reply:** the clock starts when the quiet person first opens the chat after that message. They see a notice 24 hours later ("[Name] is waiting. This connection closes in about a day if you don't reply") and it closes 48 hours after they opened it. If they never open it, it closes 7 days after the message. The person who wrote is only told they are waiting; they never learn whether the message was seen (there are no read receipts).
+- **Both have written:** it closes after 14 days with no messages.
+- A closed connection is treated like an unmatch: the chat closes for both, nothing is deleted, both see a calm note, and either person may ask to connect again straight away (a waiting period is a config value, default 0). Reconnecting starts all clocks fresh.
+- All of these numbers are server configuration.
+
 ## Inbox
 - Received perspectives are grouped by post and stay locked until the day's mandatory set is done.
 - Actions on a perspective: **Helpful**, **Not helpful** (with a reason: vague, irrelevant, insulting, sexual, spam, unsafe), **Thank privately**, **Connect**, **Report**, **Block**.
@@ -100,7 +116,7 @@ Two ways to start a connection (both use the same accept/decline step):
 - Marking perspectives unhelpful feeds the quality loop. Repeatedly unhelpful givers can lose reach or get a lower quota.
 
 ## Five tabs
-- **Explore:** one profile at a time, finite daily batch, starting with the mandatory set.
+- **Explore:** one profile at a time, finite daily batch, starting with the mandatory set. A profile you already gave a perspective to can come back on a later day only while it still has a post you have not answered, and then shows only those posts (decided 2026-10-18). A skipped profile stays hidden for 7 days.
 - **Inbox:** received perspectives and connect requests.
 - **Create:** add or edit your profile posts (up to six).
 - **Connections:** accepted connections and conversations.
@@ -116,7 +132,7 @@ Two ways to start a connection (both use the same accept/decline step):
 ## State machines
 - **Post:** `draft -> pending_moderation -> active -> paused | removed -> archived`
 - **Perspective:** `submitted -> pending_moderation -> delivered -> helpful | archived | reported | removed` (delivered perspectives stay hidden from the owner until the owner's daily unlock)
-- **Connect request:** `none -> requested -> accepted (active connection) | declined (14-day cooldown, then none)`; an active connection can become `unmatched` or `blocked`
+- **Connect request:** `none -> requested -> accepted (active connection) | declined (14-day cooldown, then none)`; an active connection can become `unmatched` (by either person, or closed automatically when it goes quiet, see Quiet connections) or `blocked`
 - **Moderation:** `unreviewed -> machine_allowed | human_review -> allowed | removed -> appealed -> upheld | restored`
 
 ## P0 scope
@@ -133,7 +149,7 @@ These were not decided in the product discussion. They are implemented as stated
 - **Viewer filter:** your own audience also acts as your viewing filter, so two people only see each other when each is inside the other's audience. (Configured in `apps/api/src/domain/eligibility.ts`.)
 - **Lock rule:** received perspectives and connect requests stay hidden until you finish the set on the day they arrived (or a later day). Once revealed they stay visible.
 - **Numbers:** comment minimum 40 characters, up to 3 quick-pick chips, 1 to 3 focus areas per post, prompts 5 to 150 characters, finite Explore batch of 10 per day (mandatory set included), a skipped profile stays hidden for 7 days, "today" is computed in Asia/Kolkata time.
-- **Option lists:** genders (woman, man, non-binary), orientations (straight, gay, lesbian, bisexual, pansexual, queer, asexual, prefer not to say), the six categories and their focus areas, hints and chips in `packages/contracts/src/post.ts`.
+- **Option lists:** genders (woman, man, non-binary), orientations (straight, gay, lesbian, bisexual, pansexual, queer, asexual, prefer not to say), the categories and their focus areas, hints and chips in `packages/contracts/src/post.ts`, and the conversation ideas in `packages/contracts/src/conversationIdeas.ts`.
 - **Connect edge case:** if the other person already asked you, a new request from you is refused and you are pointed to their request instead.
 - **Give-back:** you can always give a perspective back to someone who gave you one, even if they are outside your audience.
 

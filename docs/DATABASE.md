@@ -6,7 +6,7 @@ PostgreSQL is canonical. Use Prisma migrations and explicit repository/applicati
 The business rules behind these tables are in `PRODUCT.md`. The schema is `apps/api/prisma/schema.prisma`; the first migration is `20261016000000_core_loop_jana_init`. From now on, schema changes are additive forward migrations (see `jana_claude.md` rule 4.2).
 
 ## Tables (implemented)
-`users` (email, password hash, birth date, status) · `refresh_tokens` (hashed, rotating families) · `profiles` (basics, audience genders and age range, selfie status, `is_live`) · `media` (photo or audio, purpose `post` or `selfie`, storage key) · `posts` (1 to 6 active per profile; position 0 is the primary photo) · `perspectives` (comment, chips, status, owner feedback: verdict, reason, thanked; `received_day_key` drives the daily unlock) · `daily_progress` (required count and unlock time per user per day) · `daily_assignments` (the mandatory set, `boost` or `mandatory` slot, status) · `profile_skips` · `connect_requests` (sender, receiver, the perspective that earned it, status, response time) · `connections` (normalized pair, status, origin request) · `messages` · `blocks` · `reports` · `idempotency_keys` · `deletion_jobs` (no personal data).
+`users` (email, password hash, birth date, status) · `refresh_tokens` (hashed, rotating families) · `profiles` (basics, audience genders and age range, selfie status, `is_live`) · `media` (photo or audio, purpose `post` or `selfie`, storage key) · `posts` (1 to 6 active per profile; position 0 is the primary photo) · `perspectives` (comment, chips, status, owner feedback: verdict, reason, thanked; `received_day_key` drives the daily unlock) · `daily_progress` (required count and unlock time per user per day) · `daily_assignments` (the mandatory set, `boost` or `mandatory` slot, status) · `profile_skips` · `connect_requests` (sender, receiver, the perspective that earned it, status, response time) · `connections` (normalized pair, status, origin request; `connected_at`, each side's `seen` time for the connected moment, `first_reply_seen_at`, and `closed_reason`/`closed_at` when it closed for being quiet) · `messages` · `blocks` · `reports` · `idempotency_keys` · `deletion_jobs` (no personal data).
 
 Not built yet: `notifications`, `device_tokens`, `moderation_cases`, `moderation_actions`, `audit_logs`, pg-boss job tables.
 
@@ -22,6 +22,7 @@ Not in the model: connection intents or connection modes. A connection has no la
 - A connect request cannot be re-sent by the same sender to the same receiver within the decline cooldown (default 14 days, configurable).
 - One active connection per normalized user pair.
 - Chat opens only on an accepted connect request.
+- A quiet connection closes on its own (see `PRODUCT.md`, Quiet connections): it gets status `unmatched` plus a `closed_reason` (`no_reply`, `no_message`, `inactive`). The rules count only messages since `connected_at`, which resets when the pair reconnects. The rule is the pure function `apps/api/src/domain/connection-expiry.ts`.
 - A received perspective or connect request is revealed once the owner has completed the daily set on the day it arrived or any later day (or gave to every eligible profile that day).
 - One idempotency result per `(actor_id, scope, key)`.
 - State changes occur through application services and validated transitions.

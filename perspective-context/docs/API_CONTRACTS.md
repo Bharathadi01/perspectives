@@ -24,7 +24,7 @@
 ```
 Client branches on stable `code`, not human `message`.
 
-Error codes are the `ErrorCode` enum in `packages/contracts/src/error.ts`. Notable business codes: `PERSPECTIVE_REQUIRED_BEFORE_CONNECT` (the gate), `CONNECT_COOLDOWN_ACTIVE` (with `details.availableAt`), `CONNECT_REQUEST_PENDING`, `ALREADY_CONNECTED`, `ALREADY_SUBMITTED`, `DAILY_UNLOCK_INCOMPLETE`, `SELFIE_VERIFICATION_REQUIRED`, `PROFILE_INCOMPLETE`, `PRIMARY_POST_REQUIRED`, `POST_LIMIT_REACHED`, `POST_NOT_ELIGIBLE`, `PROFILE_NOT_ELIGIBLE`, `BLOCKED_PAIR`, `MODERATION_FAILED`, `CAP_REACHED`, `IDEMPOTENCY_KEY_REQUIRED`. There are no intent or mode codes.
+Error codes are the `ErrorCode` enum in `packages/contracts/src/error.ts`. Notable business codes: `PERSPECTIVE_REQUIRED_BEFORE_CONNECT` (the gate), `CONNECT_COOLDOWN_ACTIVE` (with `details.availableAt`), `CONNECT_REQUEST_PENDING`, `ALREADY_CONNECTED`, `CONNECTION_CLOSED` (a quiet connection closed on its own), `ALREADY_SUBMITTED`, `DAILY_UNLOCK_INCOMPLETE`, `SELFIE_VERIFICATION_REQUIRED`, `PROFILE_INCOMPLETE`, `PRIMARY_POST_REQUIRED`, `POST_LIMIT_REACHED`, `POST_NOT_ELIGIBLE`, `PROFILE_NOT_ELIGIBLE`, `BLOCKED_PAIR`, `MODERATION_FAILED`, `CAP_REACHED`, `IDEMPOTENCY_KEY_REQUIRED`. There are no intent or mode codes.
 
 ## Endpoints (implemented)
 Every authenticated mutation needs an `Idempotency-Key` header (UUID); a retry with the same key returns the stored result.
@@ -41,7 +41,9 @@ Every authenticated mutation needs an `Idempotency-Key` header (UUID); a retry w
 
 **Perspectives and inbox:** `POST /v1/perspectives` (`postId`, `comment`, `chips`, `connect`) · `GET /v1/perspectives/given` · `POST /v1/perspectives/:id/feedback` (`helpful` / `not_helpful` + reason, `thankPrivately`) · `GET /v1/inbox` (daily status, `lockedCount`, perspectives grouped by post, incoming connect requests)
 
-**Connect and chat:** `POST /v1/connect-requests` (`receiverId`) · `POST /v1/connect-requests/:id/accept` · `POST /v1/connect-requests/:id/decline` · `GET /v1/connections` · `GET /v1/connections/:id/messages` (latest 200; cursor pagination is a follow-up) · `POST /v1/connections/:id/messages` · `DELETE /v1/connections/:id` (unmatch)
+**Connect and chat:** `POST /v1/connect-requests` (`receiverId`) · `POST /v1/connect-requests/:id/accept` · `POST /v1/connect-requests/:id/decline` · `GET /v1/connections` · `GET /v1/connections/:id/messages` (latest 200; cursor pagination is a follow-up) · `POST /v1/connections/:id/messages` · `DELETE /v1/connections/:id` (unmatch) · `GET /v1/connections/unseen` (new connections the viewer has not seen the connected moment for) · `POST /v1/connections/seen` (`connectionIds`; marks only the viewer's own side, safe to repeat)
+
+Each `Connection` carries `origin.postCategory` (picks the conversation ideas), `connectedAt` (resets on reconnect), `isNew`, `expiry` (`ok`, `remind`, `you_owe_reply` with `closesAt`, or `waiting`; the person who wrote first only ever gets `waiting`) and `closedReason`. Opening a chat (`GET .../messages`) counts as seeing the connected moment and starts the first-reply clock for the person who owes a reply. A connection that closed because it went quiet answers `CONNECTION_CLOSED` (410) with `details.reason`.
 
 **Safety:** `POST /v1/reports` · `POST /v1/blocks/:userId` · `DELETE /v1/blocks/:userId` · `POST /v1/account/deletion` (password + `DELETE MY ACCOUNT`)
 
