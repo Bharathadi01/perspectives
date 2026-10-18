@@ -15,8 +15,21 @@ export interface ConnectState {
   /** When the receiver last declined a request from the viewer, or null. */
   lastDeclinedAt: Date | null;
   cooldownDays: number;
+  /** When the pair's connection last closed on its own for being quiet, or null. */
+  lastAutoClosedAt?: Date | null;
+  /** Wait after such a closure before asking again (0, the default, behaves like an unmatch). */
+  reopenCooldownDays?: number;
   sentToday: number;
   dailyCap: number | null;
+}
+
+/** The later of the decline cooldown and the quiet-closure cooldown, or null when neither applies. */
+export function requestAvailableAt(s: ConnectState): Date | null {
+  const declined = cooldownUntil(s.lastDeclinedAt, s.cooldownDays, s.now);
+  const reopened = cooldownUntil(s.lastAutoClosedAt ?? null, s.reopenCooldownDays ?? 0, s.now);
+  if (!declined) return reopened;
+  if (!reopened) return declined;
+  return declined > reopened ? declined : reopened;
 }
 
 export type ConnectDecision =
@@ -62,7 +75,7 @@ export function evaluateConnect(s: ConnectState): ConnectDecision {
       message: 'Give them a perspective first, then you can ask to connect.',
     };
   }
-  const until = cooldownUntil(s.lastDeclinedAt, s.cooldownDays, s.now);
+  const until = requestAvailableAt(s);
   if (until) {
     return {
       ok: false,

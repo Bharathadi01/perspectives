@@ -6,10 +6,12 @@ import type {
   Message,
   Relationship,
 } from '@perspective/contracts';
+import type { Connection as ConnectionRow } from '@prisma/client';
 import { AppException } from '../common/app-exception';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { DailyService } from '../daily/daily.service';
-import { ConnectState, cooldownUntil, evaluateConnect } from '../domain/connect';
+import { ConnectState, evaluateConnect, requestAvailableAt } from '../domain/connect';
+import { ExpiryConfig, ExpiryDecision, ExpiryFacts, evaluateExpiry, expiryForViewer } from '../domain/connection-expiry';
 import { isRevealed } from '../domain/daily';
 import { TextModerator } from '../moderation/moderation';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,6 +20,11 @@ import { SocialService } from '../social/social.service';
 
 function pair(a: string, b: string): { userAId: string; userBId: string } {
   return a < b ? { userAId: a, userBId: b } : { userAId: b, userBId: a };
+}
+
+/** The viewer's own "seen the connected moment" column. */
+function seenField(c: Pick<ConnectionRow, 'userAId'>, viewerId: string): 'userASeenAt' | 'userBSeenAt' {
+  return c.userAId === viewerId ? 'userASeenAt' : 'userBSeenAt';
 }
 
 @Injectable()
@@ -33,10 +40,12 @@ export class ConnectService {
 
   /** Gathers everything the connect rules need for viewer → receiver. */
   async state(viewerId: string, receiverId: string, now: Date = new Date()): Promise<ConnectState> {
-    const [receiver, blocks, connection, outgoing, incoming, gate, declined, sentToday] = await Promise.all([
+    const existing = await this.prisma.connection.findUnique({ where: { userAId_userBId: pair(viewerId, receiverId) } });
+    // A quiet connection that is overdue is closed first, so it does not block a new request.
+    const connection = existing ? (await this.refreshExpiry(existing, now)).connection : null;
+    const [receiver, blocks, outgoing, incoming, gate, declined, sentToday] = await Promise.all([
       this.social.person(receiverId),
       this.social.blockState(viewerId, receiverId),
-      this.prisma.connection.findUnique({ where: { userAId_userBId: pair(viewerId, receiverId) } }),
       this.prisma.connectRequest.findFirst({ where: { senderId: viewerId, receiverId, status: 'pending' } }),
       this.prisma.connectRequest.findFirst({ where: { senderId: receiverId, receiverId: viewerId, status: 'pending' } }),
       this.prisma.perspective.findFirst({
@@ -65,6 +74,8 @@ export class ConnectService {
       gatePerspectiveId: gate?.id ?? null,
       lastDeclinedAt: declined?.respondedAt ?? null,
       cooldownDays: this.config.CONNECT_DECLINE_COOLDOWN_DAYS,
+      lastAutoClosedAt: connection?.closedReason ? connection.closedAt : null,
+      reopenCooldownDays: this.config.REOPEN_COOLDOWN_DAYS,
       sentToday,
       dailyCap: this.config.MAX_CONNECT_REQUESTS_PER_DAY,
     };
@@ -98,6 +109,10 @@ export class ConnectService {
     }
   }
 
+  /**
+   * Accepting creates (or re-opens) the connection. The person accepting sees the connected moment
+   * right away, so their side is marked seen; the person who asked sees it next time they are around.
+   */
   async accept(viewerId: string, requestId: string): Promise<Connection> {
     const req = await this.pendingRequestFor(viewerId, requestId);
     const blocks = await this.social.blockState(viewerId, req.senderId);
@@ -105,20 +120,29 @@ export class ConnectService {
       throw new AppException('BLOCKED_PAIR', 'This person is not available.');
     }
     const ids = pair(viewerId, req.senderId);
+    const now = new Date();
+    const fresh = {
+      connectedAt: now,
+      userASeenAt: ids.userAId === viewerId ? now : null,
+      userBSeenAt: ids.userBId === viewerId ? now : null,
+      firstReplySeenAt: null,
+      closedReason: null,
+      closedAt: null,
+    };
     const connection = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.connectRequest.updateMany({
         where: { id: req.id, status: 'pending' },
-        data: { status: 'accepted', respondedAt: new Date() },
+        data: { status: 'accepted', respondedAt: now },
       });
       if (claimed.count === 0) throw new AppException('CONFLICT', 'This request was already answered.');
       await tx.connectRequest.updateMany({
         where: { senderId: viewerId, receiverId: req.senderId, status: 'pending' },
-        data: { status: 'cancelled', respondedAt: new Date() },
+        data: { status: 'cancelled', respondedAt: now },
       });
       return tx.connection.upsert({
         where: { userAId_userBId: ids },
-        create: { ...ids, originRequestId: req.id },
-        update: { status: 'active', originRequestId: req.id },
+        create: { ...ids, originRequestId: req.id, ...fresh },
+        update: { status: 'active', originRequestId: req.id, ...fresh },
         select: { id: true },
       });
     });
@@ -135,18 +159,50 @@ export class ConnectService {
     return { id: req.id, status: 'declined' };
   }
 
-  async connections(viewerId: string): Promise<Connection[]> {
-    const rows = await this.prisma.connection.findMany({
-      where: { status: 'active', OR: [{ userAId: viewerId }, { userBId: viewerId }] },
-      orderBy: { updatedAt: 'desc' },
-      select: { id: true },
-    });
-    const list = await Promise.all(rows.map((r) => this.connectionFor(viewerId, r.id)));
-    return list.sort((a, b) => (b.lastMessage?.createdAt ?? b.createdAt).localeCompare(a.lastMessage?.createdAt ?? a.createdAt));
+  /** Active connections, newest activity first. Quiet ones that are overdue close on the way. */
+  async connections(viewerId: string, now: Date = new Date()): Promise<Connection[]> {
+    const rows = await this.activeRowsFor(viewerId, now);
+    const list = await Promise.all(rows.map((r) => this.connectionFor(viewerId, r.id, now)));
+    return list.sort((a, b) => (b.lastMessage?.createdAt ?? b.connectedAt).localeCompare(a.lastMessage?.createdAt ?? a.connectedAt));
   }
 
-  async messages(viewerId: string, connectionId: string): Promise<Message[]> {
-    await this.activeMembership(viewerId, connectionId);
+  /** Connections the viewer has not yet seen the "you're connected" moment for. */
+  async unseen(viewerId: string, now: Date = new Date()): Promise<Connection[]> {
+    const rows = await this.activeRowsFor(viewerId, now);
+    const fresh = rows.filter((r) => r[seenField(r, viewerId)] === null);
+    const list = await Promise.all(fresh.map((r) => this.connectionFor(viewerId, r.id, now)));
+    return list.sort((a, b) => b.connectedAt.localeCompare(a.connectedAt));
+  }
+
+  /** Marks the connected moment as seen. Only touches the viewer's own side; repeating it is harmless. */
+  async markSeen(viewerId: string, connectionIds: readonly string[], now: Date = new Date()): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.connection.updateMany({
+        where: { id: { in: [...connectionIds] }, userAId: viewerId, userASeenAt: null },
+        data: { userASeenAt: now },
+      }),
+      this.prisma.connection.updateMany({
+        where: { id: { in: [...connectionIds] }, userBId: viewerId, userBSeenAt: null },
+        data: { userBSeenAt: now },
+      }),
+    ]);
+  }
+
+  /**
+   * Opening a chat (this GET) is the "seen" signal: it marks the connected moment as seen and, if the
+   * viewer owes the first reply, starts the first-reply clock. The other person is never told.
+   */
+  async messages(viewerId: string, connectionId: string, now: Date = new Date()): Promise<Message[]> {
+    const { connection, decision } = await this.activeMembership(viewerId, connectionId, now);
+    const updates: Partial<Pick<ConnectionRow, 'userASeenAt' | 'userBSeenAt' | 'firstReplySeenAt'>> = {};
+    const seen = seenField(connection, viewerId);
+    if (connection[seen] === null) updates[seen] = now;
+    if (decision.phase === 'awaiting_reply' && decision.quietUserId === viewerId && connection.firstReplySeenAt === null) {
+      updates.firstReplySeenAt = now;
+    }
+    if (Object.keys(updates).length > 0) {
+      await this.prisma.connection.update({ where: { id: connectionId }, data: updates });
+    }
     const rows = await this.prisma.message.findMany({
       where: { connectionId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -162,7 +218,7 @@ export class ConnectService {
   }
 
   async send(viewerId: string, connectionId: string, text: string): Promise<Message> {
-    const connection = await this.activeMembership(viewerId, connectionId);
+    const { connection } = await this.activeMembership(viewerId, connectionId);
     const partnerId = connection.userAId === viewerId ? connection.userBId : connection.userAId;
     const blocks = await this.social.blockState(viewerId, partnerId);
     if (blocks.viewerBlocked || blocks.blockedByOther) {
@@ -204,7 +260,7 @@ export class ConnectService {
       connectionId: connection?.status === 'active' ? connection.id : null,
       outgoingRequestPending: state.hasPendingOutgoing,
       incomingRequestId: incoming && isRevealed(incoming.receivedDayKey, latestUnlocked) ? incoming.id : null,
-      cooldownUntil: cooldownUntil(state.lastDeclinedAt, state.cooldownDays, now)?.toISOString() ?? null,
+      cooldownUntil: requestAvailableAt(state)?.toISOString() ?? null,
       canRequestConnect: evaluateConnect(state).ok,
     };
   }
@@ -223,6 +279,77 @@ export class ConnectService {
     });
   }
 
+  /** Closes quiet connections that are overdue, for people who are not opening the app. Returns how many closed. */
+  async sweepQuietConnections(now: Date = new Date(), batch = 500): Promise<number> {
+    const rows = await this.prisma.connection.findMany({
+      where: { status: 'active' },
+      orderBy: { updatedAt: 'asc' },
+      take: batch,
+    });
+    let closed = 0;
+    for (const row of rows) {
+      if ((await this.refreshExpiry(row, now)).decision.close) closed++;
+    }
+    return closed;
+  }
+
+  private expiryConfig(): ExpiryConfig {
+    return {
+      firstReplyWarnHours: this.config.FIRST_REPLY_WARN_HOURS,
+      firstReplyCloseHours: this.config.FIRST_REPLY_CLOSE_HOURS,
+      firstReplyBackstopDays: this.config.FIRST_REPLY_BACKSTOP_DAYS,
+      noMessageRemindDays: this.config.NO_MESSAGE_REMIND_DAYS,
+      noMessageCloseDays: this.config.NO_MESSAGE_CLOSE_DAYS,
+      inactivityCloseDays: this.config.INACTIVITY_CLOSE_DAYS,
+    };
+  }
+
+  /** Facts for the quiet-connection rule. Only messages since the pair (re)connected count. */
+  private async expiryFacts(c: ConnectionRow, now: Date): Promise<ExpiryFacts> {
+    const since = { connectionId: c.id, createdAt: { gte: c.connectedAt } };
+    const [first, last] = await Promise.all([
+      this.prisma.message.findFirst({ where: since, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], select: { senderId: true, createdAt: true } }),
+      this.prisma.message.findFirst({ where: since, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { createdAt: true } }),
+    ]);
+    const partnerReplied = first
+      ? (await this.prisma.message.findFirst({ where: { ...since, senderId: { not: first.senderId } }, select: { id: true } })) !== null
+      : false;
+    return {
+      now,
+      connectedAt: c.connectedAt,
+      firstMessage: first ? { senderId: first.senderId, at: first.createdAt } : null,
+      partnerReplied,
+      lastMessageAt: last?.createdAt ?? null,
+      firstReplySeenAt: c.firstReplySeenAt,
+    };
+  }
+
+  /** Evaluates the quiet-connection rule and closes the connection when it is due. */
+  private async refreshExpiry(c: ConnectionRow, now: Date = new Date()): Promise<{ connection: ConnectionRow; decision: ExpiryDecision }> {
+    if (c.status !== 'active') {
+      return { connection: c, decision: { phase: 'established', close: null, warn: false, quietUserId: null, closesAt: null } };
+    }
+    const partnerOf = (id: string) => (id === c.userAId ? c.userBId : c.userAId);
+    const decision = evaluateExpiry(await this.expiryFacts(c, now), partnerOf, this.expiryConfig());
+    if (!decision.close) return { connection: c, decision };
+    const closed = await this.prisma.connection.updateMany({
+      where: { id: c.id, status: 'active' },
+      data: { status: 'unmatched', closedReason: decision.close, closedAt: now },
+    });
+    const connection = closed.count > 0
+      ? { ...c, status: 'unmatched' as const, closedReason: decision.close, closedAt: now }
+      : await this.prisma.connection.findUniqueOrThrow({ where: { id: c.id } });
+    return { connection, decision };
+  }
+
+  private async activeRowsFor(viewerId: string, now: Date): Promise<ConnectionRow[]> {
+    const rows = await this.prisma.connection.findMany({
+      where: { status: 'active', OR: [{ userAId: viewerId }, { userBId: viewerId }] },
+    });
+    const refreshed = await Promise.all(rows.map((r) => this.refreshExpiry(r, now)));
+    return refreshed.filter((r) => r.connection.status === 'active').map((r) => r.connection);
+  }
+
   private async pendingRequestFor(viewerId: string, requestId: string) {
     const req = await this.prisma.connectRequest.findUnique({ where: { id: requestId } });
     if (!req || req.receiverId !== viewerId) {
@@ -238,18 +365,28 @@ export class ConnectService {
     return req;
   }
 
-  private async activeMembership(viewerId: string, connectionId: string) {
-    const connection = await this.prisma.connection.findUnique({ where: { id: connectionId } });
-    if (!connection || (connection.userAId !== viewerId && connection.userBId !== viewerId)) {
+  private async activeMembership(
+    viewerId: string,
+    connectionId: string,
+    now: Date = new Date(),
+  ): Promise<{ connection: ConnectionRow; decision: ExpiryDecision }> {
+    const found = await this.prisma.connection.findUnique({ where: { id: connectionId } });
+    if (!found || (found.userAId !== viewerId && found.userBId !== viewerId)) {
       throw new AppException('NOT_FOUND', 'Conversation not found.');
     }
+    const { connection, decision } = await this.refreshExpiry(found, now);
     if (connection.status !== 'active') {
+      if (connection.closedReason) {
+        throw new AppException('CONNECTION_CLOSED', 'This connection closed because the conversation went quiet.', {
+          reason: connection.closedReason,
+        });
+      }
       throw new AppException('FORBIDDEN', 'This conversation is closed.');
     }
-    return connection;
+    return { connection, decision };
   }
 
-  private async connectionFor(viewerId: string, connectionId: string): Promise<Connection> {
+  private async connectionFor(viewerId: string, connectionId: string, now: Date = new Date()): Promise<Connection> {
     const c = await this.prisma.connection.findUniqueOrThrow({
       where: { id: connectionId },
       include: {
@@ -261,6 +398,10 @@ export class ConnectService {
     });
     const partner = c.userAId === viewerId ? c.userB : c.userA;
     const last = c.messages[0];
+    const decision =
+      c.status === 'active'
+        ? evaluateExpiry(await this.expiryFacts(c, now), (id) => (id === c.userAId ? c.userBId : c.userAId), this.expiryConfig())
+        : null;
     return {
       id: c.id,
       partner: this.mapper.summary(partner),
@@ -269,9 +410,14 @@ export class ConnectService {
         fromUserId: c.originRequest.senderId,
         comment: c.originRequest.perspective.comment,
         postPrompt: c.originRequest.perspective.post.prompt,
+        postCategory: c.originRequest.perspective.post.category,
       },
       lastMessage: last ? { text: last.text, senderId: last.senderId, createdAt: last.createdAt.toISOString() } : null,
       createdAt: c.createdAt.toISOString(),
+      connectedAt: c.connectedAt.toISOString(),
+      isNew: c[seenField(c, viewerId)] === null,
+      expiry: decision ? expiryForViewer(decision, viewerId) : { state: 'ok', closesAt: null },
+      closedReason: c.closedReason,
     };
   }
 }

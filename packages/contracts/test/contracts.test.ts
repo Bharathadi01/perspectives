@@ -2,6 +2,7 @@ import {
   ApiErrorEnvelopeSchema,
   AudienceSchema,
   CATEGORY_CATALOG,
+  CONVERSATION_IDEAS,
   CreatePostInputSchema,
   GivePerspectiveInputSchema,
   PerspectiveFeedbackInputSchema,
@@ -11,6 +12,7 @@ import {
   UpdatePostInputSchema,
   UploadMediaInputSchema,
   ageFromBirthDate,
+  conversationIdeas,
   focusAreaKeys,
   sparkHintsFor,
 } from '../src';
@@ -84,6 +86,28 @@ describe('posts', () => {
       'How does their height or presence come across?',
     ]);
     expect(sparkHintsFor('voice', [])).toHaveLength(CATEGORY_CATALOG.voice.focusAreas.length);
+  });
+});
+
+describe('conversation ideas', () => {
+  it('has at least three short ideas for every category and both roles', () => {
+    for (const c of PostCategory.options) {
+      for (const role of ['giver', 'owner'] as const) {
+        const ideas = CONVERSATION_IDEAS[c][role];
+        expect(ideas.length).toBeGreaterThanOrEqual(3);
+        for (const idea of ideas) {
+          expect(idea.trim().length).toBeGreaterThan(0);
+          expect(idea.length).toBeLessThanOrEqual(120);
+        }
+      }
+    }
+  });
+
+  it('picks the same ideas for the same seed and never repeats one', () => {
+    const a = conversationIdeas('interests', 'giver', 'conn-1');
+    expect(a).toHaveLength(3);
+    expect(conversationIdeas('interests', 'giver', 'conn-1')).toEqual(a);
+    expect(new Set(a).size).toBe(3);
   });
 });
 

@@ -32,6 +32,19 @@ const EnvSchema = z.object({
   SKIP_HIDE_DAYS: z.coerce.number().int().min(0).default(7),
   /** Window used to find low-response profiles for the boost slot. */
   BOOST_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(7),
+  /** Quiet connections (product decision 2026-10-18): hours after the quiet person opens the chat. */
+  FIRST_REPLY_WARN_HOURS: z.coerce.number().positive().default(24),
+  FIRST_REPLY_CLOSE_HOURS: z.coerce.number().positive().default(48),
+  /** Closes an unanswered first message even if the other person never opens the chat. */
+  FIRST_REPLY_BACKSTOP_DAYS: z.coerce.number().positive().default(7),
+  NO_MESSAGE_REMIND_DAYS: z.coerce.number().positive().default(2),
+  NO_MESSAGE_CLOSE_DAYS: z.coerce.number().positive().default(3),
+  /** Once both have written, close after this many days with no messages. */
+  INACTIVITY_CLOSE_DAYS: z.coerce.number().positive().default(14),
+  /** Days before a pair whose connection closed on its own can connect again (0 = straight away, like an unmatch). */
+  REOPEN_COOLDOWN_DAYS: z.coerce.number().int().min(0).default(0),
+  /** How often to close quiet connections nobody is looking at (0 disables the sweep). */
+  EXPIRY_SWEEP_MINUTES: z.coerce.number().int().min(0).default(15),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;

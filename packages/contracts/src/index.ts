@@ -11,3 +11,4 @@ export * from './chat';
 export * from './safety';
 export * from './interests';
 export * from './personality';
+export * from './conversationIdeas';

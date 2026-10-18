@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { IdSchema, IsoDateTimeSchema } from './common';
 import { DailyStatusSchema } from './explore';
 import { ReceivedPerspectiveSchema } from './perspective';
-import { PostRefSchema } from './post';
+import { PostCategory, PostRefSchema } from './post';
 import { ProfileSummarySchema, PublicProfileSchema } from './profile';
 
 export const ConnectRequestStatus = z.enum(['pending', 'accepted', 'declined', 'cancelled']);
@@ -10,6 +10,28 @@ export type ConnectRequestStatus = z.infer<typeof ConnectRequestStatus>;
 
 export const ConnectionStatus = z.enum(['active', 'unmatched', 'blocked']);
 export type ConnectionStatus = z.infer<typeof ConnectionStatus>;
+
+/** Why a quiet connection closed on its own (see docs/PRODUCT.md, Quiet connections). */
+export const ConnectionCloseReason = z.enum(['no_reply', 'no_message', 'inactive']);
+export type ConnectionCloseReason = z.infer<typeof ConnectionCloseReason>;
+
+/**
+ * Where a connection stands for the viewer:
+ * - `ok`: nothing to show.
+ * - `remind`: connected but nobody has written yet; it closes at `closesAt`.
+ * - `you_owe_reply`: the other person wrote first and you have not replied; it closes at `closesAt`.
+ * - `waiting`: you wrote first and are waiting. Never says whether they have seen it.
+ */
+export const ConnectionExpirySchema = z.object({
+  state: z.enum(['ok', 'remind', 'you_owe_reply', 'waiting']),
+  closesAt: IsoDateTimeSchema.nullable(),
+});
+export type ConnectionExpiry = z.infer<typeof ConnectionExpirySchema>;
+
+export const MarkConnectionsSeenInputSchema = z.object({
+  connectionIds: z.array(IdSchema).min(1).max(50),
+});
+export type MarkConnectionsSeenInput = z.infer<typeof MarkConnectionsSeenInputSchema>;
 
 export const CreateConnectRequestInputSchema = z.object({ receiverId: IdSchema });
 export type CreateConnectRequestInput = z.infer<typeof CreateConnectRequestInputSchema>;
@@ -52,14 +74,22 @@ export const ConnectionSchema = z.object({
   status: ConnectionStatus,
   /** The perspective that led to the connection. */
   origin: z.object({
+    /** Who asked to connect; they gave the perspective below. */
     fromUserId: IdSchema,
     comment: z.string(),
     postPrompt: z.string(),
+    postCategory: PostCategory,
   }),
   lastMessage: z
     .object({ text: z.string(), senderId: IdSchema, createdAt: IsoDateTimeSchema })
     .nullable(),
   createdAt: IsoDateTimeSchema,
+  /** When the pair last became connected (resets when they reconnect). */
+  connectedAt: IsoDateTimeSchema,
+  /** True until the viewer has seen the "you're connected" moment. */
+  isNew: z.boolean(),
+  expiry: ConnectionExpirySchema,
+  closedReason: ConnectionCloseReason.nullable(),
 });
 export type Connection = z.infer<typeof ConnectionSchema>;
 
