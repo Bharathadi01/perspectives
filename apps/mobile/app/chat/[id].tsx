@@ -123,8 +123,18 @@ export default function Chat() {
           ListHeaderComponent={
             <View style={s.origin}>
               <Label>How you connected</Label>
-              <Text style={s.originPrompt}>On “{connection.origin.postPrompt}”</Text>
+              <Text style={s.originPrompt}>
+                {connection.origin.fromUserId === partner.id ? `${partner.displayName} said` : 'You said'}, on “{connection.origin.postPrompt}”
+              </Text>
               <Text style={s.originComment}>“{connection.origin.comment}”</Text>
+              {connection.reply ? (
+                <>
+                  <Text style={[s.originPrompt, s.originReply]}>
+                    {connection.reply.fromUserId === partner.id ? `${partner.displayName} said` : 'You said'} back, on “{connection.reply.postPrompt}”
+                  </Text>
+                  <Text style={s.originComment}>“{connection.reply.comment}”</Text>
+                </>
+              ) : null}
             </View>
           }
           renderItem={({ item }) => {
@@ -218,6 +228,7 @@ const s = StyleSheet.create({
   list: { padding: theme.spacing.base, gap: theme.spacing.sm },
   origin: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.media, padding: theme.spacing.base, gap: theme.spacing.xs, marginBottom: theme.spacing.md },
   originPrompt: { fontSize: theme.typography.fontSize.sm, color: theme.colors.muted },
+  originReply: { marginTop: theme.spacing.sm },
   originComment: { fontSize: theme.typography.fontSize.base, color: theme.colors.ink, fontStyle: 'italic' },
   bubble: { maxWidth: '80%', paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm + 2, borderRadius: 18 },
   mine: { alignSelf: 'flex-end', backgroundColor: theme.colors.ink, borderBottomRightRadius: 4 },

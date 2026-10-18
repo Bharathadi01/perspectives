@@ -87,6 +87,13 @@ Decision:
 Consequences: additive migrations (enum values; new `connections` columns); two endpoints and one error code (`CONNECTION_CLOSED`, 410); a closed connection reuses status `unmatched` with a `closedReason`. The sweep runs in every API process until pg-boss exists.
 Alternatives: an LLM writing openers (rejected for privacy, cost and safety); closing on every one-day gap (rejected as too harsh); a cooldown after a quiet closure (kept as a config value, default 0).
 
+## ADR-016: Both must give before a connection opens
+Status: accepted (product owner, 2026-10-18).
+Context: only the asker had to give a perspective; the person accepting could say yes without giving one, so chats often held a single perspective.
+Decision: to accept a connect request the receiver must have given the asker a perspective (`evaluateAccept` in `apps/api/src/domain/connect.ts`). Ticking Connect while giving to someone who already asked accepts their request in the same step. The Inbox and profile explain what is needed, and the chat shows both perspectives (`Connection.reply`).
+Consequences: more effort to accept, so some requests may sit unanswered or be declined; stronger give-to-get. Older connections have no `reply`. Declining is unchanged.
+Alternatives: only show both when both exist (kept the old rule), or leave the chat showing one perspective (rejected).
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded

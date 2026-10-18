@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { ConnectService } from '../../src/connect/connect.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { Client, createApp, give, liveUser, resetDb } from './harness';
+import { Client, createApp, ensureGave, give, liveUser, resetDb } from './harness';
 
 type Live = Client & { postIds: string[] };
 const HOUR = 60 * 60 * 1000;
@@ -39,6 +39,7 @@ describe('connected moment and quiet connections (e2e)', () => {
     await give(meera, ravi.postIds[0], { connect: true }).expect(201);
     await completeDailySet(ravi);
     const inbox = await ravi.get('/v1/inbox').expect(200);
+    await ensureGave(ravi, meera);
     const conn = await ravi.post(`/v1/connect-requests/${inbox.body.connectRequests[0].id}/accept`).expect(200);
     return { meera, ravi, id: conn.body.id as string, accepted: conn.body };
   }
@@ -121,10 +122,36 @@ describe('connected moment and quiet connections (e2e)', () => {
     const view = await ravi.get(`/v1/profiles/${meera.id}`).expect(200);
     expect(view.body.relationship).toMatchObject({ canRequestConnect: true, connectionId: null, cooldownUntil: null });
     const req = await ravi.post('/v1/connect-requests', { receiverId: meera.id }).expect(201);
+    await ensureGave(meera, { id: ravi.id, postIds: ravi.postIds });
     const again = await meera.post(`/v1/connect-requests/${req.body.id}/accept`).expect(200);
     expect(again.body.id).toBe(id);
     expect(again.body.closedReason).toBeNull();
     expect(again.body.expiry).toEqual({ state: 'ok', closesAt: null });
     expect((await ravi.get('/v1/connections/unseen').expect(200)).body).toHaveLength(1);
+  });
+
+  it('lets the receiver give back and accept in one step by ticking Connect while giving', async () => {
+    await resetDb(prisma);
+    const intoWomen = { genders: ['woman' as const], minAge: 18, maxAge: 30 };
+    const intoMen = { genders: ['man' as const], minAge: 18, maxAge: 35 };
+    const meera = await liveUser(app, { name: 'Meera', gender: 'woman', audience: intoMen });
+    const ravi = await liveUser(app, { name: 'Ravi', gender: 'man', audience: intoWomen });
+    await give(meera, ravi.postIds[0], { connect: true }).expect(201);
+    await completeDailySet(ravi);
+
+    // Ravi may have given to Meera already in his daily set; this test needs him not to have.
+    await prisma.perspective.deleteMany({ where: { giverId: ravi.id, ownerId: meera.id } });
+    const inbox = await ravi.get('/v1/inbox').expect(200);
+    expect(inbox.body.connectRequests[0].gaveBack).toBe(false);
+
+    const res = await give(ravi, meera.postIds[0], { connect: true }).expect(201);
+    expect(res.body.connect.status).toBe('connected');
+    const conn = (await ravi.get('/v1/connections').expect(200)).body;
+    expect(conn).toHaveLength(1);
+    expect(conn[0].id).toBe(res.body.connect.connectionId);
+    expect(conn[0].isNew).toBe(false);
+    expect(conn[0].reply).toMatchObject({ fromUserId: ravi.id });
+    // Meera asked, so she still has the connected moment to see.
+    expect((await meera.get('/v1/connections/unseen').expect(200)).body).toHaveLength(1);
   });
 });

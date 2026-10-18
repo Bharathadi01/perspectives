@@ -49,6 +49,8 @@ export const IncomingConnectRequestSchema = z.object({
     chips: z.array(z.string()),
     post: PostRefSchema,
   }),
+  /** Whether the viewer has already given the sender a perspective. Accepting needs one (both must give). */
+  gaveBack: z.boolean(),
   createdAt: IsoDateTimeSchema,
 });
 export type IncomingConnectRequest = z.infer<typeof IncomingConnectRequestSchema>;
@@ -80,6 +82,8 @@ export const ConnectionSchema = z.object({
     postPrompt: z.string(),
     postCategory: PostCategory,
   }),
+  /** The perspective the other person gave back before accepting, so the chat can show both. */
+  reply: z.object({ fromUserId: IdSchema, comment: z.string(), postPrompt: z.string() }).nullable(),
   lastMessage: z
     .object({ text: z.string(), senderId: IdSchema, createdAt: IsoDateTimeSchema })
     .nullable(),

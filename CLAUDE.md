@@ -3,7 +3,7 @@
 ## Product
 Perspective is an 18+ app where selfie-verified users give each other honest, text-only perspectives on how they look, dress, sound, and show up, and can then connect. It is a dating app at its core with a unique hook (perspectives), marketed perspectives-first and not as "a dating app." The same open Connect also serves friends, gym buddies, and networking.
 
-The canonical business rules are in `docs/PRODUCT.md`. If any other doc, comment, or the current skeleton disagrees with it, `docs/PRODUCT.md` wins. In brief: a profile has basics plus 1 to 6 posts (photo or 15-second audio plus a prompt or question). Each day a user gives perspectives on a mandatory set of profiles (default 3, including one boost slot for a low-response profile) to unlock the perspectives they received. A user may ask to connect only after giving the other person a perspective; the other person accepts or declines; chat opens only on accept.
+The canonical business rules are in `docs/PRODUCT.md`. If any other doc, comment, or the current skeleton disagrees with it, `docs/PRODUCT.md` wins. In brief: a profile has basics plus 1 to 6 posts (photo or 15-second audio plus a prompt or question). Each day a user gives perspectives on a mandatory set of profiles (default 3, including one boost slot for a low-response profile) to unlock the perspectives they received. A user may ask to connect only after giving the other person a perspective; the other person gives one back to accept, or declines; chat opens only on accept.
 
 Hinge is the UI and structural reference. For the initial development phase, the UI should look and feel similar to Hinge: the same overall layout patterns, structure, and interaction model (deep profiles of photos and prompts, audio prompts, one-profile-at-a-time discovery, responding to a specific element, incoming review, mutual consent before chat, private outcome feedback). This is a temporary placeholder. The product owner will redesign the UI to Perspective's own look once all logic and algorithms are done, so keep UI code componentized and put styling in design tokens so the redesign is mostly a restyle. Limits that stay: never use Hinge's name or logo, never claim any affiliation, and never copy actual Hinge files (images, screenshots used as assets, exported icons, fonts, sounds, animation files). Write Perspective's own copy and use our own tokens. The Hinge-like UI must be replaced with Perspective's own design before any public release or store submission.
 
@@ -14,7 +14,7 @@ Hinge is the UI and structural reference. For the initial development phase, the
 - Perspectives are text-only, honest, and unfiltered. Criticism is allowed; body shaming, abuse, and sexual content are not.
 - No nudity or sexual content. Shirtless, gym, and swimwear photos are allowed.
 - Connect is open. There are no connection intents, modes, or labels (no "date," "friends," "networking" tags).
-- A user may ask to connect only after giving the other person a perspective. The other person accepts or declines. Chat opens only after accept. After a decline, the same sender cannot send another request to that person for 14 days (configurable).
+- A user may ask to connect only after giving the other person a perspective. The other person gives one back to accept, or declines. Chat opens only after accept. After a decline, the same sender cannot send another request to that person for 14 days (configurable).
 - Only selfie-verified, 18+ users have an active profile.
 - Audience (gender and age range) is set at profile level. Users are never forced to see profiles outside their own filters, blocks, or mutes.
 - No profile should be left without perspectives; the daily assignment must push low-response profiles to others.
@@ -31,7 +31,7 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Schema:** the first migration exists, so schema changes are additive forward migrations only (`jana_claude.md` rule 4.2). Never edit an applied migration.
 - **Do not reintroduce** connection intents or modes, structured responses, lens-based qualification, public scores or comments.
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
-- **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-18 all passed: 95 unit and 25 end-to-end tests.
+- **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-18 all passed: 96 unit and 26 end-to-end tests.
 
 ## Working as two developers (read before every session)
 - **Branches:** work on your own branch (`jana` or `bharath`). Never push to `main` or `dev` directly. Merge your branch into `dev` by pull request, and the other developer reviews it. `main` is updated from `dev` by pull request when `dev` is stable.

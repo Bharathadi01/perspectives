@@ -10,7 +10,7 @@ import type { Connection as ConnectionRow } from '@prisma/client';
 import { AppException } from '../common/app-exception';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { DailyService } from '../daily/daily.service';
-import { ConnectState, evaluateConnect, requestAvailableAt } from '../domain/connect';
+import { ConnectState, evaluateAccept, evaluateConnect, requestAvailableAt } from '../domain/connect';
 import { ExpiryConfig, ExpiryDecision, ExpiryFacts, evaluateExpiry, expiryForViewer } from '../domain/connection-expiry';
 import { isRevealed } from '../domain/daily';
 import { TextModerator } from '../moderation/moderation';
@@ -110,6 +110,26 @@ export class ConnectService {
   }
 
   /**
+   * Used when someone ticks Connect while giving a perspective. If the other person already has a
+   * request waiting for them, the perspective they just gave is the "give back", so accept it;
+   * otherwise ask to connect. Never fails the perspective itself.
+   */
+  async tryConnect(viewerId: string, otherId: string, now: Date = new Date()): Promise<ConnectAttempt> {
+    const incoming = await this.prisma.connectRequest.findFirst({
+      where: { senderId: otherId, receiverId: viewerId, status: 'pending' },
+      select: { id: true },
+    });
+    if (!incoming) return this.tryRequest(viewerId, otherId, now);
+    try {
+      const connection = await this.accept(viewerId, incoming.id);
+      return { status: 'connected', connectionId: connection.id };
+    } catch (err) {
+      if (err instanceof AppException) return { status: 'not_sent', code: err.code };
+      throw err;
+    }
+  }
+
+  /**
    * Accepting creates (or re-opens) the connection. The person accepting sees the connected moment
    * right away, so their side is marked seen; the person who asked sees it next time they are around.
    */
@@ -119,6 +139,8 @@ export class ConnectService {
     if (blocks.viewerBlocked || blocks.blockedByOther) {
       throw new AppException('BLOCKED_PAIR', 'This person is not available.');
     }
+    const gate = evaluateAccept({ receiverGaveToSender: await this.social.hasGivenTo(viewerId, req.senderId) });
+    if (!gate.ok) throw new AppException(gate.code, gate.message, { senderId: req.senderId });
     const ids = pair(viewerId, req.senderId);
     const now = new Date();
     const fresh = {
@@ -398,6 +420,13 @@ export class ConnectService {
     });
     const partner = c.userAId === viewerId ? c.userB : c.userA;
     const last = c.messages[0];
+    const askerId = c.originRequest.senderId;
+    const answererId = askerId === c.userAId ? c.userBId : c.userAId;
+    const reply = await this.prisma.perspective.findFirst({
+      where: { giverId: answererId, ownerId: askerId, status: { not: 'removed' } },
+      orderBy: { createdAt: 'desc' },
+      include: { post: true },
+    });
     const decision =
       c.status === 'active'
         ? evaluateExpiry(await this.expiryFacts(c, now), (id) => (id === c.userAId ? c.userBId : c.userAId), this.expiryConfig())
@@ -412,6 +441,7 @@ export class ConnectService {
         postPrompt: c.originRequest.perspective.post.prompt,
         postCategory: c.originRequest.perspective.post.category,
       },
+      reply: reply ? { fromUserId: answererId, comment: reply.comment, postPrompt: reply.post.prompt } : null,
       lastMessage: last ? { text: last.text, senderId: last.senderId, createdAt: last.createdAt.toISOString() } : null,
       createdAt: c.createdAt.toISOString(),
       connectedAt: c.connectedAt.toISOString(),

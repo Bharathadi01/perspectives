@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { Client, LONG_COMMENT, createApp, give, liveUser, resetDb } from './harness';
+import { Client, LONG_COMMENT, createApp, ensureGave, give, liveUser, resetDb } from './harness';
 
 type Live = Client & { postIds: string[] };
 
@@ -126,9 +126,19 @@ describe('core loop (e2e)', () => {
     expect(mine.body[0].thanked).toBe(true);
     expect(JSON.stringify(mine.body)).not.toContain('verdict');
 
-    // Chat only opens after accept.
+    // Chat only opens after accept, and accepting needs a perspective back (both must give).
     expect((await w.ravi.get('/v1/connections').expect(200)).body).toHaveLength(0);
-    const conn = await w.ravi.post(`/v1/connect-requests/${inbox.body.connectRequests[0].id}/accept`).expect(200);
+    const requestId = inbox.body.connectRequests[0].id;
+    // Ravi's daily set may already have included Meera; this part needs him not to have given yet.
+    await prisma.perspective.deleteMany({ where: { giverId: w.ravi.id, ownerId: w.meera.id } });
+    const beforeGiving = await w.ravi.get('/v1/inbox').expect(200);
+    expect(beforeGiving.body.connectRequests[0].gaveBack).toBe(false);
+    const early2 = await w.ravi.post(`/v1/connect-requests/${requestId}/accept`).expect(403);
+    expect(early2.body.error.code).toBe('PERSPECTIVE_REQUIRED_BEFORE_ACCEPT');
+    await ensureGave(w.ravi, w.meera);
+    expect((await w.ravi.get('/v1/inbox').expect(200)).body.connectRequests[0].gaveBack).toBe(true);
+    const conn = await w.ravi.post(`/v1/connect-requests/${requestId}/accept`).expect(200);
+    expect(conn.body.reply).toMatchObject({ fromUserId: w.ravi.id, comment: LONG_COMMENT });
     await w.ravi.post(`/v1/connections/${conn.body.id}/messages`, { text: 'Hey Meera, thanks!' }).expect(201);
     const msgs = await w.meera.get(`/v1/connections/${conn.body.id}/messages`).expect(200);
     expect(msgs.body.map((m: { text: string }) => m.text)).toEqual(['Hey Meera, thanks!']);

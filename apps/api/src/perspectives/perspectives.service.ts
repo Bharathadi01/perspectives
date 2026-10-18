@@ -107,7 +107,7 @@ export class PerspectivesService {
     }
 
     await this.daily.markGiven(viewerId, post.ownerId, now);
-    const connect = input.connect ? await this.connect.tryRequest(viewerId, post.ownerId, now) : null;
+    const connect = input.connect ? await this.connect.tryConnect(viewerId, post.ownerId, now) : null;
     const ownerRow = await this.prisma.user.findUniqueOrThrow({ where: { id: post.ownerId }, include: PROFILE_USER_INCLUDE });
     return {
       perspective: {
@@ -150,6 +150,16 @@ export class PerspectivesService {
       (r) => !isRevealed(r.receivedDayKey, latestUnlocked) && !lockedPerspectiveIds.has(r.perspectiveId),
     );
     const pendingFromGiver = new Map(visibleRequests.map((r) => [r.senderId, r.id]));
+    // Accepting needs the viewer to have given the asker a perspective too (both must give).
+    const gaveBackTo = new Set(
+      (
+        await this.prisma.perspective.findMany({
+          where: { giverId: viewerId, ownerId: { in: visibleRequests.map((r) => r.senderId) }, status: { not: 'removed' } },
+          select: { ownerId: true },
+          distinct: ['ownerId'],
+        })
+      ).map((p) => p.ownerId),
+    );
 
     const groups = new Map<string, InboxGroup>();
     for (const row of revealed) {
@@ -164,6 +174,7 @@ export class PerspectivesService {
       groups: [...groups.values()],
       connectRequests: visibleRequests.map((r) => ({
         id: r.id,
+        gaveBack: gaveBackTo.has(r.senderId),
         sender: this.mapper.summary(r.sender),
         perspective: {
           id: r.perspective.id,

@@ -41,6 +41,15 @@ export default function ProfileScreen() {
     if (rel.connectionId) {
       return <Button title={`Message ${name}`} onPress={() => router.push({ pathname: '/chat/[id]', params: { id: rel.connectionId! } })} />;
     }
+    if (rel.incomingRequestId && !rel.gaveToThem) {
+      const requestId = rel.incomingRequestId;
+      return (
+        <View style={s.gap}>
+          <Text style={s.info}>{name} asked to connect. Give {name} a perspective on any post to accept.</Text>
+          <Button title="Decline" variant="secondary" onPress={() => void run(() => decline.run(requestId), 'Declined. They won’t be told.')} />
+        </View>
+      );
+    }
     if (rel.incomingRequestId) {
       const requestId = rel.incomingRequestId;
       return (
@@ -126,6 +135,7 @@ const s = StyleSheet.create({
     paddingTop: theme.spacing.md,
   },
   row: { flexDirection: 'row', gap: theme.spacing.sm },
+  gap: { gap: theme.spacing.sm },
   flex: { flex: 1 },
   info: { textAlign: 'center', color: theme.colors.muted, fontSize: theme.typography.fontSize.sm, paddingVertical: theme.spacing.sm },
 });

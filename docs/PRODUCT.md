@@ -22,7 +22,7 @@ Perspective is a dating app at its core, with one unique hook: perspectives. Peo
 4. Each day the app assigns you a mandatory set of profiles (default 3). You give a perspective on one post of each.
 5. Giving the mandatory set unlocks the perspectives you received that day. You may keep giving more, but you do not have to.
 6. Review received perspectives privately. Mark them helpful or not helpful, thank the giver privately, report, block, or Connect.
-7. Connect: you can only ask to connect with someone after you have given them a perspective. The other person accepts or declines. Chat opens only after accept.
+7. Connect: you can only ask to connect with someone after you have given them a perspective. The other person accepts or declines, and to accept they give you a perspective back. Chat opens only after accept.
 
 ## Profile
 **Mandatory before the profile goes live:** selfie verification, age (derived from a birthdate, 18+), gender, height, orientation/preference, city, and a primary post that includes a photo.
@@ -87,7 +87,7 @@ Two ways to start a connection (both use the same accept/decline step):
 - **Giver starts:** while giving a perspective, the giver ticks Connect. The owner sees the perspective with the connect request attached.
 - **Owner starts:** the owner reads a perspective they like, opens the giver's profile, gives the giver a perspective on one of their posts, then sends a connect request.
 
-**The receiver** sees the request together with the perspective that earned it, then **accepts or declines**. Chat opens only after accept.
+**The receiver** sees the request together with the perspective that earned it, then **accepts or declines**. **To accept, the receiver must give the asker a perspective too** (both must give, decided 2026-10-18). The Inbox card then says "To connect, give [name] a perspective too" and offers "Give [name] a perspective" instead of Connect. The composer offers "Also connect with [name]", so giving back and accepting happen in one step. Chat opens only after accept, and shows both perspectives. Declining needs nothing.
 
 **Decline:** the sender cannot send another connect request to the same person for **14 days** (the value is configurable; 0 disables it).
 
@@ -151,7 +151,7 @@ These were not decided in the product discussion. They are implemented as stated
 - **Numbers:** comment minimum 40 characters, up to 3 quick-pick chips, 1 to 3 focus areas per post, prompts 5 to 150 characters, finite Explore batch of 10 per day (mandatory set included), a skipped profile stays hidden for 7 days, "today" is computed in Asia/Kolkata time.
 - **Option lists:** genders (woman, man, non-binary), orientations (straight, gay, lesbian, bisexual, pansexual, queer, asexual, prefer not to say), the categories and their focus areas, hints and chips in `packages/contracts/src/post.ts`, and the conversation ideas in `packages/contracts/src/conversationIdeas.ts`.
 - **Connect edge case:** if the other person already asked you, a new request from you is refused and you are pointed to their request instead.
-- **Give-back:** you can always give a perspective back to someone who gave you one, even if they are outside your audience.
+- **Give-back:** you can always give a perspective back to someone who gave you one, even if they are outside your audience. This is what lets a receiver outside the asker's audience still accept. A per-profile daily received cap, if one is set, could block a give-back.
 
 ## North star
 Helpful Perspectives per Weekly Active Owner.

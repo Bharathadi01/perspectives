@@ -89,3 +89,25 @@ export function evaluateConnect(s: ConnectState): ConnectDecision {
   }
   return { ok: true, perspectiveId: s.gatePerspectiveId };
 }
+
+export interface AcceptState {
+  /** Whether the person accepting has given the asker a perspective (any non-removed one). */
+  receiverGaveToSender: boolean;
+}
+
+export type AcceptDecision = { ok: true } | { ok: false; code: ErrorCode; message: string };
+
+/**
+ * Both must give (product decision 2026-10-18): the asker gave the first perspective, and the person
+ * accepting must give one back before the chat opens.
+ */
+export function evaluateAccept(s: AcceptState): AcceptDecision {
+  if (!s.receiverGaveToSender) {
+    return {
+      ok: false,
+      code: 'PERSPECTIVE_REQUIRED_BEFORE_ACCEPT',
+      message: 'Give them a perspective first, then you can accept.',
+    };
+  }
+  return { ok: true };
+}

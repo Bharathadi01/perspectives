@@ -9,6 +9,7 @@ export function errorMessage(err: unknown): string {
       case 'VALIDATION_FAILED':
       case 'MODERATION_FAILED':
       case 'PERSPECTIVE_REQUIRED_BEFORE_CONNECT':
+      case 'PERSPECTIVE_REQUIRED_BEFORE_ACCEPT':
       case 'CONNECT_COOLDOWN_ACTIVE':
       case 'CONNECT_REQUEST_PENDING':
       case 'ALREADY_SUBMITTED':
