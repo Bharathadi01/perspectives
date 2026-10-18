@@ -71,3 +71,14 @@ export function timeAgo(iso: string, now: Date = new Date()): string {
   if (hours < 24) return `${hours}h`;
   return `${Math.round(hours / 24)}d`;
 }
+
+/** "in 5 hours", "in about a day", "in under an hour": for deadlines such as a quiet connection closing. */
+export function timeUntil(iso: string, now: Date = new Date()): string {
+  const mins = Math.round((new Date(iso).getTime() - now.getTime()) / 60000);
+  if (mins < 60) return 'in under an hour';
+  const hours = Math.round(mins / 60);
+  if (hours === 1) return 'in about an hour';
+  if (hours < 22) return `in ${hours} hours`;
+  if (hours < 36) return 'in about a day';
+  return `in ${Math.round(hours / 24)} days`;
+}

@@ -32,6 +32,8 @@ export function errorMessage(err: unknown): string {
         return 'This is no longer available.';
       case 'BLOCKED_PAIR':
         return 'You blocked this person.';
+      case 'CONNECTION_CLOSED':
+        return 'This connection closed because the conversation went quiet.';
       default:
         return 'Something went wrong. Please try again.';
     }

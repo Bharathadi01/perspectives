@@ -185,8 +185,8 @@ export function useDeclineConnect() {
   return useIdempotentMutation((requestId: string, key: string) => api.connect.decline(requestId, key), { onSuccess: refresh });
 }
 
-export function useConnections() {
-  return useQuery({ queryKey: queryKeys.connections, queryFn: () => api.connect.connections() });
+export function useConnections(enabled = true) {
+  return useQuery({ queryKey: queryKeys.connections, queryFn: () => api.connect.connections(), enabled });
 }
 
 /** Chat is polled in v1 (PostgreSQL is canonical; sockets come later). */
@@ -212,6 +212,31 @@ export function useSendMessage(connectionId: string) {
 export function useUnmatch() {
   const refresh = useInvalidateSocial();
   return useIdempotentMutation((connectionId: string, key: string) => api.connect.unmatch(connectionId, key), { onSuccess: refresh });
+}
+
+// ---------- connected moment ----------
+/**
+ * New connections the user has not celebrated yet. Checked when the app opens, when it comes back to
+ * the foreground (react-query refetches on focus), and every 15 seconds while it is open, until push
+ * notifications exist.
+ */
+export function useUnseenConnections(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.unseenConnections,
+    queryFn: () => api.connect.unseen(),
+    enabled,
+    refetchInterval: 15_000,
+    staleTime: 0,
+  });
+}
+
+export function useMarkConnectionsSeen() {
+  const qc = useQueryClient();
+  return useIdempotentMutation((ids: string[], key: string) => api.connect.markSeen(ids, key), {
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.connections });
+    },
+  });
 }
 
 // ---------- safety ----------

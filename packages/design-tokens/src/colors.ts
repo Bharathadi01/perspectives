@@ -20,6 +20,15 @@ export const colors = {
   photoScrim: 'rgba(23, 23, 27, 0.45)',
   overlay: 'rgba(23, 23, 27, 0.55)',
   shadow: '#17171B',
+  /** The "you're connected" moment: deep brand background, soft glow and confetti. */
+  celebrationBackground: '#2B2266',
+  celebrationGlow: 'rgba(236, 233, 251, 0.16)',
+  confettiGold: '#F2C14E',
+  confettiCoral: '#F78C6B',
+  confettiMint: '#7BD3C4',
+  confettiLilac: '#ECE9FB',
+  /** Small notice banners in chat (for example "Reply soon"). */
+  noticeBackground: '#FFF4E5',
 } as const;
 
 export type Colors = typeof colors;

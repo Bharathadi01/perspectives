@@ -53,10 +53,7 @@ export default function ProfileScreen() {
             onPress={() =>
               void accept
                 .run(requestId)
-                .then((c) => {
-                  toast(`You’re connected with ${name}.`, 'success');
-                  router.replace({ pathname: '/chat/[id]', params: { id: c.id } });
-                })
+                .then((c) => router.replace({ pathname: '/connected', params: { ids: c.id } }))
                 .catch((err: unknown) => toast(errorMessage(err), 'error'))
             }
           />

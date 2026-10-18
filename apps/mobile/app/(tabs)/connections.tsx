@@ -44,7 +44,10 @@ export default function Connections() {
               <View style={s.nameRow}>
                 <Text style={s.name}>{item.partner.displayName}</Text>
                 {item.partner.verified ? <VerifiedBadge size={14} /> : null}
-                <Text style={s.time}>{timeAgo(item.lastMessage?.createdAt ?? item.createdAt)}</Text>
+                {item.isNew ? <Text style={[s.tag, s.tagNew]}>New</Text> : null}
+                {item.expiry.state === 'you_owe_reply' ? <Text style={[s.tag, s.tagWarn]}>Reply soon</Text> : null}
+                {item.expiry.state === 'remind' ? <Text style={[s.tag, s.tagWarn]}>Say hi</Text> : null}
+                <Text style={s.time}>{timeAgo(item.lastMessage?.createdAt ?? item.connectedAt)}</Text>
               </View>
               <Text style={s.preview} numberOfLines={1}>
                 {item.lastMessage ? item.lastMessage.text : `Connected over: “${item.origin.postPrompt}”`}
@@ -66,5 +69,15 @@ const s = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   name: { fontSize: theme.typography.fontSize.base, fontWeight: theme.typography.fontWeight.semibold, color: theme.colors.ink },
   time: { marginLeft: 'auto', fontSize: theme.typography.fontSize.xs, color: theme.colors.muted },
+  tag: {
+    fontSize: theme.typography.fontSize.xs,
+    fontWeight: theme.typography.fontWeight.semibold,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: theme.radius.pill,
+    overflow: 'hidden',
+  },
+  tagNew: { backgroundColor: theme.colors.brandSoft, color: theme.colors.brand },
+  tagWarn: { backgroundColor: theme.colors.noticeBackground, color: theme.colors.warning },
   preview: { fontSize: theme.typography.fontSize.sm, color: theme.colors.muted },
 });

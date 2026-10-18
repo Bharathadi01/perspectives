@@ -75,8 +75,8 @@ export default function Inbox() {
     try {
       if (yes) {
         const connection = await accept.run(requestId);
-        toast(`You’re connected with ${connection.partner.displayName}.`, 'success');
-        router.push({ pathname: '/chat/[id]', params: { id: connection.id } });
+        // The connected moment, then straight into the chat.
+        router.push({ pathname: '/connected', params: { ids: connection.id } });
       } else {
         await decline.run(requestId);
         toast('Declined. They won’t be told.', 'info');
