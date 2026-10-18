@@ -73,6 +73,7 @@ export default function Explore() {
             <ProfileView
               profile={card.profile}
               givenPostIds={card.givenPostIds}
+              hideAnswered
               onGive={(post) => router.push({ pathname: '/give/[postId]', params: { postId: post.id, profileId: card.profile.id } })}
             />
           </ScrollView>

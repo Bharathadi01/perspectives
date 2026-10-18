@@ -79,6 +79,24 @@ describe('core loop (e2e)', () => {
     expect(abusive.body.error.code).toBe('MODERATION_FAILED');
   });
 
+  it('brings a profile back on a later day only while it still has a post the viewer has not answered', async () => {
+    const w = await world();
+    // Yesterday Ravi answered Asha's only post and one of Meera's two posts.
+    await give(w.ravi, w.asha.postIds[0]).expect(201);
+    await give(w.ravi, w.meera.postIds[0]).expect(201);
+    await prisma.perspective.updateMany({ where: { giverId: w.ravi.id }, data: { receivedDayKey: '2000-01-01' } });
+
+    await w.ravi.get('/v1/explore').expect(200);
+    const targets = (await prisma.dailyAssignment.findMany({ where: { userId: w.ravi.id } })).map((s) => s.targetId);
+    expect(targets).not.toContain(w.asha.id);
+    expect(targets).toContain(w.meera.id);
+
+    // Meera's profile still lists both posts and marks the answered one, so Explore can hide it.
+    const meera = await w.ravi.get(`/v1/profiles/${w.meera.id}`).expect(200);
+    expect(meera.body.givenPostIds).toEqual([w.meera.postIds[0]]);
+    expect(meera.body.profile.posts).toHaveLength(2);
+  });
+
   it('keeps received perspectives locked until the daily set is done, then lets the owner accept a connect', async () => {
     const w = await world();
     const given = await give(w.meera, w.ravi.postIds[0], { connect: true }).expect(201);
