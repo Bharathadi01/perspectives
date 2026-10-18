@@ -170,6 +170,8 @@ Deep research on collaborative multi-agent vibe coding reveals specific traps. H
 
 ## 6. Mandatory Pre-Push Protocol: The Sync Manifest
 
+> Before every push the agent must also have updated `business-logic/BUSINESS_LOGIC.md` (see `CLAUDE.md`, "Business logic document"). The manifest has a tick box for it.
+
 **MANDATORY RULE:** Before committing and pushing any branch to GitHub, every AI agent working on the codebase **must create a Markdown Sync Manifest** inside the `sync-manifests/` directory.
 
 ### Manifest File Naming Convention:

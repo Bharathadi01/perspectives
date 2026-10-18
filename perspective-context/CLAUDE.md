@@ -17,6 +17,14 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
 - **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-18 all passed: 96 unit and 26 end-to-end tests.
 
+## Business logic document (MANDATORY after every change)
+`business-logic/BUSINESS_LOGIC.md` explains, in plain words, everything the app does today: every screen flow, rule, number, error and edge case, plus what is fake or missing. The product owner reads it to know what is happening instead of asking.
+- **After every successful build, feature, rule change or behavior-changing bug fix, update it in the same commit.** Not "later". A change is not finished until it is updated. This applies to every developer and every AI agent, whoever is working.
+- Update the section that describes the behavior, the numbers table, the error table and the "fake or missing" list if they changed, add a dated entry at the top of its change log, and update "Last updated".
+- It describes what is **built**, never what is planned. Keep the tags ([Built], [Placeholder], [Not built], [Conflict]) accurate. Write for a non-programmer.
+- If your change disagrees with `docs/PRODUCT.md`, list it under the file's conflicts section and tell the product owner. Do not change `docs/PRODUCT.md` without approval.
+- Before you finish any task, say in your report that you updated it (or why nothing needed updating).
+
 ## Working as two developers (read before every session)
 - **Branches:** work on your own branch (`jana` or `bharath`). Never push to `main` or `dev` directly. Merge your branch into `dev` by pull request, and the other developer reviews it. `main` is updated from `dev` by pull request when `dev` is stable.
 - **Start of every session:** make sure `git status` is clean, then `git pull origin dev`. After pulling, run `pnpm install`, `pnpm db:migrate`, and rebuild.
@@ -24,7 +32,7 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Do not change product rules on your own.** New profile fields, labels (for example relationship goals), matching factors, or renamed terms need a decision from Jana first (see `docs/PRODUCT.md`). If you think one is a good idea, write it up as a proposal and stop. Connect has no intents or labels. "Perspective" always means the feedback a giver writes on a post; the question attached to a post is called a "prompt" or "question".
 - **Docs and code must agree.** If you change behavior, update the matching doc in the same change (`docs/PRODUCT.md` only after Jana confirms) and the `perspective-context/` copy.
 - **Shared files:** `schema.prisma`, `packages/contracts/src/index.ts`, `packages/api-client/src/client.ts`, `apps/mobile/src/features/hooks.ts`, `pnpm-lock.yaml`. Add new files instead of editing old ones where you can, and add a row to `docs/ACTIVE_CHANGES.md` before touching `schema.prisma`. Never hand-merge the lockfile; run `pnpm install` after a merge.
-- **Before you push:** `pnpm build`, `pnpm typecheck`, `pnpm test` and `pnpm test:e2e` pass, and you wrote a sync manifest in `sync-manifests/`.
+- **Before you push:** `pnpm build`, `pnpm typecheck`, `pnpm test` and `pnpm test:e2e` pass, you updated `business-logic/BUSINESS_LOGIC.md`, and you wrote a sync manifest in `sync-manifests/`.
 - **Build tips:** stop the API before rebuilding (a running API locks `apps/api/dist`). If `pnpm build` is killed for lack of memory, run `pnpm -r --workspace-concurrency=1 run build`.
 
 ## Stack
