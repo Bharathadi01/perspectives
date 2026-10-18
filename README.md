@@ -6,7 +6,7 @@ Perspective is an 18+ app where selfie-verified users give each other honest, te
 
 Each profile has basics plus 1 to 6 **posts** (a photo or a 15-second audio clip with a prompt or question). Each day, users give perspectives on a mandatory set of profiles to unlock the perspectives they received. You can ask to connect with someone only after giving them a perspective; they accept or decline; chat opens only on accept.
 
-The business rules live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any other doc.
+The business rules we want live in [`docs/PRODUCT.md`](docs/PRODUCT.md) and win over any other doc. What the app actually does today, in plain words, is in [`business-logic/BUSINESS_LOGIC.md`](business-logic/BUSINESS_LOGIC.md); it must be updated after every change.
 
 ---
 

@@ -80,10 +80,15 @@ enum PostKind {
 
 enum PostCategory {
   style
+  grooming
   fitness
   looks
   voice
   vibe
+  personality
+  profile
+  interests
+  lifestyle
   other
 }
 
@@ -142,6 +147,13 @@ enum ConnectionStatus {
   active
   unmatched
   blocked
+}
+
+/// Why a quiet connection was closed automatically (it then has status `unmatched`).
+enum ConnectionCloseReason {
+  no_reply
+  no_message
+  inactive
 }
 
 enum ReportTargetType {
@@ -227,30 +239,30 @@ model RefreshToken {
 }
 
 model Profile {
-  userId          String       @id @db.Uuid
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName     String?
-  gender          Gender?
-  heightCm        Int?
-  orientation     Orientation?
+  userId               String            @id @db.Uuid
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName          String?
+  gender               Gender?
+  heightCm             Int?
+  orientation          Orientation?
   city                 String?
   pronouns             String?
-  audienceGenders      Gender[]         @default([])
+  audienceGenders      Gender[]          @default([])
   audienceMinAge       Int?
   audienceMaxAge       Int?
   datingIntention      DatingIntention?
-  intentionDealbreaker Boolean          @default(false)
-  interests            String[]         @default([])
+  intentionDealbreaker Boolean           @default(false)
+  interests            String[]          @default([])
   lifestylePace        LifestylePace?
   socialPreference     SocialPreference?
   personalityPrompts   Json?
-  selfieStatus         SelfieStatus     @default(unverified)
-  selfieMediaId        String?          @db.Uuid
+  selfieStatus         SelfieStatus      @default(unverified)
+  selfieMediaId        String?           @db.Uuid
   selfieCheckedAt      DateTime?
   /// True when basics, audience, selfie, and a primary photo post are all in place.
-  isLive               Boolean          @default(false)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  isLive               Boolean           @default(false)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   @@index([isLive, gender])
   @@map("profiles")
@@ -276,21 +288,21 @@ model Media {
 }
 
 model Post {
-  id           String        @id @default(uuid()) @db.Uuid
-  ownerId      String        @db.Uuid
-  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid()) @db.Uuid
+  ownerId      String       @db.Uuid
+  owner        User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   position     Int
   kind         PostKind
-  mediaId      String?       @unique @db.Uuid
-  media        Media?        @relation("PostMedia", fields: [mediaId], references: [id], onDelete: Cascade)
-  audioMediaId String?       @unique @db.Uuid
-  audioMedia   Media?        @relation("PostAudioMedia", fields: [audioMediaId], references: [id], onDelete: SetNull)
-  prompt     String
-  category   PostCategory
-  focusAreas String[]
-  status     PostStatus   @default(active)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  mediaId      String?      @unique @db.Uuid
+  media        Media?       @relation("PostMedia", fields: [mediaId], references: [id], onDelete: Cascade)
+  audioMediaId String?      @unique @db.Uuid
+  audioMedia   Media?       @relation("PostAudioMedia", fields: [audioMediaId], references: [id], onDelete: SetNull)
+  prompt       String
+  category     PostCategory
+  focusAreas   String[]
+  status       PostStatus   @default(active)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   perspectives Perspective[]
 
@@ -390,17 +402,26 @@ model ConnectRequest {
 }
 
 model Connection {
-  id              String           @id @default(uuid()) @db.Uuid
+  id               String                 @id @default(uuid()) @db.Uuid
   /// Normalized pair: userAId < userBId.
-  userAId         String           @db.Uuid
-  userA           User             @relation("ConnectionA", fields: [userAId], references: [id], onDelete: Cascade)
-  userBId         String           @db.Uuid
-  userB           User             @relation("ConnectionB", fields: [userBId], references: [id], onDelete: Cascade)
-  status          ConnectionStatus @default(active)
-  originRequestId String           @unique @db.Uuid
-  originRequest   ConnectRequest   @relation(fields: [originRequestId], references: [id], onDelete: Cascade)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  userAId          String                 @db.Uuid
+  userA            User                   @relation("ConnectionA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId          String                 @db.Uuid
+  userB            User                   @relation("ConnectionB", fields: [userBId], references: [id], onDelete: Cascade)
+  status           ConnectionStatus       @default(active)
+  originRequestId  String                 @unique @db.Uuid
+  originRequest    ConnectRequest         @relation(fields: [originRequestId], references: [id], onDelete: Cascade)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  /// When the pair last became connected (reset when they reconnect); quiet-connection rules count from here.
+  connectedAt      DateTime               @default(now())
+  /// When each side saw the "you're connected" moment; null means it is still to be shown.
+  userASeenAt      DateTime?
+  userBSeenAt      DateTime?
+  /// When the person who owes the first reply first opened the chat after the first message.
+  firstReplySeenAt DateTime?
+  closedReason     ConnectionCloseReason?
+  closedAt         DateTime?
 
   messages Message[]
 

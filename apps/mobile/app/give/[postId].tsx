@@ -42,6 +42,9 @@ export default function GivePerspective() {
   const name = view.data.profile.displayName;
   const rel = view.data.relationship;
   const canTickConnect = rel.connectionId === null && !rel.outgoingRequestPending && rel.incomingRequestId === null;
+  // They already asked to connect: this perspective is the one that lets you accept (both must give).
+  const canAcceptWithThis = rel.connectionId === null && rel.incomingRequestId !== null;
+  const canTick = canTickConnect || canAcceptWithThis;
   const hints = sparkHintsFor(post.category, post.focusAreas);
   const length = comment.trim().length;
   const ready = length >= RULES.commentMinLength && length <= RULES.commentMaxLength;
@@ -51,7 +54,11 @@ export default function GivePerspective() {
 
   const submit = async () => {
     try {
-      const result = await give.run({ postId: post.id, comment: comment.trim(), chips, connect: connect && canTickConnect });
+      const result = await give.run({ postId: post.id, comment: comment.trim(), chips, connect: connect && canTick });
+      if (result.connect?.status === 'connected') {
+        router.replace({ pathname: '/connected', params: { ids: result.connect.connectionId } });
+        return;
+      }
       if (result.connect?.status === 'sent') toast(`Perspective sent, and you asked ${name} to connect.`, 'success');
       else if (result.connect?.status === 'not_sent') toast(CONNECT_NOT_SENT[result.connect.code] ?? 'Perspective sent.', 'info');
       else toast(result.daily.unlocked ? 'Perspective sent. Your inbox is unlocked!' : 'Perspective sent.', 'success');
@@ -123,16 +130,20 @@ export default function GivePerspective() {
             </View>
           </View>
 
-          {canTickConnect ? (
+          {canTick ? (
             <View style={s.connect}>
               <View style={s.flex}>
-                <Text style={s.connectTitle}>Also ask {name} to connect</Text>
-                <Muted>They’ll see your perspective and can accept or decline. Chat opens only if they accept.</Muted>
+                <Text style={s.connectTitle}>{canAcceptWithThis ? `Also connect with ${name}` : `Also ask ${name} to connect`}</Text>
+                <Muted>
+                  {canAcceptWithThis
+                    ? `${name} asked to connect with you. Giving this perspective lets you accept, and the chat opens right away.`
+                    : 'They’ll see your perspective and can accept or decline. Chat opens only if they accept.'}
+                </Muted>
               </View>
               <Switch
                 value={connect}
                 onValueChange={setConnect}
-                accessibilityLabel={`Also ask ${name} to connect`}
+                accessibilityLabel={canAcceptWithThis ? `Also connect with ${name}` : `Also ask ${name} to connect`}
                 trackColor={{ true: theme.colors.brand, false: theme.colors.border }}
               />
             </View>

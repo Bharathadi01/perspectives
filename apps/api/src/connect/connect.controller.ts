@@ -5,6 +5,8 @@ import {
   ConnectRequestResult,
   CreateConnectRequestInput,
   CreateConnectRequestInputSchema,
+  MarkConnectionsSeenInput,
+  MarkConnectionsSeenInputSchema,
   Message,
   SendMessageInput,
   SendMessageInputSchema,
@@ -43,6 +45,21 @@ export class ConnectController {
   @Get('connections')
   connections(@CurrentUser() user: AuthUser): Promise<Connection[]> {
     return this.connect.connections(user.id);
+  }
+
+  /** New connections the viewer has not seen the "you're connected" moment for yet. */
+  @Get('connections/unseen')
+  unseen(@CurrentUser() user: AuthUser): Promise<Connection[]> {
+    return this.connect.unseen(user.id);
+  }
+
+  @Post('connections/seen')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async markSeen(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodPipe(MarkConnectionsSeenInputSchema)) body: MarkConnectionsSeenInput,
+  ): Promise<void> {
+    await this.connect.markSeen(user.id, body.connectionIds);
   }
 
   @Get('connections/:id/messages')

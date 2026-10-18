@@ -15,8 +15,21 @@ export interface ConnectState {
   /** When the receiver last declined a request from the viewer, or null. */
   lastDeclinedAt: Date | null;
   cooldownDays: number;
+  /** When the pair's connection last closed on its own for being quiet, or null. */
+  lastAutoClosedAt?: Date | null;
+  /** Wait after such a closure before asking again (0, the default, behaves like an unmatch). */
+  reopenCooldownDays?: number;
   sentToday: number;
   dailyCap: number | null;
+}
+
+/** The later of the decline cooldown and the quiet-closure cooldown, or null when neither applies. */
+export function requestAvailableAt(s: ConnectState): Date | null {
+  const declined = cooldownUntil(s.lastDeclinedAt, s.cooldownDays, s.now);
+  const reopened = cooldownUntil(s.lastAutoClosedAt ?? null, s.reopenCooldownDays ?? 0, s.now);
+  if (!declined) return reopened;
+  if (!reopened) return declined;
+  return declined > reopened ? declined : reopened;
 }
 
 export type ConnectDecision =
@@ -62,7 +75,7 @@ export function evaluateConnect(s: ConnectState): ConnectDecision {
       message: 'Give them a perspective first, then you can ask to connect.',
     };
   }
-  const until = cooldownUntil(s.lastDeclinedAt, s.cooldownDays, s.now);
+  const until = requestAvailableAt(s);
   if (until) {
     return {
       ok: false,
@@ -75,4 +88,26 @@ export function evaluateConnect(s: ConnectState): ConnectDecision {
     return { ok: false, code: 'CAP_REACHED', message: 'You have reached today’s connect limit.' };
   }
   return { ok: true, perspectiveId: s.gatePerspectiveId };
+}
+
+export interface AcceptState {
+  /** Whether the person accepting has given the asker a perspective (any non-removed one). */
+  receiverGaveToSender: boolean;
+}
+
+export type AcceptDecision = { ok: true } | { ok: false; code: ErrorCode; message: string };
+
+/**
+ * Both must give (product decision 2026-10-18): the asker gave the first perspective, and the person
+ * accepting must give one back before the chat opens.
+ */
+export function evaluateAccept(s: AcceptState): AcceptDecision {
+  if (!s.receiverGaveToSender) {
+    return {
+      ok: false,
+      code: 'PERSPECTIVE_REQUIRED_BEFORE_ACCEPT',
+      message: 'Give them a perspective first, then you can accept.',
+    };
+  }
+  return { ok: true };
 }

@@ -27,6 +27,9 @@
 - [ ] Minimum 48px touch targets preserved
 - [ ] Reused existing components from `apps/mobile/src/components`
 
+## 5b. Business logic document
+- [ ] `business-logic/BUSINESS_LOGIC.md` updated in this change (section, change log entry, "Last updated"), or nothing about behavior changed: [say which]
+
 ## 6. Verification & Test Evidence
 - [ ] `pnpm test` passed
 - [ ] `pnpm --filter @perspective/contracts build` succeeded

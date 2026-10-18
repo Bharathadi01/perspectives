@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
+import { ConnectedMomentWatcher } from '../../src/components/connect/ConnectedMomentWatcher';
 import { LoadingState } from '../../src/components/ui/States';
-import { useInbox, useMe } from '../../src/features/hooks';
+import { useConnections, useInbox, useMe } from '../../src/features/hooks';
 import { useSession } from '../../src/session/sessionStore';
 import { theme } from '../../src/theme';
 
@@ -21,6 +22,7 @@ export default function TabsLayout() {
   const me = useMe(status === 'signedIn');
   const live = !!me.data?.isLive;
   const inbox = useInbox();
+  const connections = useConnections(live);
 
   if (status === 'signedOut') return <Redirect href="/(auth)/welcome" />;
   if (status === 'loading' || me.isLoading) return <LoadingState />;
@@ -29,8 +31,13 @@ export default function TabsLayout() {
   const inboxBadge = inbox.data
     ? inbox.data.lockedCount + inbox.data.connectRequests.length || undefined
     : undefined;
+  const connectionsBadge = connections.data
+    ? connections.data.filter((c) => c.isNew || c.expiry.state === 'you_owe_reply').length || undefined
+    : undefined;
 
   return (
+    <>
+    <ConnectedMomentWatcher enabled={live} />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -48,11 +55,12 @@ export default function TabsLayout() {
           options={{
             title: t.title,
             tabBarAccessibilityLabel: t.title,
-            tabBarBadge: t.name === 'inbox' ? inboxBadge : undefined,
+            tabBarBadge: t.name === 'inbox' ? inboxBadge : t.name === 'connections' ? connectionsBadge : undefined,
             tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? t.iconActive : t.icon} size={26} color={String(color)} />,
           }}
         />
       ))}
     </Tabs>
+    </>
   );
 }

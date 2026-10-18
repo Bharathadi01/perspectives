@@ -121,3 +121,10 @@ export async function liveUser(app: INestApplication, o: LiveUserOptions): Promi
 export function give(giver: Client, postId: string, extra: object = {}) {
   return giver.post('/v1/perspectives', { postId, comment: LONG_COMMENT, ...extra });
 }
+
+/** Makes sure `giver` has given `owner` at least one perspective (the give-back needed to accept). */
+export async function ensureGave(giver: Client, owner: { id: string; postIds: string[] }): Promise<void> {
+  const view = await giver.get(`/v1/profiles/${owner.id}`).expect(200);
+  if (view.body.relationship.gaveToThem) return;
+  await give(giver, owner.postIds[0]).expect(201);
+}

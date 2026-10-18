@@ -12,12 +12,12 @@ This table is the single source for the stack. If README, CLAUDE.md, BLUEPRINT.m
 | Area | Built and used now | Planned (switch on by ADR when the trigger is met) |
 |---|---|---|
 | Monorepo | pnpm workspaces, TypeScript; `turbo.json` exists but scripts use `pnpm -r` | Turborepo only if build times need caching |
-| Mobile | Expo SDK 58 (React 19, React Native 0.88), Expo Router 58, expo-audio, TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | Expo Development Builds before the first native feature (real selfie SDK, push) |
+| Mobile | Expo SDK 58 (React 19, React Native 0.88), Expo Router 58, expo-audio, expo-haptics, TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | Expo Development Builds before the first native feature (real selfie SDK, push) |
 | API | NestJS 10, Zod validation (no class-validator), Swagger at `/docs`, JWT + rotating refresh tokens | Rate limiting: `@nestjs/throttler` in-process first; Redis-backed only with several API instances |
 | Database | PostgreSQL 16 + Prisma 6 (Homebrew or Docker) | pgvector only after a ranking experiment |
 | Media | Local disk behind `MediaStorage`, HMAC-signed URLs | Cloudinary (ADR-003) for signed upload and EXIF stripping; S3 + CDN only if cost or control demands |
-| Jobs | None | pg-boss on PostgreSQL; Redis/BullMQ only at measured queue pressure |
-| Chat | Polling (`GET /v1/connections/:id/messages`) | Socket.IO (or SSE) as transport; PostgreSQL stays canonical |
+| Jobs | None, except an in-process timer that closes quiet connections every 15 minutes (`EXPIRY_SWEEP_MINUTES`) | pg-boss on PostgreSQL; Redis/BullMQ only at measured queue pressure |
+| Chat | Polling (`GET /v1/connections/:id/messages` every 4 s; new connections every 15 s) | Socket.IO (or SSE) as transport; PostgreSQL stays canonical |
 | Moderation, selfie verification | Stubs (`TextModerator`, `SelfieVerifier`) | A vendor API for text and image moderation and for liveness selfie checks, rather than building ML |
 | AI service | `apps/ai-service` FastAPI skeleton, not called by anything | Activate only for Python-only models, GPU inference, or independent AI scaling |
 | Local infra | PostgreSQL only | Redis only with its first real use |

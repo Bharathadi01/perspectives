@@ -4,8 +4,23 @@ import { IdSchema, IsoDateTimeSchema, RULES } from './common';
 export const PostKind = z.enum(['photo', 'audio', 'text']);
 export type PostKind = z.infer<typeof PostKind>;
 
-/** Working category names; final wording is a product-copy task (docs/PRODUCT.md). */
-export const PostCategory = z.enum(['style', 'fitness', 'looks', 'voice', 'vibe', 'other']);
+/**
+ * What a post asks a perspective about. Working names; final wording is a product-copy task
+ * (docs/PRODUCT.md). The order is the order shown in pickers.
+ */
+export const PostCategory = z.enum([
+  'style',
+  'grooming',
+  'fitness',
+  'looks',
+  'voice',
+  'vibe',
+  'personality',
+  'profile',
+  'interests',
+  'lifestyle',
+  'other',
+]);
 export type PostCategory = z.infer<typeof PostCategory>;
 
 export const PostStatus = z.enum(['pending_moderation', 'active', 'paused', 'removed', 'archived']);
@@ -38,8 +53,19 @@ export const CATEGORY_CATALOG: Record<PostCategory, CategoryDefinition> = {
       { key: 'colors', label: 'Colors', hint: 'Do the colors work together?' },
       { key: 'grooming', label: 'Hair & grooming', hint: 'What stands out about hair and grooming?' },
       { key: 'occasion', label: 'Right for the occasion', hint: 'Does it suit where they are going?' },
+      { key: 'accessories', label: 'Accessories', hint: 'Do the accessories add to the look or distract from it?' },
     ],
     chips: ['Put-together', 'Effortless', 'Bold choice', 'Colors work', 'Try a different fit', 'Overdressed for it', 'Underdressed for it'],
+  },
+  grooming: {
+    label: 'Hair & grooming',
+    focusAreas: [
+      { key: 'haircut', label: 'The haircut', hint: 'How does the haircut suit them?' },
+      { key: 'facial_hair', label: 'Beard & facial hair', hint: 'Does the facial hair (or the lack of it) work for them?' },
+      { key: 'freshness', label: 'Fresh & cared for', hint: 'Do they look fresh and well looked after?' },
+      { key: 'overall_grooming', label: 'Overall grooming', hint: 'What would you tweak about their grooming?' },
+    ],
+    chips: ['Suits them', 'Fresh cut', 'Well kept', 'Try a shorter style', 'Try growing it out', 'Due for a trim'],
   },
   fitness: {
     label: 'Fitness & physique',
@@ -80,6 +106,47 @@ export const CATEGORY_CATALOG: Record<PostCategory, CategoryDefinition> = {
       { key: 'standout', label: 'What stands out', hint: 'What is the one thing that stands out?' },
     ],
     chips: ['Friendly', 'Calm', 'High energy', 'Approachable', 'Mysterious', 'Hard to read'],
+  },
+  personality: {
+    label: 'Personality & humor',
+    focusAreas: [
+      { key: 'humor', label: 'Humor', hint: 'Do they come across as funny? What gives it away?' },
+      { key: 'kindness', label: 'Kindness', hint: 'Do they seem kind and warm? What makes you think so?' },
+      { key: 'confidence', label: 'Confidence', hint: 'How confident do they come across?' },
+      { key: 'easygoing', label: 'Easy-going or serious', hint: 'Do they seem easy-going, serious, or somewhere between?' },
+      { key: 'genuine', label: 'Genuine', hint: 'Do they come across as genuine? Why?' },
+    ],
+    chips: ['Funny', 'Warm', 'Genuine', 'Confident', 'Thoughtful', 'Hard to read'],
+  },
+  profile: {
+    label: 'Profile & bio',
+    focusAreas: [
+      { key: 'genuine', label: 'Feels like the real them', hint: 'Does this feel like the real them?' },
+      { key: 'standout', label: 'What stands out', hint: 'What stands out most about how they present themselves?' },
+      { key: 'curious', label: 'What you would ask', hint: 'What would you want to ask them after seeing this?' },
+      { key: 'missing', label: 'What is missing', hint: 'What is missing that would help you get to know them?' },
+    ],
+    chips: ['Genuine', 'Interesting', 'Makes me curious', 'Too vague', 'Show more of you', 'Clear picture'],
+  },
+  interests: {
+    label: 'Interests & hobbies',
+    focusAreas: [
+      { key: 'comes_across', label: 'How it comes across', hint: 'How does this interest come across to you?' },
+      { key: 'shown_well', label: 'How it is shown', hint: 'Does the post show the interest well?' },
+      { key: 'want_to_know', label: 'What you would want to know', hint: 'What would you want to know about it?' },
+      { key: 'in_common', label: 'Something in common', hint: 'Do you share this interest, or something like it?' },
+    ],
+    chips: ['Sounds fun', 'Impressive', 'Want to know more', 'Something in common', 'Show more of it', 'Unexpected'],
+  },
+  lifestyle: {
+    label: 'Lifestyle & places',
+    focusAreas: [
+      { key: 'says_about', label: 'What it says about them', hint: 'What does this say about how they live?' },
+      { key: 'looks_fun', label: 'What looks fun', hint: 'What looks most fun or interesting here?' },
+      { key: 'setting', label: 'The place', hint: 'What do you notice about the place or setting?' },
+      { key: 'curious', label: 'What you would ask', hint: 'What would you ask them about this?' },
+    ],
+    chips: ['Looks fun', 'Adventurous', 'Cozy', 'Great taste', 'Want to know more', 'Feels staged'],
   },
   other: {
     label: 'Something else',

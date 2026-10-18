@@ -203,7 +203,15 @@ async function main(): Promise<void> {
     data: { senderId: ravi, receiverId: asha, perspectiveId: raviToAsha.id, receivedDayKey: yesterday, status: 'accepted', respondedAt: now },
   });
   const connection = await prisma.connection.create({
-    data: { userAId: ravi < asha ? ravi : asha, userBId: ravi < asha ? asha : ravi, originRequestId: accepted.id },
+    data: {
+      userAId: ravi < asha ? ravi : asha,
+      userBId: ravi < asha ? asha : ravi,
+      originRequestId: accepted.id,
+      // Connected two hours ago and both have already seen the connected moment.
+      connectedAt: new Date(now.getTime() - 2 * 3600000),
+      userASeenAt: now,
+      userBSeenAt: now,
+    },
   });
   await prisma.message.createMany({
     data: [

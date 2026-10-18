@@ -9,6 +9,7 @@ export function errorMessage(err: unknown): string {
       case 'VALIDATION_FAILED':
       case 'MODERATION_FAILED':
       case 'PERSPECTIVE_REQUIRED_BEFORE_CONNECT':
+      case 'PERSPECTIVE_REQUIRED_BEFORE_ACCEPT':
       case 'CONNECT_COOLDOWN_ACTIVE':
       case 'CONNECT_REQUEST_PENDING':
       case 'ALREADY_SUBMITTED':
@@ -32,6 +33,8 @@ export function errorMessage(err: unknown): string {
         return 'This is no longer available.';
       case 'BLOCKED_PAIR':
         return 'You blocked this person.';
+      case 'CONNECTION_CLOSED':
+        return 'This connection closed because the conversation went quiet.';
       default:
         return 'Something went wrong. Please try again.';
     }

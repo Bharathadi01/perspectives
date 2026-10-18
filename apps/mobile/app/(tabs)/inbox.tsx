@@ -75,8 +75,8 @@ export default function Inbox() {
     try {
       if (yes) {
         const connection = await accept.run(requestId);
-        toast(`You’re connected with ${connection.partner.displayName}.`, 'success');
-        router.push({ pathname: '/chat/[id]', params: { id: connection.id } });
+        // The connected moment, then straight into the chat.
+        router.push({ pathname: '/connected', params: { ids: connection.id } });
       } else {
         await decline.run(requestId);
         toast('Declined. They won’t be told.', 'info');
@@ -131,9 +131,18 @@ export default function Inbox() {
                 footer={
                   <View style={s.gap}>
                     <Muted>On your post: “{r.perspective.post.prompt}”</Muted>
+                    {r.gaveBack ? null : <Muted>To connect, give {r.sender.displayName} a perspective too.</Muted>}
                     <View style={s.row}>
                       <Button title="Decline" variant="secondary" style={s.flex} onPress={() => void answer(r.id, false)} />
-                      <Button title="Connect" style={s.flex} onPress={() => void answer(r.id, true)} loading={accept.isPending} />
+                      {r.gaveBack ? (
+                        <Button title="Connect" style={s.flex} onPress={() => void answer(r.id, true)} loading={accept.isPending} />
+                      ) : (
+                        <Button
+                          title={`Give ${r.sender.displayName} a perspective`}
+                          style={s.flex}
+                          onPress={() => router.push({ pathname: '/profile/[id]', params: { id: r.sender.id } })}
+                        />
+                      )}
                     </View>
                   </View>
                 }

@@ -22,3 +22,4 @@
 - [ ] Migration reviewed or no schema change
 - [ ] No secrets or sensitive logging
 - [ ] Docs updated
+- [ ] `business-logic/BUSINESS_LOGIC.md` updated (section, change log entry, "Last updated") or nothing about behavior changed

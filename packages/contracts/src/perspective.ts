@@ -68,6 +68,8 @@ export type ReceivedPerspective = z.infer<typeof ReceivedPerspectiveSchema>;
 
 export const ConnectAttemptSchema = z.union([
   z.object({ status: z.literal('sent'), requestId: IdSchema }),
+  /** The giver ticked Connect while the other person already had a request waiting: it was accepted. */
+  z.object({ status: z.literal('connected'), connectionId: IdSchema }),
   z.object({ status: z.literal('not_sent'), code: ErrorCode }),
 ]);
 export type ConnectAttempt = z.infer<typeof ConnectAttemptSchema>;

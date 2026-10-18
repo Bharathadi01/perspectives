@@ -237,6 +237,10 @@ export function createApiClient(options: ApiClientOptions) {
         call({ method: 'POST', path: `/v1/connections/${connectionId}/messages`, body: { text }, schema: MessageSchema, idempotencyKey }),
       unmatch: (connectionId: string, idempotencyKey?: string) =>
         call({ method: 'DELETE', path: `/v1/connections/${connectionId}`, schema: NoContent, idempotencyKey }),
+      // ---- connected moment ----
+      unseen: () => call({ method: 'GET', path: '/v1/connections/unseen', schema: z.array(ConnectionSchema) }),
+      markSeen: (connectionIds: string[], idempotencyKey?: string) =>
+        call({ method: 'POST', path: '/v1/connections/seen', body: { connectionIds }, schema: NoContent, idempotencyKey }),
     },
 
     safety: {

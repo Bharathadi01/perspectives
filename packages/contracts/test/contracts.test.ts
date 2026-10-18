@@ -2,14 +2,18 @@ import {
   ApiErrorEnvelopeSchema,
   AudienceSchema,
   CATEGORY_CATALOG,
+  CONVERSATION_IDEAS,
   CreatePostInputSchema,
   GivePerspectiveInputSchema,
   PerspectiveFeedbackInputSchema,
+  PostCategory,
   RULES,
   SignUpInputSchema,
   UpdatePostInputSchema,
   UploadMediaInputSchema,
   ageFromBirthDate,
+  conversationIdeas,
+  focusAreaKeys,
   sparkHintsFor,
 } from '../src';
 
@@ -82,6 +86,72 @@ describe('posts', () => {
       'How does their height or presence come across?',
     ]);
     expect(sparkHintsFor('voice', [])).toHaveLength(CATEGORY_CATALOG.voice.focusAreas.length);
+  });
+});
+
+describe('conversation ideas', () => {
+  it('has at least three short ideas for every category and both roles', () => {
+    for (const c of PostCategory.options) {
+      for (const role of ['giver', 'owner'] as const) {
+        const ideas = CONVERSATION_IDEAS[c][role];
+        expect(ideas.length).toBeGreaterThanOrEqual(3);
+        for (const idea of ideas) {
+          expect(idea.trim().length).toBeGreaterThan(0);
+          expect(idea.length).toBeLessThanOrEqual(120);
+        }
+      }
+    }
+  });
+
+  it('picks the same ideas for the same seed and never repeats one', () => {
+    const a = conversationIdeas('interests', 'giver', 'conn-1');
+    expect(a).toHaveLength(3);
+    expect(conversationIdeas('interests', 'giver', 'conn-1')).toEqual(a);
+    expect(new Set(a).size).toBe(3);
+  });
+});
+
+describe('category catalog', () => {
+  const categories = PostCategory.options;
+
+  it('covers every category with focus areas, hints and chips', () => {
+    expect(categories).toHaveLength(11);
+    for (const c of categories) {
+      const def = CATEGORY_CATALOG[c];
+      expect(def.label.trim().length).toBeGreaterThan(0);
+      expect(def.focusAreas.length).toBeGreaterThanOrEqual(2);
+      expect(def.chips.length).toBeGreaterThan(0);
+      const keys = def.focusAreas.map((f) => f.key);
+      expect(new Set(keys).size).toBe(keys.length);
+      for (const f of def.focusAreas) {
+        expect(f.label.trim().length).toBeGreaterThan(0);
+        expect(f.hint.trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('keeps the original categories and focus areas valid for existing posts', () => {
+    const original: Record<string, string[]> = {
+      style: ['outfit', 'fit', 'colors', 'grooming', 'occasion'],
+      fitness: ['physique', 'posture', 'progress', 'training'],
+      looks: ['first_look', 'photo', 'expression', 'presence'],
+      voice: ['tone', 'clarity', 'confidence', 'warmth'],
+      vibe: ['impression', 'energy', 'approachable', 'standout'],
+      other: ['take', 'change'],
+    };
+    for (const [c, keys] of Object.entries(original)) {
+      expect(focusAreaKeys(c as PostCategory)).toEqual(expect.arrayContaining(keys));
+    }
+  });
+
+  it('never words a hint or chip as a score or rating', () => {
+    const text = categories.flatMap((c) => [
+      ...CATEGORY_CATALOG[c].focusAreas.map((f) => f.hint),
+      ...CATEGORY_CATALOG[c].chips,
+    ]);
+    for (const t of text) {
+      expect(t).not.toMatch(/\b(rate|rating|score|out of 10|hot)\b/i);
+    }
   });
 });
 

@@ -1,6 +1,6 @@
 import { dayKeyFor } from '../../src/common/day';
 import { pickDailySet, pickReplacement, AssignmentCandidate } from '../../src/domain/assignment';
-import { cooldownUntil, evaluateConnect, ConnectState } from '../../src/domain/connect';
+import { cooldownUntil, evaluateAccept, evaluateConnect, ConnectState } from '../../src/domain/connect';
 import { dailyStatus, isRevealed, mandatoryCount, requiredAfterUnfilledSlot } from '../../src/domain/daily';
 import { audienceIncludes, missingRequirements, mutuallyVisible, AudiencePerson } from '../../src/domain/eligibility';
 import { categoryAffinity, qualityPrior, rankingScore, reciprocityNeed } from '../../src/domain/ranking';
@@ -180,5 +180,15 @@ describe('connect rules', () => {
     expect(evaluateConnect({ ...base, sentToday: 50, dailyCap: null }).ok).toBe(true);
     const capped = evaluateConnect({ ...base, sentToday: 5, dailyCap: 5 });
     expect(!capped.ok && capped.code).toBe('CAP_REACHED');
+  });
+});
+
+describe('accepting a connect request (both must give)', () => {
+  it('needs the person accepting to have given the asker a perspective', () => {
+    expect(evaluateAccept({ receiverGaveToSender: false })).toMatchObject({
+      ok: false,
+      code: 'PERSPECTIVE_REQUIRED_BEFORE_ACCEPT',
+    });
+    expect(evaluateAccept({ receiverGaveToSender: true })).toEqual({ ok: true });
   });
 });

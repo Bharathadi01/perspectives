@@ -1,6 +1,18 @@
 import { ApiError } from '@perspective/api-client';
 import { errorMessage } from '../src/lib/errors';
-import { formatDuration, formatHeight, normalizeDigits, timeAgo } from '../src/lib/labels';
+import { formatDuration, formatHeight, normalizeDigits, timeAgo, timeUntil } from '../src/lib/labels';
+
+describe('timeUntil', () => {
+  const now = new Date('2026-10-18T10:00:00Z');
+  const later = (mins: number) => new Date(now.getTime() + mins * 60000).toISOString();
+  it('words a deadline plainly', () => {
+    expect(timeUntil(later(20), now)).toBe('in under an hour');
+    expect(timeUntil(later(65), now)).toBe('in about an hour');
+    expect(timeUntil(later(5 * 60), now)).toBe('in 5 hours');
+    expect(timeUntil(later(24 * 60), now)).toBe('in about a day');
+    expect(timeUntil(later(3 * 24 * 60), now)).toBe('in 3 days');
+  });
+});
 import { theme } from '../src/theme';
 
 describe('design tokens', () => {

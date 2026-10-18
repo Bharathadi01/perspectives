@@ -16,6 +16,8 @@ import { PostCard } from './PostCard';
 interface ProfileViewProps {
   profile: PublicProfile;
   givenPostIds?: readonly string[];
+  /** Explore: leave out posts the viewer already answered, so a returning profile is not repetitive. */
+  hideAnswered?: boolean;
   compatibilityScore?: number;
   matchReasons?: MatchReason[];
   /** Give a perspective on one post. Omit for read-only (your own profile). */
@@ -30,12 +32,16 @@ interface ProfileViewProps {
 export function ProfileView({
   profile,
   givenPostIds = [],
+  hideAnswered = false,
   compatibilityScore,
   matchReasons,
   onGive,
   headerRight,
 }: ProfileViewProps) {
-  const [primary, ...rest] = profile.posts;
+  const unanswered = profile.posts.filter((p) => !givenPostIds.includes(p.id));
+  // The server only offers profiles that still have an unanswered post; fall back to all posts just in case.
+  const posts = hideAnswered && unanswered.length > 0 ? unanswered : profile.posts;
+  const [primary, ...rest] = posts;
   const card = (post: Post) => (
     <PostCard
       key={post.id}

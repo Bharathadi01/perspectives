@@ -3,6 +3,7 @@
 This is the shared source of truth for two developers and their separate Claude Code agents.
 
 Read in this order:
+0. `business-logic/BUSINESS_LOGIC.md` at the repo root: what the app actually does today (update it after every change)
 1. `CLAUDE.md`
 2. `docs/PRODUCT.md`
 3. `docs/ARCHITECTURE.md`
