@@ -3,8 +3,8 @@ import { Prisma } from '@prisma/client';
 import type { DailyStatus } from '@perspective/contracts';
 import { addDays, todayKey } from '../common/day';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
-import { AssignmentPolicy, mayHoldMandatorySlot, pickDailySet, pickReplacement } from '../domain/assignment';
-import { dailyStatus, mandatoryCount, requiredAfterUnfilledSlot } from '../domain/daily';
+import { AssignmentPolicy, mandatoryPoolSize, mayHoldMandatorySlot, pickDailySet, pickReplacement } from '../domain/assignment';
+import { PoolThresholds, dailyStatus, mandatoryCount, requiredAfterUnfilledSlot } from '../domain/daily';
 import { PrismaService } from '../prisma/prisma.service';
 import { Person, SocialService } from '../social/social.service';
 import { CandidatesService } from './candidates.service';
@@ -15,10 +15,11 @@ export interface PendingSlot {
 }
 
 /**
- * The daily give-to-get set (docs/PRODUCT.md): each day a user gets a mandatory set (default 3
- * different people, one of them a boost slot for a low-response profile). Giving to all of them
- * unlocks the perspectives received that day. Skipped or invalid slots are replaced; when no
- * replacement exists the requirement shrinks, never below what was already given.
+ * The daily give-to-get set (docs/PRODUCT.md, decided 2026-10-20): each day a user gets a mandatory
+ * set of 1, 2 or 3 different people, depending on how many could fill a slot for them; one may be a
+ * boost slot for an active person with no recent perspectives. Giving to all of them unlocks the
+ * perspectives received that day. Skipped or invalid slots are replaced; when no replacement exists
+ * the requirement shrinks, never below what was already given.
  */
 @Injectable()
 export class DailyService {
@@ -47,13 +48,10 @@ export class DailyService {
     if (existing) return existing;
 
     const viewer = await this.social.person(userId);
-    const picks = viewer
-      ? pickDailySet(
-          await this.candidates.eligible(viewer, await this.recentlySkipped(userId, now), now),
-          mandatoryCount(userId, this.config.DAILY_MANDATORY_COUNT),
-          this.policy(userId, dayKey),
-        )
-      : [];
+    const policy = this.policy(userId, dayKey);
+    const candidates = viewer ? await this.candidates.eligible(viewer, await this.recentlySkipped(userId, now), now) : [];
+    const count = mandatoryCount(mandatoryPoolSize(candidates, policy), this.config.DAILY_MANDATORY_COUNT, this.thresholds());
+    const picks = pickDailySet(candidates, count, policy);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -73,6 +71,11 @@ export class DailyService {
       }
       throw err;
     }
+  }
+
+  /** Pool-size thresholds for the 1/2/3 daily count and the after-set count. */
+  thresholds(): PoolThresholds {
+    return { full: this.config.POOL_FULL_AT, partial: this.config.POOL_PARTIAL_AT };
   }
 
   /** Over-exposure and safety rules for building this viewer's set today (seeded per viewer and day). */
@@ -146,18 +149,24 @@ export class DailyService {
     return row?.dayKey ?? null;
   }
 
-  /** Profiles acted on today (given to or skipped), used for the finite daily batch. */
-  async actionsToday(userId: string, now: Date = new Date()): Promise<number> {
+  /**
+   * Profiles acted on today (given to or skipped) that were not in today's mandatory set: the
+   * profiles used up from the after-set allowance.
+   */
+  async afterSetActionsToday(userId: string, now: Date = new Date()): Promise<number> {
     const dayKey = this.today(now);
-    const [given, skips] = await Promise.all([
+    const [assigned, given, skips] = await Promise.all([
+      this.prisma.dailyAssignment.findMany({ where: { userId, dayKey }, select: { targetId: true } }),
       this.prisma.perspective.findMany({
         where: { giverId: userId, receivedDayKey: dayKey },
         distinct: ['ownerId'],
         select: { ownerId: true },
       }),
-      this.prisma.profileSkip.count({ where: { viewerId: userId, dayKey } }),
+      this.prisma.profileSkip.findMany({ where: { viewerId: userId, dayKey }, select: { targetId: true } }),
     ]);
-    return given.length + skips;
+    const inSet = new Set(assigned.map((a) => a.targetId));
+    const acted = new Set([...given.map((g) => g.ownerId), ...skips.map((s) => s.targetId)]);
+    return [...acted].filter((id) => !inSet.has(id)).length;
   }
 
   /** People to keep out of today's Explore: assigned today, skipped recently, or given to today. */

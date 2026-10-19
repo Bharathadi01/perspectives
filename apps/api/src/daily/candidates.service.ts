@@ -1,26 +1,29 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { addDays, dayKeyFor, todayKey } from '../common/day';
+import { addDays, dayKeyFor, daysBetweenKeys, todayKey } from '../common/day';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { AssignmentCandidate } from '../domain/assignment';
 import { mutuallyVisible } from '../domain/eligibility';
 import {
+  RankingWeights,
   computeCompatibility,
-  datingIntentionCompatibility,
-  freshness,
-  qualityPrior,
+  givingQuality,
+  newMemberScore,
   rankingScore,
   reciprocityNeed,
+  recentlyActiveScore,
   reportPenalty,
 } from '../domain/ranking';
 import { PrismaService } from '../prisma/prisma.service';
 import { PERSON_SELECT, Person, SocialService, toPerson } from '../social/social.service';
 
+const DAY_MS = 86400000;
+
 /**
- * Finds profiles a viewer may be shown, and scores them with the v2 feed ranking.
- * Stage 1: Eligibility (docs/PRODUCT.md & docs/ONBOARDING_AND_MATCHING_RESEARCH.md):
- * live, active, not viewer, not blocked, mutually inside audience, passes hard dealbreakers,
- * has open post, under daily cap.
- * Stage 2 & 3: Compatibility scoring & diversity ranking.
+ * Finds the people a viewer may be shown and scores them (docs/PRODUCT.md → Algorithms, 2026-10-20).
+ * Eligibility: live, active account, not the viewer, not blocked either way, inside each other's
+ * audience, not excluded (already assigned, given to or skipped), still has a post the viewer has not
+ * answered, and under the optional hard received cap. Each candidate also carries the facts the
+ * daily-set rules need: activity, perspectives received, sets already holding them, and reports.
  */
 @Injectable()
 export class CandidatesService {
@@ -45,21 +48,7 @@ export class CandidatesService {
 
     const people = rows
       .map((row) => ({ person: toPerson(row, now), postIds: row.posts.map((p) => p.id) }))
-      .filter(({ person }) => {
-        if (blocked.has(person.id) || exclude.has(person.id) || !mutuallyVisible(viewer, person)) {
-          return false;
-        }
-        // Stage 1 Hard Dealbreaker: Dating Intentions
-        if (viewer.intentionDealbreaker) {
-          const comp = datingIntentionCompatibility(viewer.datingIntention, person.datingIntention);
-          if (!comp.compatible) return false;
-        }
-        if (person.intentionDealbreaker) {
-          const comp = datingIntentionCompatibility(person.datingIntention, viewer.datingIntention);
-          if (!comp.compatible) return false;
-        }
-        return true;
-      });
+      .filter(({ person }) => !blocked.has(person.id) && !exclude.has(person.id) && mutuallyVisible(viewer, person));
     if (people.length === 0) return [];
 
     const ids = people.map((p) => p.person.id);
@@ -72,18 +61,22 @@ export class CandidatesService {
       ).map((p) => p.postId),
     );
     const withOpenPost = people.filter(({ postIds }) => postIds.some((id) => !answered.has(id)));
+    if (withOpenPost.length === 0) return [];
 
-    const capped = await this.cappedToday(withOpenPost.map((p) => p.person.id), now);
-    const pool = withOpenPost.filter(({ person }) => !capped.has(person.id));
+    const tz = this.config.APP_TIMEZONE;
+    const today = todayKey(tz, now);
+    const openIds = withOpenPost.map((p) => p.person.id);
+    const receivedTodayBy = await this.receivedToday(openIds, now);
+    const hardCap = this.config.MAX_PERSPECTIVES_RECEIVED_PER_DAY;
+    const pool = withOpenPost.filter(({ person }) => hardCap === null || (receivedTodayBy.get(person.id) ?? 0) < hardCap);
     if (pool.length === 0) return [];
 
     const poolIds = pool.map((p) => p.person.id);
-    const tz = this.config.APP_TIMEZONE;
-    const since = addDays(now, -this.config.BOOST_LOOKBACK_DAYS);
-    const [recent, verdicts, reporters, assignedToday, activeOwners] = await Promise.all([
+    const activityWindow = Math.max(7, this.config.MANDATORY_INACTIVE_DAYS, this.config.BOOST_ACTIVE_DAYS);
+    const [recent, verdicts, reportersBy, assignedToday, lastActive] = await Promise.all([
       this.prisma.perspective.groupBy({
         by: ['ownerId'],
-        where: { ownerId: { in: poolIds }, createdAt: { gte: since } },
+        where: { ownerId: { in: poolIds }, createdAt: { gte: addDays(now, -this.config.BOOST_LOOKBACK_DAYS) } },
         _count: { _all: true },
       }),
       this.prisma.perspective.groupBy({
@@ -91,52 +84,50 @@ export class CandidatesService {
         where: { giverId: { in: poolIds }, verdict: { not: null } },
         _count: { _all: true },
       }),
-      // One row per distinct reporter; reports a reviewer allowed, and those whose reporter deleted their account, do not count.
-      this.prisma.report.findMany({
-        where: {
-          targetType: 'profile',
-          targetId: { in: poolIds },
-          reporterId: { not: null },
-          status: { not: 'allowed' },
-          createdAt: { gte: addDays(now, -this.config.REPORT_LOOKBACK_DAYS) },
-        },
-        distinct: ['targetId', 'reporterId'],
-        select: { targetId: true },
-      }),
+      this.distinctReporters(poolIds, now),
       // Mandatory slots already holding each profile today, across every viewer (over-exposure).
       this.prisma.dailyAssignment.groupBy({
         by: ['targetId'],
-        where: { targetId: { in: poolIds }, dayKey: todayKey(tz, now), status: { in: ['pending', 'given'] } },
+        where: { targetId: { in: poolIds }, dayKey: today, status: { in: ['pending', 'given'] } },
         _count: { _all: true },
       }),
-      // Owners who opened the app recently: a daily-progress row exists once they open Explore or the Inbox.
-      this.prisma.dailyProgress.findMany({
-        where: { userId: { in: poolIds }, dayKey: { gte: dayKeyFor(addDays(now, -this.config.BOOST_ACTIVE_DAYS), tz) } },
-        distinct: ['userId'],
-        select: { userId: true },
+      // When each owner last opened the app: a daily-progress row exists once they open Explore or the Inbox.
+      this.prisma.dailyProgress.groupBy({
+        by: ['userId'],
+        where: { userId: { in: poolIds }, dayKey: { gte: dayKeyFor(addDays(now, -activityWindow), tz) } },
+        _max: { dayKey: true },
       }),
     ]);
     const recentBy = new Map(recent.map((r) => [r.ownerId, r._count._all]));
-    const reportersBy = new Map<string, number>();
-    for (const r of reporters) reportersBy.set(r.targetId, (reportersBy.get(r.targetId) ?? 0) + 1);
     const assignedBy = new Map(assignedToday.map((a) => [a.targetId, a._count._all]));
-    const active = new Set(activeOwners.map((a) => a.userId));
+    const lastActiveBy = new Map(lastActive.map((a) => [a.userId, a._max.dayKey]));
     const verdictCount = (giverId: string, verdict: 'helpful' | 'not_helpful') =>
       verdicts.find((v) => v.giverId === giverId && v.verdict === verdict)?._count._all ?? 0;
+    const weights = this.weights();
+    const softLimit = this.config.RECEIVED_SOFT_LIMIT_PER_DAY;
+    const inactiveDays = this.config.MANDATORY_INACTIVE_DAYS;
 
     return pool.map(({ person }) => {
       const recentReceived = recentBy.get(person.id) ?? 0;
       const assigned = assignedBy.get(person.id) ?? 0;
       const recentReporters = reportersBy.get(person.id) ?? 0;
       const ageMs = now.getTime() - person.createdAt.getTime();
+      const isNew = ageMs < this.config.BOOST_NEW_PROFILE_HOURS * 3600000;
+      const lastKey = lastActiveBy.get(person.id) ?? null;
+      // A brand-new account counts as active today even before it opens Explore.
+      const daysSinceActive = isNew ? 0 : lastKey ? daysBetweenKeys(lastKey, today) : null;
       const compatibility = computeCompatibility(viewer, person);
-      const score = rankingScore({
-        compatibility: compatibility.score,
-        reciprocityNeed: reciprocityNeed(recentReceived + assigned),
-        freshness: freshness(ageMs / 86400000),
-        qualityPrior: qualityPrior(verdictCount(person.id, 'helpful'), verdictCount(person.id, 'not_helpful')),
-        penalties: reportPenalty(recentReporters),
-      });
+      const score = rankingScore(
+        {
+          sharedInterests: compatibility.score,
+          need: reciprocityNeed(recentReceived + assigned),
+          recentlyActive: recentlyActiveScore(daysSinceActive),
+          newMember: newMemberScore(ageMs / DAY_MS),
+          givingQuality: givingQuality(verdictCount(person.id, 'helpful'), verdictCount(person.id, 'not_helpful')),
+          penalties: reportPenalty(recentReporters),
+        },
+        weights,
+      );
       return {
         id: person.id,
         recentReceived,
@@ -146,10 +137,10 @@ export class CandidatesService {
         matchReasons: compatibility.reasons,
         assignedToday: assigned,
         boostReady:
-          this.config.BOOST_ACTIVE_DAYS === 0 ||
-          active.has(person.id) ||
-          ageMs < this.config.BOOST_NEW_PROFILE_HOURS * 3600000,
+          this.config.BOOST_ACTIVE_DAYS === 0 || (daysSinceActive !== null && daysSinceActive <= this.config.BOOST_ACTIVE_DAYS),
         recentReporters,
+        dormant: inactiveDays > 0 && (daysSinceActive === null || daysSinceActive > inactiveDays),
+        atSoftLimit: softLimit > 0 && (receivedTodayBy.get(person.id) ?? 0) >= softLimit,
       };
     });
   }
@@ -160,15 +151,72 @@ export class CandidatesService {
     return list.find((c) => c.id === targetId) ?? null;
   }
 
-  /** Owners who already reached the optional per-day received cap. */
+  /** Owners who reached the optional hard received cap today (none unless the cap is set). */
   async cappedToday(ownerIds: string[], now: Date = new Date()): Promise<Set<string>> {
     const cap = this.config.MAX_PERSPECTIVES_RECEIVED_PER_DAY;
     if (cap === null || ownerIds.length === 0) return new Set();
+    const counts = await this.receivedToday(ownerIds, now);
+    return new Set([...counts].filter(([, n]) => n >= cap).map(([id]) => id));
+  }
+
+  /** Perspectives each owner received today (by the day they arrived). */
+  private async receivedToday(ownerIds: string[], now: Date): Promise<Map<string, number>> {
+    if (ownerIds.length === 0) return new Map();
     const counts = await this.prisma.perspective.groupBy({
       by: ['ownerId'],
       where: { ownerId: { in: ownerIds }, receivedDayKey: todayKey(this.config.APP_TIMEZONE, now) },
       _count: { _all: true },
     });
-    return new Set(counts.filter((c) => c._count._all >= cap).map((c) => c.ownerId));
+    return new Map(counts.map((c) => [c.ownerId, c._count._all]));
+  }
+
+  /**
+   * Distinct people who reported each person in the report window (decided 2026-10-20): reports on
+   * their profile, posts, perspectives or messages all count, each reporter once. Reports a reviewer
+   * allowed, and those whose reporter deleted their account, do not count.
+   */
+  private async distinctReporters(personIds: string[], now: Date): Promise<Map<string, number>> {
+    const people = new Set(personIds);
+    const reports = await this.prisma.report.findMany({
+      where: {
+        reporterId: { not: null },
+        status: { not: 'allowed' },
+        createdAt: { gte: addDays(now, -this.config.REPORT_LOOKBACK_DAYS) },
+      },
+      select: { targetType: true, targetId: true, reporterId: true },
+    });
+    if (reports.length === 0) return new Map();
+    const idsOf = (type: string) => reports.filter((r) => r.targetType === type).map((r) => r.targetId);
+    const [posts, perspectives, messages] = await Promise.all([
+      this.prisma.post.findMany({ where: { id: { in: idsOf('post') } }, select: { id: true, ownerId: true } }),
+      this.prisma.perspective.findMany({ where: { id: { in: idsOf('perspective') } }, select: { id: true, giverId: true } }),
+      this.prisma.message.findMany({ where: { id: { in: idsOf('message') } }, select: { id: true, senderId: true } }),
+    ]);
+    const personOf = new Map<string, string>([
+      ...posts.map((p): [string, string] => [`post:${p.id}`, p.ownerId]),
+      ...perspectives.map((p): [string, string] => [`perspective:${p.id}`, p.giverId]),
+      ...messages.map((m): [string, string] => [`message:${m.id}`, m.senderId]),
+    ]);
+    const pairs = new Set<string>();
+    for (const r of reports) {
+      const personId = r.targetType === 'profile' ? r.targetId : personOf.get(`${r.targetType}:${r.targetId}`);
+      if (personId && people.has(personId) && personId !== r.reporterId) pairs.add(`${personId}|${r.reporterId}`);
+    }
+    const counts = new Map<string, number>();
+    for (const pair of pairs) {
+      const personId = pair.split('|')[0];
+      counts.set(personId, (counts.get(personId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  private weights(): RankingWeights {
+    return {
+      sharedInterests: this.config.RANK_WEIGHT_INTERESTS,
+      need: this.config.RANK_WEIGHT_NEED,
+      recentlyActive: this.config.RANK_WEIGHT_ACTIVE,
+      newMember: this.config.RANK_WEIGHT_NEW_MEMBER,
+      givingQuality: this.config.RANK_WEIGHT_QUALITY,
+    };
   }
 }

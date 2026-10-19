@@ -3,7 +3,7 @@ import { weightedPick } from './random';
 
 export interface AssignmentCandidate {
   id: string;
-  /** Perspectives received in the boost lookback window. */
+  /** Perspectives received in the lookback window (3 days by default). */
   recentReceived: number;
   /** Feed ranking score (higher is a better match). */
   score: number;
@@ -15,8 +15,12 @@ export interface AssignmentCandidate {
   assignedToday?: number;
   /** The owner opened the app recently or the profile is new; only these can take the boost slot. */
   boostReady?: boolean;
-  /** Distinct people who reported this profile in the report lookback window. */
+  /** Distinct people who reported this person (profile, posts, perspectives, messages) in the report window. */
   recentReporters?: number;
+  /** The owner has not opened the app for 7 days (and is not new): never in a mandatory slot. */
+  dormant?: boolean;
+  /** The person already received the soft daily limit of perspectives today: no more mandatory slots today. */
+  atSoftLimit?: boolean;
 }
 
 export type SlotKind = 'boost' | 'mandatory';
@@ -57,9 +61,25 @@ function isPaused(c: AssignmentCandidate, p: AssignmentPolicy): boolean {
   return p.pauseReporters > 0 && (c.recentReporters ?? 0) >= p.pauseReporters;
 }
 
-/** Whether a profile may hold a mandatory slot at all (used to re-check a pending slot). */
+/**
+ * Whether a profile may hold a mandatory slot at all (also used to re-check a pending slot):
+ * not paused by reports, not inactive for 7 days, not at today's soft received limit.
+ */
 export function mayHoldMandatorySlot(c: AssignmentCandidate, p: AssignmentPolicy): boolean {
-  return !isPaused(c, p);
+  return !isPaused(c, p) && !c.dormant && !c.atSoftLimit;
+}
+
+/** How many people could fill a mandatory slot for this viewer now (drives the 1/2/3 count). */
+export function mandatoryPoolSize(candidates: readonly AssignmentCandidate[], p: AssignmentPolicy): number {
+  return candidates.filter((c) => mayHoldMandatorySlot(c, p)).length;
+}
+
+/**
+ * Who qualifies for the boost slot (decided 2026-10-20): someone who may hold a slot, opened the app
+ * in the last few days (or is new), and received no perspectives in the lookback window.
+ */
+export function qualifiesForBoost(c: AssignmentCandidate, p: AssignmentPolicy): boolean {
+  return mayHoldMandatorySlot(c, p) && (c.boostReady ?? true) && c.recentReceived === 0;
 }
 
 function underCap(c: AssignmentCandidate, p: AssignmentPolicy): boolean {
@@ -67,9 +87,10 @@ function underCap(c: AssignmentCandidate, p: AssignmentPolicy): boolean {
 }
 
 /**
- * The boost slot: among profiles that are safe, recently active and under today's cap, take the
- * least-served (and those at most one perspective above them, up to `boostPoolSize`), then pick one
- * at random, giving a better fit a somewhat higher chance. Null when nobody qualifies.
+ * The boost slot: among people who qualify (active, no perspectives recently, safe) and are under
+ * today's cap, take the least-served (those at most one above the lowest, up to `boostPoolSize`),
+ * then pick one at random, giving more shared interests a somewhat higher chance. Null when nobody
+ * qualifies: then the slot is an ordinary best match.
  */
 function pickBoost(
   candidates: readonly AssignmentCandidate[],
@@ -78,7 +99,7 @@ function pickBoost(
   slotIndex: number,
 ): AssignmentCandidate | null {
   const pool = candidates
-    .filter((c) => !taken.has(c.id) && !isPaused(c, p) && (c.boostReady ?? true) && underCap(c, p))
+    .filter((c) => !taken.has(c.id) && qualifiesForBoost(c, p) && underCap(c, p))
     .sort(byLeastServed);
   if (pool.length === 0) return null;
   const lowest = served(pool[0]);
@@ -86,20 +107,20 @@ function pickBoost(
   return weightedPick(near, (c) => 0.5 + (c.compatibilityScore ?? 0.5), `${p.seed}:boost:${slotIndex}`);
 }
 
-/** A relevance slot: the best score among safe profiles, preferring those under today's cap. */
+/** A relevance slot: the best score among people who may hold a slot, preferring those under today's cap. */
 function pickRelevant(
   candidates: readonly AssignmentCandidate[],
   taken: ReadonlySet<string>,
   p: AssignmentPolicy,
 ): AssignmentCandidate | null {
-  const open = candidates.filter((c) => !taken.has(c.id) && !isPaused(c, p)).sort(byScore);
+  const open = candidates.filter((c) => !taken.has(c.id) && mayHoldMandatorySlot(c, p)).sort(byScore);
   return open.find((c) => underCap(c, p)) ?? open[0] ?? null;
 }
 
 /**
- * Builds today's mandatory set: one boost slot for a low-response profile, then the best
- * relevance matches. When no profile qualifies for the boost, every slot is a relevance slot.
- * Returns fewer than `count` when not enough profiles are eligible.
+ * Builds today's mandatory set: one boost slot for an active person with no recent perspectives,
+ * then the best relevance matches. When nobody qualifies for the boost, every slot is a relevance
+ * slot. Returns fewer than `count` when not enough people may hold a slot.
  */
 export function pickDailySet(
   candidates: readonly AssignmentCandidate[],
@@ -140,4 +161,19 @@ export function pickReplacement(
   }
   const relevant = pickRelevant(candidates, none, policy);
   return relevant ? { id: relevant.id, slot: 'mandatory' } : null;
+}
+
+/**
+ * The next profile after the mandatory set (decided 2026-10-20): the best match, except that the
+ * last profile of the day's after-set allowance is a random "discovery" pick (seeded per viewer and
+ * day, so reopening shows the same one). Random picks never appear in the mandatory set.
+ */
+export function pickAfterSetProfile(
+  candidates: readonly AssignmentCandidate[],
+  remaining: number,
+  seed: string,
+): AssignmentCandidate | null {
+  if (remaining <= 0 || candidates.length === 0) return null;
+  if (remaining === 1) return weightedPick(candidates, () => 1, `${seed}:discovery`);
+  return [...candidates].sort(byScore)[0];
 }

@@ -164,6 +164,11 @@ async function main(): Promise<void> {
 
   // Yesterday: Meera and Asha gave Ravi perspectives, and Ravi finished yesterday's set (revealed).
   await prisma.dailyProgress.create({ data: { userId: ravi, dayKey: yesterday, requiredCount: 0, unlockedAt: giveAt(yesterday) } });
+  // Everyone else "opened the app" yesterday too, so they count as active people for the daily set
+  // (people who have not opened the app in 7 days are never put into a set).
+  await prisma.dailyProgress.createMany({
+    data: ids.filter((u) => u !== ravi).map((userId) => ({ userId, dayKey: yesterday, requiredCount: 0, unlockedAt: giveAt(yesterday) })),
+  });
   await prisma.perspective.create({
     data: {
       postId: postIds.get(ravi)![0], giverId: meera, ownerId: ravi, receivedDayKey: yesterday, createdAt: giveAt(yesterday),

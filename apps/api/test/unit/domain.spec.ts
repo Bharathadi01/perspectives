@@ -1,10 +1,19 @@
-import { dayKeyFor } from '../../src/common/day';
-import { pickDailySet, pickReplacement, served, AssignmentCandidate, AssignmentPolicy } from '../../src/domain/assignment';
+import { dayKeyFor, daysBetweenKeys } from '../../src/common/day';
+import {
+  mandatoryPoolSize,
+  mayHoldMandatorySlot,
+  pickAfterSetProfile,
+  pickDailySet,
+  pickReplacement,
+  qualifiesForBoost,
+  served,
+  AssignmentCandidate,
+  AssignmentPolicy,
+} from '../../src/domain/assignment';
 import { seededUnit, weightedPick } from '../../src/domain/random';
 import { cooldownUntil, evaluateAccept, evaluateConnect, ConnectState } from '../../src/domain/connect';
-import { dailyStatus, isRevealed, mandatoryCount, requiredAfterUnfilledSlot } from '../../src/domain/daily';
+import { bonusCount, dailyStatus, isRevealed, mandatoryCount, requiredAfterUnfilledSlot } from '../../src/domain/daily';
 import { audienceIncludes, missingRequirements, mutuallyVisible, AudiencePerson } from '../../src/domain/eligibility';
-import { categoryAffinity, qualityPrior, rankingScore, reciprocityNeed } from '../../src/domain/ranking';
 
 describe('audience and eligibility', () => {
   const womenUnder26 = { genders: ['woman' as const], minAge: 18, maxAge: 25 };
@@ -51,8 +60,36 @@ describe('audience and eligibility', () => {
 });
 
 describe('daily give-to-get', () => {
-  it('uses the configured mandatory count (v1 fixed)', () => {
-    expect(mandatoryCount('u', 3)).toBe(3);
+  it('asks for 3, 2 or 1 by how many people could fill a slot (15+, 6 to 14, 1 to 5), 0 when nobody can', () => {
+    expect(mandatoryCount(40)).toBe(3);
+    expect(mandatoryCount(15)).toBe(3);
+    expect(mandatoryCount(14)).toBe(2);
+    expect(mandatoryCount(6)).toBe(2);
+    expect(mandatoryCount(5)).toBe(1);
+    expect(mandatoryCount(1)).toBe(1);
+    expect(mandatoryCount(0)).toBe(0);
+  });
+
+  it('never asks for more than the configured maximum', () => {
+    expect(mandatoryCount(40, 2)).toBe(2);
+    expect(mandatoryCount(40, 0)).toBe(0);
+    expect(mandatoryCount(10, 3, { full: 10, partial: 4 })).toBe(3);
+  });
+
+  it('gives 5 more profiles after the set at 15+, 4 at 6 to 14, then as many as are left up to 3', () => {
+    expect(bonusCount(30)).toBe(5);
+    expect(bonusCount(15)).toBe(5);
+    expect(bonusCount(14)).toBe(4);
+    expect(bonusCount(6)).toBe(4);
+    expect(bonusCount(5)).toBe(3);
+    expect(bonusCount(2)).toBe(2);
+    expect(bonusCount(0)).toBe(0);
+  });
+
+  it('counts whole days between day keys', () => {
+    expect(daysBetweenKeys('2026-10-20', '2026-10-20')).toBe(0);
+    expect(daysBetweenKeys('2026-10-17', '2026-10-20')).toBe(3);
+    expect(daysBetweenKeys('2026-09-30', '2026-10-01')).toBe(1);
   });
 
   it('unlocks once the required count is given', () => {
@@ -98,8 +135,16 @@ describe('daily set assignment', () => {
   });
 
   it('returns fewer slots when few profiles are eligible', () => {
-    expect(pickDailySet([c('a', 1, 0.5)], 3)).toEqual([{ id: 'a', slot: 'boost' }]);
+    expect(pickDailySet([c('a', 0, 0.5)], 3)).toEqual([{ id: 'a', slot: 'boost' }]);
     expect(pickDailySet([], 3)).toEqual([]);
+  });
+
+  it('only boosts someone with no perspectives in the window; otherwise every slot is a best match', () => {
+    expect(pickDailySet([c('a', 1, 0.5)], 3)).toEqual([{ id: 'a', slot: 'mandatory' }]);
+    expect(pickDailySet([c('a', 2, 0.9), c('b', 1, 0.1)], 2)).toEqual([
+      { id: 'a', slot: 'mandatory' },
+      { id: 'b', slot: 'mandatory' },
+    ]);
   });
 
   it('breaks boost ties by longest waiting', () => {
@@ -137,10 +182,10 @@ describe('daily set assignment with the over-exposure policy', () => {
     return assigned;
   }
 
-  it('counts slots already assigned today as served', () => {
+  it('counts slots already assigned today as served, and boosts the least-assigned', () => {
     expect(served(c('a', { recentReceived: 2, assignedToday: 3 }))).toBe(5);
-    const set = pickDailySet([c('busy', { assignedToday: 4 }), c('quiet', { recentReceived: 1 })], 1, policy);
-    expect(set).toEqual([{ id: 'quiet', slot: 'boost' }]);
+    const set = pickDailySet([c('busy', { assignedToday: 4 }), c('fresh', { assignedToday: 0 })], 1, policy);
+    expect(set).toEqual([{ id: 'fresh', slot: 'boost' }]);
   });
 
   it('spreads the boost across viewers instead of piling onto one profile', () => {
@@ -161,12 +206,18 @@ describe('daily set assignment with the over-exposure policy', () => {
     expect(pickDailySet(pool, 3, policy)).toEqual(pickDailySet(pool, 3, policy));
   });
 
-  it('chooses the boost only from the least-served, within one perspective of the lowest', () => {
-    const pool = [c('zero'), c('one', { recentReceived: 1 }), c('two', { recentReceived: 2 }), c('five', { recentReceived: 5 })];
+  it('chooses the boost only among people with no recent perspectives, least-assigned first', () => {
+    const pool = [
+      c('zero'),
+      c('zeroBusy', { assignedToday: 3 }),
+      c('one', { recentReceived: 1 }),
+      c('five', { recentReceived: 5 }),
+    ];
     for (let v = 0; v < 40; v++) {
       const [boost] = pickDailySet(pool, 1, { ...policy, seed: `v${v}` });
-      expect(['zero', 'one']).toContain(boost.id);
+      expect(boost).toEqual({ id: 'zero', slot: 'boost' });
     }
+    expect(qualifiesForBoost(c('one', { recentReceived: 1 }), policy)).toBe(false);
   });
 
   it('never boosts or assigns a profile reported by two different people', () => {
@@ -177,12 +228,29 @@ describe('daily set assignment with the over-exposure policy', () => {
     expect(pickDailySet([c('once', { recentReporters: 1 })], 1, policy)).toEqual([{ id: 'once', slot: 'boost' }]);
   });
 
-  it('never boosts an owner who has not opened the app recently, but may still rank them', () => {
+  it('never boosts an owner who has not opened the app in the last few days, but may still rank them', () => {
     const set = pickDailySet([c('away', { boostReady: false }), c('here', { recentReceived: 3, score: 0.1 })], 2, policy);
     expect(set).toEqual([
+      { id: 'away', slot: 'mandatory' },
+      { id: 'here', slot: 'mandatory' },
+    ]);
+    expect(pickDailySet([c('away', { boostReady: false }), c('here', { score: 0.1 })], 2, policy)).toEqual([
       { id: 'here', slot: 'boost' },
       { id: 'away', slot: 'mandatory' },
     ]);
+  });
+
+  it('keeps people inactive for 7 days and people at the soft received limit out of every set slot', () => {
+    const dormant = c('dormant', { dormant: true, score: 0.99 });
+    const limited = c('limited', { atSoftLimit: true, score: 0.98 });
+    const ok = c('ok', { recentReceived: 2, score: 0.1 });
+    const set = pickDailySet([dormant, limited, ok], 3, policy);
+    expect(set).toEqual([{ id: 'ok', slot: 'mandatory' }]);
+    expect(pickReplacement([dormant, limited], 'boost', policy)).toBeNull();
+    expect(pickReplacement([dormant, limited], 'mandatory', policy)).toBeNull();
+    expect(mayHoldMandatorySlot(dormant, policy)).toBe(false);
+    expect(mayHoldMandatorySlot(limited, policy)).toBe(false);
+    expect(mandatoryPoolSize([dormant, limited, ok, c('paused', { recentReporters: 2 })], policy)).toBe(1);
   });
 
   it('turns the boost into a relevance slot when nobody qualifies', () => {
@@ -212,13 +280,26 @@ describe('seeded randomness', () => {
   });
 });
 
-describe('ranking (placeholder weights)', () => {
-  it('prefers under-served, relevant, helpful profiles', () => {
-    const strong = rankingScore({ reciprocityNeed: reciprocityNeed(0), freshness: 1, categoryAffinity: 1, qualityPrior: 1, penalties: 0 });
-    const weak = rankingScore({ reciprocityNeed: reciprocityNeed(9), freshness: 0, categoryAffinity: 0, qualityPrior: 0, penalties: 0.3 });
-    expect(strong).toBeGreaterThan(weak);
-    expect(categoryAffinity(['style'], ['style', 'voice'])).toBe(0.5);
-    expect(qualityPrior(0, 0)).toBe(0.5);
+describe('profiles after the set', () => {
+  const c = (id: string, score: number): AssignmentCandidate => ({ id, recentReceived: 0, score, createdAt: new Date('2026-10-01') });
+  const pool = [c('low', 0.1), c('best', 0.9), c('mid', 0.5), c('also', 0.3)];
+
+  it('shows best matches first', () => {
+    expect(pickAfterSetProfile(pool, 5, 'v:2026-10-20')?.id).toBe('best');
+    expect(pickAfterSetProfile(pool, 2, 'v:2026-10-20')?.id).toBe('best');
+  });
+
+  it('makes the last one a random discovery pick, the same on every reopen that day', () => {
+    const first = pickAfterSetProfile(pool, 1, 'v:2026-10-20');
+    expect(first).not.toBeNull();
+    expect(pickAfterSetProfile(pool, 1, 'v:2026-10-20')).toEqual(first);
+    const picks = new Set(Array.from({ length: 40 }, (_, i) => pickAfterSetProfile(pool, 1, `v${i}:2026-10-20`)?.id));
+    expect(picks.size).toBeGreaterThan(1);
+  });
+
+  it('shows nothing when the allowance is used up or nobody is left', () => {
+    expect(pickAfterSetProfile(pool, 0, 'v')).toBeNull();
+    expect(pickAfterSetProfile([], 3, 'v')).toBeNull();
   });
 });
 

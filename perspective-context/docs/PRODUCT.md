@@ -90,7 +90,7 @@ No profile should be left without perspectives. A profile that gets few or none 
 - **Narrow audience:** the audience widens automatically (see Audience).
 
 ### Explore after the set (decided 2026-10-20)
-- After the mandatory set, a free user gets **4 to 5 more profiles** a day, fewer when the pool is small so people do not run out of new faces. Random "discovery" picks appear only here, never in the mandatory set.
+- After the mandatory set, a free user gets **4 to 5 more profiles** a day, fewer when the pool is small so people do not run out of new faces. Random "discovery" picks appear only here, never in the mandatory set. *Detail (decided 2026-10-20):* 5 when 15 or more eligible people are left that day, 4 when 6 to 14, and below that as many as are left up to 3; best matches first, and the last one of the day is a random discovery pick (the same if the app is reopened).
 - A paid option for unlimited browsing (as other apps do) is a later monetization idea, not part of v1.
 
 ## Algorithms
@@ -108,6 +108,7 @@ All three are rule-based formulas with numbers in server config; no machine lear
 - Recently active: opened the app today or yesterday counts most.
 - New member: a bonus during the first week.
 - Giving quality: how often their own perspectives were marked helpful, starting neutral until there are enough marks.
+- *Details (decided 2026-10-20):* recently active is 1.0 for today or yesterday, 0.5 for 2 to 3 days ago, 0.2 for 4 to 7 days, 0 after that; new member is 1.0 during the first 7 days; giving quality is (helpful marks + 2.5) / (all marks + 5); need counts perspectives in the last 3 days plus today's sets; the count of people available for the 1/2/3 rule is everyone who could be put into a set right now.
 - Not used: daily rhythm, social energy, relationship goals, orientation, and any attractiveness or popularity score.
 
 ## Connect

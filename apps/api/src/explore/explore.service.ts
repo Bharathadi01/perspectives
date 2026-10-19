@@ -1,17 +1,18 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ExploreCard, ExploreResponse, ExploreSlot } from '@perspective/contracts';
 import { AppException } from '../common/app-exception';
-import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { CandidatesService } from '../daily/candidates.service';
 import { DailyService } from '../daily/daily.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PROFILE_USER_INCLUDE, ProfileMapper } from '../profiles/profile.mapper';
 import { SocialService } from '../social/social.service';
+import { pickAfterSetProfile } from '../domain/assignment';
+import { bonusCount } from '../domain/daily';
 import { computeCompatibility } from '../domain/ranking';
 
 /**
- * Explore shows one profile at a time: first today's mandatory set (with its boost slot), then
- * optional profiles until the finite daily batch is used up. No infinite scroll.
+ * Explore shows one profile at a time: first today's mandatory set, then 4 to 5 more profiles
+ * (fewer when the pool is small), the last being a random discovery pick. No infinite scroll.
  */
 @Injectable()
 export class ExploreService {
@@ -21,33 +22,32 @@ export class ExploreService {
     private readonly candidates: CandidatesService,
     private readonly social: SocialService,
     private readonly mapper: ProfileMapper,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   async next(viewerId: string, now: Date = new Date()): Promise<ExploreResponse> {
     const pending = await this.daily.nextPendingSlot(viewerId, now);
     const daily = await this.daily.status(viewerId, now);
-    const actions = await this.daily.actionsToday(viewerId, now);
-    const batchLeft = Math.max(0, this.config.DAILY_BATCH_SIZE - actions);
 
     if (pending) {
+      // The boost card looks like any other card in the set (decided 2026-10-20): no "few perspectives" note.
       return {
         daily,
-        card: await this.card(viewerId, pending.targetId, pending.slot),
-        remainingInBatch: Math.max(daily.requiredCount - daily.givenCount, batchLeft),
+        card: await this.card(viewerId, pending.targetId, 'mandatory'),
+        remainingInBatch: Math.max(0, daily.requiredCount - daily.givenCount),
       };
     }
-    if (batchLeft === 0) {
-      return { daily, card: null, remainingInBatch: 0 };
-    }
+
+    // After the set: 5 more at 15+ people left, 4 at 6 to 14, fewer below; the last one is a random discovery pick.
     const viewer = await this.social.person(viewerId);
     if (!viewer) throw new AppException('UNAUTHORIZED', 'Please sign in.');
     const pool = await this.candidates.eligible(viewer, await this.daily.excludedToday(viewerId, now), now);
-    const best = [...pool].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))[0];
+    const used = await this.daily.afterSetActionsToday(viewerId, now);
+    const left = Math.max(0, bonusCount(pool.length + used, this.daily.thresholds()) - used);
+    const next = pickAfterSetProfile(pool, left, `${viewerId}:${daily.dayKey}`);
     return {
       daily,
-      card: best ? await this.card(viewerId, best.id, 'optional') : null,
-      remainingInBatch: best ? batchLeft : 0,
+      card: next ? await this.card(viewerId, next.id, 'optional') : null,
+      remainingInBatch: next ? left : 0,
     };
   }
 

@@ -1,307 +1,113 @@
 import {
+  DEFAULT_RANKING_WEIGHTS,
   computeCompatibility,
-  datingIntentionCompatibility,
-  freshness,
+  givingQuality,
   interestSimilarity,
-  lifestyleCompatibility,
-  qualityPrior,
+  newMemberScore,
   rankingScore,
   reciprocityNeed,
+  recentlyActiveScore,
   reportPenalty,
 } from '../../src/domain/ranking';
-import type { Person } from '../../src/social/social.service';
 
-function createMockPerson(overrides: Partial<Person> = {}): Person {
-  return {
-    id: 'user-' + Math.random().toString(36).substring(2, 9),
-    isActive: true,
-    isLive: true,
-    createdAt: new Date(),
-    gender: 'woman',
-    age: 25,
-    city: 'Bengaluru',
-    audience: { genders: ['man'], minAge: 20, maxAge: 35 },
-    postCategories: ['vibe', 'style'],
-    datingIntention: 'long_term',
-    intentionDealbreaker: false,
-    interests: ['cinema_film', 'specialty_coffee', 'books_reading'],
-    lifestylePace: 'balanced',
-    socialPreference: 'ambivert',
-    heightCm: 165,
-    ...overrides,
-  };
-}
-
-describe('Matching Engine — Stage 2 Compatibility Scoring', () => {
-  describe('Interest Similarity (Jaccard)', () => {
-    it('returns score 1.0 for identical interest sets', () => {
-      const interests = ['live_gigs', 'hiking_trails', 'home_cooking'];
-      const res = interestSimilarity(interests, interests);
-      expect(res.score).toBe(1.0);
-      expect(res.sharedIds).toEqual(interests);
-      expect(res.isKnown).toBe(true);
+/** Ranking for the beta (docs/PRODUCT.md → Algorithms, decided 2026-10-20). */
+describe('ranking (beta formula)', () => {
+  describe('shared interests (Jaccard)', () => {
+    it('is 1 for identical sets and 0 for disjoint sets', () => {
+      expect(interestSimilarity(['hiking_trails', 'photography'], ['photography', 'hiking_trails']).score).toBe(1);
+      expect(interestSimilarity(['hiking_trails'], ['photography']).score).toBe(0);
     });
 
-    it('returns correct fractional score for partially overlapping sets', () => {
-      const a = ['live_gigs', 'hiking_trails', 'indie_alt']; // size 3
-      const b = ['live_gigs', 'home_cooking', 'indie_alt']; // size 3
-      // shared: 2 ('live_gigs', 'indie_alt')
-      // union: 4 ('live_gigs', 'hiking_trails', 'indie_alt', 'home_cooking')
-      // J = 2/4 = 0.5
-      const res = interestSimilarity(a, b);
-      expect(res.score).toBe(0.5);
-      expect(res.sharedIds).toEqual(['live_gigs', 'indie_alt']);
-      expect(res.isKnown).toBe(true);
+    it('is the shared share of everything either chose', () => {
+      const r = interestSimilarity(['a', 'b', 'c'], ['b', 'c', 'd']);
+      expect(r.score).toBeCloseTo(2 / 4);
+      expect(r.sharedIds).toEqual(['b', 'c']);
     });
 
-    it('returns score 0.0 for completely disjoint interest sets', () => {
-      const a = ['live_gigs', 'indie_alt'];
-      const b = ['video_games', 'board_games'];
-      const res = interestSimilarity(a, b);
-      expect(res.score).toBe(0.0);
-      expect(res.sharedIds).toEqual([]);
-      expect(res.isKnown).toBe(true);
-    });
-
-    it('handles empty sets as unknown (0.5 neutral, isKnown = false)', () => {
-      const emptyRes = interestSimilarity([], []);
-      expect(emptyRes.score).toBe(0.5);
-      expect(emptyRes.isKnown).toBe(false);
-      expect(emptyRes.sharedIds).toEqual([]);
-
-      const partialEmpty = interestSimilarity(['live_gigs'], []);
-      expect(partialEmpty.score).toBe(0.5);
-      expect(partialEmpty.isKnown).toBe(false);
+    it('is a neutral 0.5 when either side has no interests', () => {
+      expect(interestSimilarity([], ['a'])).toEqual({ score: 0.5, sharedIds: [], isKnown: false });
     });
   });
 
-  describe('Dating Intention Compatibility Matrix', () => {
-    it('awards 1.0 for identical intentions', () => {
-      const res = datingIntentionCompatibility('long_term', 'long_term');
-      expect(res.score).toBe(1.0);
-      expect(res.isKnown).toBe(true);
-      expect(res.compatible).toBe(true);
+  describe('fit uses shared interests only', () => {
+    it('gives a plain-words reason for shared interests and nothing else', () => {
+      const r = computeCompatibility({ interests: ['photography', 'running'] }, { interests: ['photography'] });
+      expect(r.score).toBeCloseTo(0.5);
+      expect(r.reasons).toHaveLength(1);
+      expect(r.reasons[0].kind).toBe('shared_interest');
     });
 
-    it('awards 0.85 for adjacent compatible intentions (e.g. long_term and long_term_open)', () => {
-      const res1 = datingIntentionCompatibility('long_term', 'long_term_open');
-      expect(res1.score).toBe(0.85);
-      expect(res1.compatible).toBe(true);
-
-      const res2 = datingIntentionCompatibility('long_term_open', 'long_term');
-      expect(res2.score).toBe(0.85);
-      expect(res2.compatible).toBe(true);
-    });
-
-    it('awards 0.85 for casual and short_term_open', () => {
-      const res = datingIntentionCompatibility('casual', 'short_term_open');
-      expect(res.score).toBe(0.85);
-      expect(res.compatible).toBe(true);
-    });
-
-    it('awards 0.6 for figuring_out exploratory intention', () => {
-      const res = datingIntentionCompatibility('long_term', 'figuring_out');
-      expect(res.score).toBe(0.6);
-      expect(res.compatible).toBe(true);
-    });
-
-    it('evaluates opposing intentions with low compatibility (0.15) and compatible = false', () => {
-      const res = datingIntentionCompatibility('long_term', 'casual');
-      expect(res.score).toBe(0.15);
-      expect(res.isKnown).toBe(true);
-      expect(res.compatible).toBe(false);
-    });
-
-    it('handles missing intention as neutral fallback (0.5, isKnown = false)', () => {
-      const res1 = datingIntentionCompatibility(null, 'long_term');
-      expect(res1.score).toBe(0.5);
-      expect(res1.isKnown).toBe(false);
-
-      const res2 = datingIntentionCompatibility(null, null);
-      expect(res2.score).toBe(0.5);
-      expect(res2.isKnown).toBe(false);
+    it('ignores relationship goals, daily rhythm and social energy', () => {
+      const viewer = { interests: ['photography'], datingIntention: 'long_term', lifestylePace: 'early_bird', socialPreference: 'introvert' };
+      const a = { interests: ['photography'], datingIntention: 'casual', lifestylePace: 'night_owl', socialPreference: 'social_butterfly' };
+      const b = { interests: ['photography'], datingIntention: 'long_term', lifestylePace: 'early_bird', socialPreference: 'introvert' };
+      expect(computeCompatibility(viewer, a)).toEqual(computeCompatibility(viewer, b));
     });
   });
 
-  describe('Lifestyle and Social Preference Compatibility', () => {
-    it('awards 1.0 for matching pace and social preferences', () => {
-      const res = lifestyleCompatibility('balanced', 'balanced', 'ambivert', 'ambivert');
-      expect(res.score).toBe(1.0);
-      expect(res.isKnown).toBe(true);
+  describe('inputs', () => {
+    it('need falls as a profile receives perspectives or sits in sets today', () => {
+      expect(reciprocityNeed(0)).toBe(1);
+      expect(reciprocityNeed(1)).toBe(0.5);
+      expect(reciprocityNeed(3)).toBe(0.25);
     });
 
-    it('moderates score for contrasting diurnal rhythms (early_bird vs night_owl)', () => {
-      const res = lifestyleCompatibility('early_bird', 'night_owl', 'introvert', 'introvert');
-      // pace: 0.3, social: 1.0 -> avg 0.65
-      expect(res.score).toBeCloseTo(0.65, 2);
-      expect(res.isKnown).toBe(true);
+    it('recently active: today or yesterday 1, 2 to 3 days 0.5, 4 to 7 days 0.2, older 0', () => {
+      expect(recentlyActiveScore(0)).toBe(1);
+      expect(recentlyActiveScore(1)).toBe(1);
+      expect(recentlyActiveScore(2)).toBe(0.5);
+      expect(recentlyActiveScore(3)).toBe(0.5);
+      expect(recentlyActiveScore(4)).toBe(0.2);
+      expect(recentlyActiveScore(7)).toBe(0.2);
+      expect(recentlyActiveScore(8)).toBe(0);
+      expect(recentlyActiveScore(null)).toBe(0);
     });
 
-    it('handles missing lifestyle data gracefully without zeroing the score', () => {
-      const res = lifestyleCompatibility(null, null, null, null);
-      expect(res.score).toBe(0.5);
-      expect(res.isKnown).toBe(false);
-    });
-  });
-
-  describe('Full Multidimensional Compatibility & Missing Data Renormalization', () => {
-    it('computes high compatibility and grounded reasons when profiles strongly align', () => {
-      const viewer = createMockPerson({
-        interests: ['cinema_film', 'specialty_coffee', 'books_reading'],
-        datingIntention: 'long_term',
-        lifestylePace: 'balanced',
-        socialPreference: 'ambivert',
-      });
-      const candidate = createMockPerson({
-        interests: ['cinema_film', 'specialty_coffee', 'travel_backpacking'],
-        datingIntention: 'long_term',
-        lifestylePace: 'balanced',
-        socialPreference: 'ambivert',
-      });
-
-      const result = computeCompatibility(viewer, candidate);
-
-      expect(result.score).toBeGreaterThanOrEqual(0.8);
-      expect(result.coverage).toBe(1.0);
-      expect(result.reasons.length).toBeGreaterThan(0);
-      // Explanations must be grounded in actual matching attributes
-      expect(result.reasons.some((r) => r.kind === 'shared_interest' && r.text.includes('Cinema & Arthouse'))).toBe(true);
-      expect(result.reasons.some((r) => r.kind === 'dating_intention' && r.text.includes('Long-term partner'))).toBe(true);
+    it('new member: 1 during the first week, then 0', () => {
+      expect(newMemberScore(0)).toBe(1);
+      expect(newMemberScore(6.9)).toBe(1);
+      expect(newMemberScore(7)).toBe(0);
     });
 
-    it('renormalizes weights dynamically when candidate has missing interests and intention', () => {
-      const viewer = createMockPerson({
-        interests: ['cinema_film'],
-        datingIntention: 'long_term',
-      });
-      const sparseCandidate = createMockPerson({
-        interests: [],
-        datingIntention: null,
-        lifestylePace: null,
-        socialPreference: null,
-        postCategories: [],
-      });
-
-      const result = computeCompatibility(viewer, sparseCandidate);
-
-      // Score must not be 0 because missing data is not an automatic rejection
-      expect(result.score).toBe(0.5);
-      expect(result.coverage).toBe(0.0);
-      expect(result.reasons).toEqual([]);
+    it('giving quality starts neutral and moves with enough marks', () => {
+      expect(givingQuality(0, 0)).toBe(0.5);
+      expect(givingQuality(1, 0)).toBeCloseTo(3.5 / 6);
+      expect(givingQuality(0, 1)).toBeCloseTo(2.5 / 6);
+      expect(givingQuality(20, 0)).toBeGreaterThan(0.85);
+      expect(givingQuality(0, 20)).toBeLessThan(0.15);
     });
 
-    it('is strictly deterministic for identical inputs', () => {
-      const viewer = createMockPerson({ interests: ['coffee_cafes', 'live_music'] });
-      const candidate = createMockPerson({ interests: ['coffee_cafes', 'hiking_camping'] });
-
-      const run1 = computeCompatibility(viewer, candidate);
-      const run2 = computeCompatibility(viewer, candidate);
-
-      expect(run1.score).toBe(run2.score);
-      expect(run1.coverage).toBe(run2.coverage);
-      expect(run1.reasons).toEqual(run2.reasons);
+    it('report penalty is 0.1 per different reporter, at most 0.5', () => {
+      expect(reportPenalty(0)).toBe(0);
+      expect(reportPenalty(2)).toBeCloseTo(0.2);
+      expect(reportPenalty(9)).toBeCloseTo(0.5);
     });
   });
 
-  describe('Ranking Score Integration', () => {
-    it('combines compatibility with reciprocity, freshness, and quality priors', () => {
-      const highCompatScore = rankingScore({
-        compatibility: 0.9,
-        reciprocityNeed: reciprocityNeed(1),
-        freshness: freshness(2),
-        qualityPrior: qualityPrior(10, 1),
-        penalties: reportPenalty(0),
-      });
+  describe('score', () => {
+    const neutral = { sharedInterests: 0.5, need: 0.5, recentlyActive: 0.5, newMember: 0, givingQuality: 0.5, penalties: 0 };
 
-      const lowCompatScore = rankingScore({
-        compatibility: 0.2,
-        reciprocityNeed: reciprocityNeed(1),
-        freshness: freshness(2),
-        qualityPrior: qualityPrior(10, 1),
-        penalties: reportPenalty(0),
-      });
-
-      expect(highCompatScore).toBeGreaterThan(lowCompatScore);
+    it('uses the decided weights (0.45, 0.20, 0.15, 0.10, 0.10)', () => {
+      expect(DEFAULT_RANKING_WEIGHTS).toEqual({ sharedInterests: 0.45, need: 0.2, recentlyActive: 0.15, newMember: 0.1, givingQuality: 0.1 });
+      const all = rankingScore({ sharedInterests: 1, need: 1, recentlyActive: 1, newMember: 1, givingQuality: 1, penalties: 0 });
+      expect(all).toBeCloseTo(1);
     });
 
-    it('penalizes reported candidates proportionally', () => {
-      const clean = rankingScore({
-        compatibility: 0.8,
-        reciprocityNeed: 0.5,
-        freshness: 0.8,
-        qualityPrior: 0.8,
-        penalties: reportPenalty(0),
-      });
-
-      const reported = rankingScore({
-        compatibility: 0.8,
-        reciprocityNeed: 0.5,
-        freshness: 0.8,
-        qualityPrior: 0.8,
-        penalties: reportPenalty(3), // 0.3 penalty
-      });
-
-      expect(clean - reported).toBeCloseTo(0.3, 2);
-    });
-  });
-
-  describe('Stage 1 Eligibility & Hard Dealbreakers', () => {
-    function isStage1Eligible(viewer: Person, candidate: Person): boolean {
-      if (viewer.intentionDealbreaker) {
-        const comp = datingIntentionCompatibility(viewer.datingIntention, candidate.datingIntention);
-        if (!comp.compatible) return false;
-      }
-      if (candidate.intentionDealbreaker) {
-        const comp = datingIntentionCompatibility(candidate.datingIntention, viewer.datingIntention);
-        if (!comp.compatible) return false;
-      }
-      return true;
-    }
-
-    it('rejects candidates with opposing intentions when viewer marked intention as a dealbreaker', () => {
-      const viewer = createMockPerson({
-        datingIntention: 'long_term',
-        intentionDealbreaker: true, // Dealbreaker active!
-      });
-      const candidate = createMockPerson({
-        datingIntention: 'casual',
-        intentionDealbreaker: false,
-      });
-
-      expect(isStage1Eligible(viewer, candidate)).toBe(false);
+    it('prefers shared interests most, then need', () => {
+      const interests = rankingScore({ ...neutral, sharedInterests: 1 });
+      const need = rankingScore({ ...neutral, need: 1 });
+      const active = rankingScore({ ...neutral, recentlyActive: 1 });
+      expect(interests).toBeGreaterThan(need);
+      expect(need).toBeGreaterThan(active);
     });
 
-    it('rejects candidate when candidate marked intention as dealbreaker against viewer', () => {
-      const viewer = createMockPerson({
-        datingIntention: 'casual',
-        intentionDealbreaker: false,
-      });
-      const candidate = createMockPerson({
-        datingIntention: 'long_term',
-        intentionDealbreaker: true, // Candidate dealbreaker active!
-      });
-
-      expect(isStage1Eligible(viewer, candidate)).toBe(false);
+    it('subtracts the report penalty', () => {
+      expect(rankingScore({ ...neutral, penalties: 0.2 })).toBeCloseTo(rankingScore(neutral) - 0.2);
     });
 
-    it('permits candidates with opposing intentions when NEITHER marked dealbreaker, allowing soft scoring', () => {
-      const viewer = createMockPerson({
-        datingIntention: 'long_term',
-        intentionDealbreaker: false,
-      });
-      const candidate = createMockPerson({
-        datingIntention: 'casual',
-        intentionDealbreaker: false,
-      });
-
-      // Allowed through Stage 1
-      expect(isStage1Eligible(viewer, candidate)).toBe(true);
-
-      // But Stage 2 compatibility reflects the difference
-      const stage2 = computeCompatibility(viewer, candidate);
-      const intentionComp = datingIntentionCompatibility(viewer.datingIntention, candidate.datingIntention);
-      expect(intentionComp.score).toBe(0.15);
-      expect(stage2.score).toBeLessThan(0.85);
+    it('accepts tuned weights from config', () => {
+      const onlyNeed = { sharedInterests: 0, need: 1, recentlyActive: 0, newMember: 0, givingQuality: 0 };
+      expect(rankingScore({ ...neutral, need: 0.25 }, onlyNeed)).toBeCloseTo(0.25);
     });
   });
 });

@@ -1,11 +1,36 @@
 import type { DailyStatus } from '@perspective/contracts';
 
 /**
- * How many perspectives a user must give today before unlocking their own.
- * v1: a fixed configured count (product default 3), behind a function so it can become dynamic.
+ * Pool-size thresholds (docs/PRODUCT.md, decided 2026-10-20). With at least `full` people available
+ * the user gets the most; with at least `partial` a little less; below that, fewer still.
  */
-export function mandatoryCount(_userId: string, configuredCount: number): number {
-  return configuredCount;
+export interface PoolThresholds {
+  full: number;
+  partial: number;
+}
+
+export const DEFAULT_POOL_THRESHOLDS: PoolThresholds = { full: 15, partial: 6 };
+
+/**
+ * How many perspectives a user must give today before unlocking their own, from how many people
+ * could fill a set slot for them right now: 3 at 15 or more, 2 at 6 to 14, 1 at 1 to 5, 0 when
+ * nobody is available (they are unlocked straight away). Never more than `max`.
+ */
+export function mandatoryCount(available: number, max = 3, t: PoolThresholds = DEFAULT_POOL_THRESHOLDS): number {
+  if (available <= 0 || max <= 0) return 0;
+  const count = available >= t.full ? 3 : available >= t.partial ? 2 : 1;
+  return Math.min(count, max, available);
+}
+
+/**
+ * How many more profiles a free user gets after the mandatory set, from how many eligible people are
+ * left for them that day: 5 at 15 or more, 4 at 6 to 14, and below that as many as are left, up to 3.
+ */
+export function bonusCount(available: number, t: PoolThresholds = DEFAULT_POOL_THRESHOLDS): number {
+  if (available <= 0) return 0;
+  if (available >= t.full) return 5;
+  if (available >= t.partial) return 4;
+  return Math.min(available, 3);
 }
 
 export function dailyStatus(dayKey: string, requiredCount: number, givenCount: number): DailyStatus {

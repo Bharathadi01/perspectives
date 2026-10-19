@@ -123,7 +123,9 @@ Consequences: schema changes (goal, optional orientation, account hold and suspe
 Alternatives: two settings ("hear from" and "interested in"); an open perspective pool; an orientation-driven feed; logistic-regression ranking from the start (rejected for now: no data of our own, and no gain on the sandbox).
 Activation/rollback criteria: reviewed after the 4-week beta using `BETA_PLAN.md`.
 
-## ADR-019: Admin access through separate identities and a separate web page
+Step 1 built (2026-10-20): mandatory count 1/2/3, the new boost rule (no boost slot when nobody qualifies), inactive and soft-limit exclusions, 5 connect requests a day, 4 to 5 profiles after the set, the new ranking, reports on posts, perspectives and messages counted, and the relationship-goal dealbreaker removed from matching. Details the product owner settled while building: the after-set count is 5 at 15+ people left, 4 at 6 to 14, else as many as are left up to 3, with the last one a seeded random discovery pick; recently active = 1.0 today or yesterday, 0.5 at 2 to 3 days, 0.2 at 4 to 7, else 0; new member = 1.0 for the first 7 days; giving quality = (helpful + 2.5) / (marks + 5); need and the boost use a 3-day window; the count pool is everyone who could hold a set slot (6-set-cap profiles included). Weights and thresholds are config.
+
+ Admin access through separate identities and a separate web page
 Status: accepted (product owner, 2026-10-20); not built.
 Context: bans need a human review tool. Giving normal accounts an admin role would put ban powers one stolen phone or missed role check away, and admin screens in the mobile app would ship to every user.
 Decision: separate admin identities (own table, own password, created only by a server command), an authenticator-app code at each sign-in, a web-only `apps/admin` project, admin-only endpoints under `/v1/admin` with a separate token, short sessions, and an audit log of every admin action (`SECURITY.md` → Admin access and enforcement).

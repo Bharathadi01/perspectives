@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
-/** Empty string or unset means "no cap" (product decision: caps default to unlimited). */
-const OptionalCap = z
-  .string()
-  .optional()
-  .transform((v) => (v === undefined || v.trim() === '' ? null : Number(v)))
-  .pipe(z.number().int().positive().nullable());
+/** An empty string means "no cap". Unset uses `fallback` (null = no cap). */
+const optionalCap = (fallback: number | null) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? fallback : v.trim() === '' ? null : Number(v)))
+    .pipe(z.number().int().positive().nullable());
+
+const weight = (fallback: number) => z.coerce.number().min(0).max(1).default(fallback);
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().default('development'),
@@ -20,18 +23,26 @@ const EnvSchema = z.object({
   MEDIA_URL_TTL_SEC: z.coerce.number().int().positive().default(3600),
   /** Timezone that defines "today" for the daily give-to-get set. assumption: Asia/Kolkata */
   APP_TIMEZONE: z.string().default('Asia/Kolkata'),
-  /** Mandatory perspectives per day (product default 3). */
+  /** Most mandatory perspectives per day. The actual count is 1, 2 or 3 by pool size (decided 2026-10-20). */
   DAILY_MANDATORY_COUNT: z.coerce.number().int().min(0).default(3),
-  /** assumption: finite daily Explore batch size, including the mandatory set */
-  DAILY_BATCH_SIZE: z.coerce.number().int().min(1).default(10),
+  /** People available for a set at which the daily set is full (3) and the after-set gets 5 (decided 2026-10-20). */
+  POOL_FULL_AT: z.coerce.number().int().min(1).default(15),
+  /** People available at which the daily set is 2 and the after-set gets 4; below it, fewer. */
+  POOL_PARTIAL_AT: z.coerce.number().int().min(1).default(6),
   /** Days before the same sender can re-request after a decline (product default 14; 0 disables). */
   CONNECT_DECLINE_COOLDOWN_DAYS: z.coerce.number().int().min(0).default(14),
-  MAX_CONNECT_REQUESTS_PER_DAY: OptionalCap,
-  MAX_PERSPECTIVES_RECEIVED_PER_DAY: OptionalCap,
+  /** Connect requests a person may send per day (beta value 5, decided 2026-10-20). Empty = no cap. */
+  MAX_CONNECT_REQUESTS_PER_DAY: optionalCap(5),
+  /** Optional hard cap on perspectives one profile can receive per day. Unset: none (the product has no hard cap). */
+  MAX_PERSPECTIVES_RECEIVED_PER_DAY: optionalCap(null),
+  /** Soft limit: after this many perspectives received today, a person is put into no more mandatory sets (0 = off). */
+  RECEIVED_SOFT_LIMIT_PER_DAY: z.coerce.number().int().min(0).default(10),
+  /** People who have not opened the app for this many days are never put into a mandatory set (0 = off). */
+  MANDATORY_INACTIVE_DAYS: z.coerce.number().int().min(0).default(7),
   /** assumption: how long a skipped profile stays out of Explore */
   SKIP_HIDE_DAYS: z.coerce.number().int().min(0).default(7),
-  /** Window used to find low-response profiles for the boost slot. */
-  BOOST_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(7),
+  /** "Recently" for the boost (no perspectives in this many days) and for need in the ranking (decided 2026-10-20: 3). */
+  BOOST_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(3),
   /** Over-exposure (2026-10-19): most mandatory slots one profile may hold per day across all viewers (0 = no cap). */
   MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY: z.coerce.number().int().min(0).default(6),
   /** The boost is picked at random from this many of the least-served profiles (1 = always the single least-served). */
@@ -44,6 +55,12 @@ const EnvSchema = z.object({
   REPORT_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(30),
   /** Distinct recent reporters that keep a profile out of every mandatory slot (0 turns this off). */
   REPORT_PAUSE_REPORTERS: z.coerce.number().int().min(0).default(2),
+  /** Ranking weights (decided 2026-10-20). */
+  RANK_WEIGHT_INTERESTS: weight(0.45),
+  RANK_WEIGHT_NEED: weight(0.2),
+  RANK_WEIGHT_ACTIVE: weight(0.15),
+  RANK_WEIGHT_NEW_MEMBER: weight(0.1),
+  RANK_WEIGHT_QUALITY: weight(0.1),
   /** Quiet connections (product decision 2026-10-18): hours after the quiet person opens the chat. */
   FIRST_REPLY_WARN_HOURS: z.coerce.number().positive().default(24),
   FIRST_REPLY_CLOSE_HOURS: z.coerce.number().positive().default(48),

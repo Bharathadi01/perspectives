@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-20 (product decisions for the beta written down; the app itself has not changed yet)
+**Last updated:** 2026-10-20 (beta step 1 built: daily set of 1 to 3, new boost rule, inactive and soft-limit rules, 5 connect requests a day, 4 to 5 profiles after the set, new ranking, reports on posts, perspectives and messages count)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -65,19 +65,23 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 | Setting | Default | What it does |
 |---|---|---|
 | `APP_TIMEZONE` | Asia/Kolkata | Decides when "today" starts and ends for the daily set |
-| `DAILY_MANDATORY_COUNT` | 3 | How many perspectives you must give each day |
-| `DAILY_BATCH_SIZE` | 10 | How many profiles you can act on per day in Explore (given to or skipped) |
+| `DAILY_MANDATORY_COUNT` | 3 | The most perspectives you must give in a day; the actual number is 1, 2 or 3 by how many people are available |
+| `POOL_FULL_AT` | 15 | People available at which the set is 3 and you get 5 more profiles after it |
+| `POOL_PARTIAL_AT` | 6 | People available at which the set is 2 and you get 4 more after it; below this, fewer |
 | `CONNECT_DECLINE_COOLDOWN_DAYS` | 14 | After someone declines you, you cannot ask them again for this long (0 turns it off) |
-| `MAX_CONNECT_REQUESTS_PER_DAY` | none (unlimited) | Optional cap on requests a person can send per day |
-| `MAX_PERSPECTIVES_RECEIVED_PER_DAY` | none (unlimited) | Optional cap on perspectives one profile can receive per day |
+| `MAX_CONNECT_REQUESTS_PER_DAY` | 5 | Connect requests a person can send per day (empty = unlimited) |
+| `MAX_PERSPECTIVES_RECEIVED_PER_DAY` | none | Optional hard cap on perspectives one profile can receive per day; not set (the product has no hard cap) |
+| `RECEIVED_SOFT_LIMIT_PER_DAY` | 10 | After this many perspectives received today, a person is put into no more daily sets today (give-backs and chosen perspectives still work; 0 = off) |
+| `MANDATORY_INACTIVE_DAYS` | 7 | Someone who has not opened the app in this many days is never put into a daily set (0 = off) |
 | `SKIP_HIDE_DAYS` | 7 | A skipped profile stays out of your Explore for this long |
-| `BOOST_LOOKBACK_DAYS` | 7 | The window used to count "recent" perspectives when picking the boost profile and scoring |
+| `BOOST_LOOKBACK_DAYS` | 3 | "Recently": the boost needs no perspectives in this many days, and need in the ranking counts them over the same days |
 | `MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY` | 6 | The most daily sets one person can be put into per day, across everyone (0 = no limit). Only broken when nobody else is left |
-| `BOOST_CANDIDATE_POOL` | 5 | The boost person is picked from up to this many of the people who received the fewest perspectives (1 = always the single fewest) |
+| `BOOST_CANDIDATE_POOL` | 5 | The boost person is picked at random from up to this many of the qualifying people in the fewest sets today |
 | `BOOST_ACTIVE_DAYS` | 3 | The boost only goes to someone who opened Explore or the Inbox today or in this many days before (0 = no check) |
 | `BOOST_NEW_PROFILE_HOURS` | 48 | An account younger than this can take the boost even without that check |
 | `REPORT_LOOKBACK_DAYS` | 30 | The window for counting how many different people reported a profile |
-| `REPORT_PAUSE_REPORTERS` | 2 | A profile reported by this many different people in that window is not put into anyone's daily set (0 = off) |
+| `REPORT_PAUSE_REPORTERS` | 2 | A person reported by this many different people in that window (on their profile, posts, perspectives or messages) is not put into anyone's daily set (0 = off) |
+| `RANK_WEIGHT_INTERESTS`, `_NEED`, `_ACTIVE`, `_NEW_MEMBER`, `_QUALITY` | 0.45, 0.20, 0.15, 0.10, 0.10 | The ranking weights (section 9.5) |
 | `ACCESS_TOKEN_TTL_SEC` | 900 (15 minutes) | How long a sign-in token works before it is renewed |
 | `REFRESH_TOKEN_TTL_DAYS` | 30 | How long you stay signed in without opening the app |
 | `MEDIA_URL_TTL_SEC` | 3600 (1 hour) | How long a photo or voice link stays valid |
@@ -286,36 +290,33 @@ Code: `apps/api/src/domain/eligibility.ts`, `apps/api/src/profiles/profiles.serv
 
 ## 9. Explore and the daily set
 
-Code: `apps/api/src/daily/*`, `apps/api/src/explore/explore.service.ts`, `apps/api/src/domain/assignment.ts`, `domain/ranking.ts`, `domain/daily.ts`, `apps/mobile/app/(tabs)/explore.tsx`.
+Code: `apps/api/src/daily/*`, `apps/api/src/explore/explore.service.ts`, `apps/api/src/domain/assignment.ts`, `domain/ranking.ts`, `domain/daily.ts`, `domain/random.ts`, `apps/mobile/app/(tabs)/explore.tsx`. Rules decided 2026-10-20 (`docs/PRODUCT.md` → Daily give-to-get, ADR-018).
 
 ### 9.1 What Explore shows
 **One profile at a time.** Order of what appears:
-1. First, the profiles of **today's daily set**, one after another. A short note above each card says which kind it is: "This person hasn't had many perspectives yet. Yours could be their first" (the boost profile), "Part of today's set. Give a perspective on any one post", or "Bonus profile. Give a perspective if you want to" (after the set is done).
-2. After the set is done, optional **bonus profiles** until the day's batch is used up.
+1. First, the profiles of **today's daily set** (1, 2 or 3 people, see 9.3), one after another. A short note above each card says "Part of today's set. Give a perspective on any one post." The boost person (9.3) looks exactly like everyone else in the set: there is no note saying they have had few perspectives.
+2. After the set is done, **4 to 5 more profiles** (fewer when few people are left, see 9.8), with the note "Bonus profile. Give a perspective if you want to."
 3. When nothing is left: "You're done for today" (if the set is finished) or "No one to show right now" (if nobody is available).
 
-A **progress line** at the top shows "X of 3 given today" and "Today's perspectives are unlocked" once finished. A "..." menu on the card offers Report or Block. A close (X) button **skips** the profile.
+A **progress line** at the top shows "X of N given today" and "Today's perspectives are unlocked" once finished. A "..." menu on the card offers Report or Block. A close (X) button **skips** the profile.
 
-On each profile, a person gives a perspective on **one specific post** by tapping its "Give perspective" button. Posts you already answered on someone who comes back are **hidden** from the card (so you only see what is left to answer). The card can also show a short note about why you might match ("You both share passion for Photography", "Both looking for Long-term partner"). [Conflict: the intention note, section 12.]
+On each profile, a person gives a perspective on **one specific post** by tapping its "Give perspective" button. Posts you already answered on someone who comes back are **hidden** from the card. The card can show a short note about shared interests ("You both share passion for Photography"); nothing else is used for that note.
 
 ### 9.2 What "today" means
 "Today" is the calendar date in `APP_TIMEZONE` (India time by default), decided by the server's clock. At midnight in that timezone the day changes and a fresh set is made on the person's first visit.
 
 ### 9.3 Building today's set (first visit of the day)
 1. The server finds everyone **eligible** for this viewer (9.4).
-2. The viewer must be live and have at least one audience gender chosen, or the set is empty.
-3. It picks up to **3** people (`DAILY_MANDATORY_COUNT`):
-   - **Boost slot (1):** someone who has received few perspectives. "Few" counts the perspectives they received in the last 7 days **plus the daily sets they are already in today** (so 50 people opening the app the same morning do not all get the same person). Only people who can take it:
-     - opened Explore or the Inbox today or in the 3 days before (or have an account under 48 hours old),
-     - are in fewer than 6 daily sets today,
-     - and were not reported by 2 or more different people in the last 30 days.
-     From those, the app takes the ones with the lowest count (and anyone just one above them), at most 5, and picks one **at random**, giving someone who shares more of your interests a somewhat higher chance (at most about 3 to 1). The random pick is fixed per person per day: opening the app again gives the same pick.
-   - **The other 2:** the eligible people with the **highest scores** (9.5), skipping anyone already in 6 daily sets today unless nobody else is left. Someone reported by 2 or more different people is never used.
-   - If **nobody can take the boost slot** (for example everyone left has not opened the app for days), all slots are normal "highest score" slots.
-4. If **nobody** is eligible, the requirement is 0 and the person is **unlocked immediately** (they have nothing to give).
-5. If fewer than 3 are eligible, the set is smaller and the requirement is that smaller number.
+2. **Who can be put into a set at all:** eligible people who
+   - have **opened the app in the last 7 days** (today or the 7 days before; "opened" means they opened Explore or the Inbox, which the app does as soon as it starts; an account under 48 hours old counts as active),
+   - have **not already received 10 perspectives today** (the soft limit: they can still receive perspectives people choose to give, and give-backs always work),
+   - and were **not reported by 2 or more different people** in the last 30 days (9.5).
+3. **How many you must give (the count):** from how many people could be put into your set right now: **3** when 15 or more, **2** when 6 to 14, **1** when 1 to 5, and **0** when nobody (you are unlocked straight away).
+4. **The boost slot (at most 1):** someone who can be put into a set **and** opened the app in the last 3 days (or is under 48 hours old) **and received no perspectives in the last 3 days**, and is in fewer than 6 daily sets today. From those, the app takes the ones in the fewest sets today (and anyone just one above them), at most 5, and picks one **at random**, giving someone who shares more of your interests a somewhat higher chance (at most about 3 to 1). The random pick is fixed per person per day: opening the app again gives the same pick. **If nobody qualifies, there is no boost slot**: every slot is a best match.
+5. **The other slots:** the people with the **highest scores** (9.5), skipping anyone already in 6 daily sets today unless nobody else is left.
+6. If fewer people are available than the count, the set is smaller and the requirement is that smaller number.
 
-Code: `apps/api/src/domain/assignment.ts` (the rule), `domain/random.ts` (the fixed-per-day random pick), `daily/candidates.service.ts` (the counts).
+Code: `apps/api/src/domain/daily.ts` (`mandatoryCount`), `domain/assignment.ts` (who may hold a slot, the boost, the picks), `domain/random.ts` (the fixed-per-day random pick), `daily/candidates.service.ts` (the facts).
 
 ### 9.4 Who is eligible for you
 All must be true:
@@ -323,40 +324,39 @@ All must be true:
 2. Their gender is one you chose, and **you are both inside each other's audience** (gender and age).
 3. Not blocked either way.
 4. Not already in today's set, not given to **today**, and not skipped in the last **7 days**.
-5. **Relationship-goal dealbreaker:** if you, or they, switched "strict dealbreaker" on and your goals are not compatible, you are never shown to each other [Conflict]. Compatible pairs: same goal; long-term with long-term-open; long-term-open with short-term-open; short-term-open with casual; anyone with "still figuring it out"; anyone with "friends". Every other pair counts as incompatible (for example long-term with casual).
-6. They have **at least one active post you have not answered**.
-7. They have not reached the optional daily received cap (off by default).
+5. They have **at least one active post you have not answered**.
+6. They have not reached the optional hard received cap (not set: the product has no hard cap).
 
-### 9.5 How people are ranked (for the 2 normal slots and for bonus profiles)
-Score = **45% compatibility + 25% need + 15% freshness + 15% quality − report penalty.** The weights are guesses [Placeholder, to be tuned].
-- **Compatibility** (0 to 1): 40% shared interests (overlap divided by total), 25% relationship-goal match, 20% overlap of post categories, 15% daily rhythm and social energy. Anything one side left blank is simply left out and the rest is re-balanced; if nothing is known the score is 0.5. [Conflict: interests, goals, rhythm, social energy are not in the product rules.]
-- **Need:** 1 divided by (1 + perspectives received in the last 7 days + daily sets they are already in today). Fewer means higher.
-- **Freshness:** newer profiles score higher (halves roughly every 3 weeks: e to the power of minus age in days divided by 30).
-- **Quality:** the share of this person's own perspectives (the ones they gave others) that owners marked helpful. 0.5 when there is no data.
-- **Report penalty:** 0.1 for each **different person** who reported the profile in the last 30 days, up to 5 people. Several reports from the same person count once. Reports a reviewer marked as allowed, and reports whose reporter deleted their account, do not count.
+The relationship-goal "dealbreaker" no longer hides anyone (removed from matching 2026-10-20; the question itself is still asked in onboarding until the next round).
 
-Bonus profiles in Explore simply show the highest-scoring eligible person.
+### 9.5 How people are ranked (for set slots and the profiles after the set)
+Score = **0.45 × shared interests + 0.20 × need + 0.15 × recently active + 0.10 × new member + 0.10 × giving quality − report penalty.** Weights are server settings (`RANK_WEIGHT_*`), to be tuned with the simulator and the beta.
+- **Shared interests** (0 to 1): the interests you both picked, divided by all the interests either of you picked. 0.5 when either of you picked none.
+- **Need:** 1 divided by (1 + perspectives received in the last 3 days + daily sets they are already in today). Fewer means higher.
+- **Recently active:** opened the app today or yesterday 1.0; 2 to 3 days ago 0.5; 4 to 7 days ago 0.2; longer 0. A new account (under 48 hours) counts as today.
+- **New member:** 1.0 during the first 7 days of their profile, then 0.
+- **Giving quality:** how often owners marked this person's own perspectives helpful, starting neutral: (helpful marks + 2.5) divided by (all helpful/not-helpful marks + 5). With no marks it is 0.5; it only moves away from 0.5 as marks build up.
+- **Report penalty:** 0.1 for each **different person** who reported them in the last 30 days, up to 5 people. Reports on their **profile, posts, perspectives or messages** all count, each reporter once. Reports a reviewer marked as allowed, and reports whose reporter deleted their account, do not count.
+- **Not used:** daily rhythm, social energy, relationship goals, orientation, post categories, or any attractiveness or popularity score.
 
 ### 9.6 Skipping
 Tapping X on a profile: the skip is recorded privately (the other person is never told), the profile is hidden for **7 days**, and:
-- If it was one of today's set, it is **replaced** by another eligible person in the same kind of slot (a boost slot gets another low-response profile, chosen the same way as in 9.3; a normal slot gets the next best). If nobody can take a boost slot, it is refilled as a normal slot.
+- If it was one of today's set, it is **replaced** by another person in the same kind of slot (a boost slot gets another qualifying person, chosen as in 9.3; a normal slot gets the next best). If nobody qualifies for a boost slot, it is refilled as a normal slot.
 - If **no replacement exists**, today's requirement drops by 1 (never below what you already gave), and if you have now given enough, you unlock.
 
 ### 9.7 Staying valid
-Every time the next profile in the set is about to be shown, the server re-checks it. If that person has since been blocked, gone offline, has no unanswered post left, or has been reported by 2 or more different people, the slot is quietly **replaced** (or the requirement shrinks).
+Every time the next profile in the set is about to be shown, the server re-checks it. If that person has since been blocked, gone offline, has no unanswered post left, has been reported by 2 or more different people, has not opened the app for 7 days, or has reached 10 perspectives today, the slot is quietly **replaced** (or the requirement shrinks).
 
-### 9.8 The finite batch
-You can act on up to **10 profiles a day** (given to or skipped, counting each person once). After that, Explore says you are done for today, even if more people exist. The daily set itself is always shown first, even if the batch count were used up.
+### 9.8 After the set
+After the set, you get **5 more profiles** when 15 or more people are left for you that day, **4** when 6 to 14 are left, and when fewer than 6 are left, as many as are left up to 3. Each profile you give to or skip counts. They are the best matches (9.5), except the **last one of the day, which is a random "discovery" pick** (fixed for that day). These can include people who would not be put into a set (for example someone who has not opened the app for a while, or someone with 10 perspectives today). Random picks never appear in the daily set. A paid option for more is a later idea, not built.
 
 ### 9.9 Returning profiles
 Someone you gave a perspective to can reappear **on a later day** only while they still have a post you have not answered, and then only the unanswered posts show. If you answered all their posts, they never reappear.
 
 ### 9.10 Unlocking
-The set unlocks the moment you have given a perspective to **every person currently required**. Only perspectives given to people **in your set** count toward the set; giving to a bonus profile does not.
+The set unlocks the moment you have given a perspective to **every person currently required**. Only perspectives given to people **in your set** count toward the set; giving to a profile after the set does not.
 
-**Fixed 2026-10-19:** the boost used to go to the single profile with the fewest perspectives, so the same person could land in everyone's set on the same day (a simulation showed about 44 sets for one person at 200 users). It now counts today's sets, picks at random among the few least-served, and stops at 6 sets per person per day (9.3).
-
-**Still to decide (product owner):** the boost slot is filled even when the least-served person already has many perspectives, so its note ("hasn't had many perspectives yet") can be wrong in a busy pool. Normal slots can still go to people who have not opened the app for a long time.
+**History:** before 2026-10-19 the boost went to the single profile with the fewest perspectives, so one person could land in everyone's set (fixed: today's sets count, a random pick, at most 6 sets a day). On 2026-10-20 the set became 1 to 3 by pool size, the boost became "active, no perspectives in 3 days, or none", inactive people and people at 10 perspectives today stopped being put into sets, and the ranking changed to the formula above.
 
 ---
 
@@ -439,7 +439,7 @@ A profile can be opened from Explore, the Inbox, a chat, or your given list.
 5. **They already asked you:** you are told to answer their request in your Inbox (no second request).
 6. You have **not given them a perspective** (the gate): "Give them a perspective first, then you can ask to connect."
 7. **A cooldown:** they declined you in the last 14 days, or (if configured) your connection closed for being quiet recently: "You can ask this person again later," with the date.
-8. The optional daily cap on requests (off by default).
+8. The daily limit: **5 connect requests a day** ("You have reached today's connect limit").
 
 If allowed, a request is stored carrying **your latest perspective to them**, stamped with today's date.
 
@@ -527,10 +527,11 @@ Code: `apps/api/src/safety/*`, `apps/mobile/src/components/SafetyMenu.tsx`.
 ### 14.1 Reporting [Placeholder]
 On profiles, posts, perspectives and chats, a "..." menu offers **Report**. The person picks a reason: nudity or sexual content, body shaming, harassment or hate, threats or violence, self-harm, scam or fake profile, might be under 18, spam, something else (optional note up to 500 characters). The reporter's identity is stored; the reported person is never told.
 - **What the server does with it:** it **only saves it**. Nobody reviews reports yet; there is no moderation tool, warning, suspension or ban [Not built].
-- **Effects (automatic, for reports on a profile):**
-  - Each **different person** who reported the profile in the last 30 days adds 0.1 to its ranking penalty (up to 5 people), so it appears less in other people's Explore (section 9.5).
-  - Once **2 or more different people** reported it in the last 30 days, it is **never put into anyone's daily set** (not the boost, not a normal slot), and a pending slot holding it is replaced. It can still appear as an optional bonus profile.
+- **Effects (automatic).** Reports on a person's **profile, posts, perspectives or messages** all count against that person (since 2026-10-20; before, only profile reports counted):
+  - Each **different person** who reported them in the last 30 days adds 0.1 to their ranking penalty (up to 5 people), so they appear less in other people's Explore (section 9.5).
+  - Once **2 or more different people** reported them in the last 30 days, they are **never put into anyone's daily set** (not the boost, not a normal slot), and a pending slot holding them is replaced. They can still appear after the set.
   - Several reports from the same person count once, so one person cannot push someone out alone.
+  - Holds (3 different reporters, or one serious report) are decided but not built yet (section 17).
 - [Conflict] The confirmation says "it's hidden for you", but the server does **not** hide reported content or people for the reporter.
 
 ### 14.2 Blocking [Built]
@@ -589,7 +590,7 @@ There is **no waiting period** and no way back [Placeholder: a grace period is p
 | Priya | priya@perspective.test | Woman, 25, Bengaluru; audience: men 21 to 35 |
 | Arjun | arjun@perspective.test | Man (gay), 30, Bengaluru; audience: men 24 to 40 |
 
-Seed state: Ravi starts with yesterday's perspectives already visible, one more perspective that is locked until he finishes today's set, a pending connect request from Priya, and a connection with Asha (connected 2 hours ago, with two messages). Photos are generated color gradients, not real people.
+Seed state: everyone "opened the app" yesterday (so they count as active). With 4 women in his audience, Ravi's daily set is **1** profile, then 3 more after it. Ravi starts with yesterday's perspectives already visible, one more perspective that is locked until he finishes today's set, a pending connect request from Priya, and a connection with Asha (connected 2 hours ago, with two messages). Photos are generated color gradients, not real people.
 
 **Development-only shortcuts** (all off in a release build):
 - If no sign-in is saved, the app **signs in as Ravi automatically** (it calls the local server).
@@ -605,7 +606,7 @@ Seed state: Ravi starts with yesterday's perspectives already visible, one more 
 - Selfie verification approves any photo (no liveness, no face match).
 - Text moderation is a tiny phrase list; no photo or voice moderation.
 - Photos and voice are stored on the server's disk; hidden location data is not removed.
-- Ranking weights, and the fixed daily count of 3.
+- Ranking weights (decided starting values, not yet tuned on real data).
 - Account deletion is instant and total.
 - Reports are saved but never reviewed.
 - Voice length is trusted from the app.
@@ -629,16 +630,14 @@ Seed state: Ravi starts with yesterday's perspectives already visible, one more 
 - The weak-giver loop (notice, fewer new members, review).
 
 **Conflicts with the product rules** (code vs `docs/PRODUCT.md`). On 2026-10-20 the product owner decided the beta model (ADR-018), so most of these are now **decided but not built yet**:
-1. **Relationship goals are public and used for matching.** Every profile shows a "dating intention", and a "strict dealbreaker" hides incompatible people. *Decided:* replace them with a private goal question (Get perspectives / Meet new people) and remove the dealbreaker.
+1. **Relationship goals are still asked and shown on profiles.** Every profile shows a "dating intention" and onboarding still asks for it and the dealbreaker switch. Since 2026-10-20 neither is used for matching any more (the dealbreaker hides nobody). *Decided, next round:* replace them with a private goal question (Get perspectives / Meet new people).
 2. **Orientation is required and shown on profiles.** *Decided:* optional, private, not used for matching during the beta.
-3. **Ranking uses more than the product allows:** daily rhythm, social energy, relationship goals, post-category overlap and account age. *Decided:* shared interests, need, recently active, new member and giving quality only (`PRODUCT.md` → Algorithms).
-4. **The daily set does not match the decided rules yet:** the mandatory count is always 3 (decided 1, 2 or 3 by people available); the boost picks among the least-served over 7 days and shows "hasn't had many perspectives yet" (decided: only active people with no perspectives in 3 days, otherwise none, with no such note); people inactive for 7 days can still fill normal slots (decided: skipped); the daily batch is 10 (decided: the set plus 4 to 5).
-5. **Caps are unlimited** (decided for the beta: 5 connect requests a day; stop pushing someone who received 10 today).
-6. **Reports:** a profile reported by 3 different people is not put on hold, a single serious report does nothing automatic, and only profile reports count (decided: holds, serious-report fast path, and reports on posts, perspectives and messages count). There is no admin review, ban or appeal (section 17, not built).
-7. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
-8. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
-9. **The report confirmation promises to hide the content**, but the server does not.
-10. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
+3. **Reports:** a person reported by 3 different people is not put on hold, and a single serious report does nothing automatic (decided: holds and a serious-report fast path). There is no admin review, ban or appeal (not built). Reports on posts, perspectives and messages now count (built 2026-10-20).
+4. **Automatic age widening and the in-app notices list** are decided but not built, so a very narrow audience can still leave someone with nobody to see.
+5. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
+6. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
+7. **The report confirmation promises to hide the content**, but the server does not.
+8. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
 
 ---
 
@@ -665,7 +664,7 @@ Seed state: Ravi starts with yesterday's perspectives already visible, one more 
 | CONNECT_REQUEST_PENDING | Already waiting, or they already asked you | The server's message |
 | ALREADY_CONNECTED | Already connected | "You are already connected." |
 | CONNECTION_CLOSED | Chat closed because it went quiet | The "This connection closed" screen |
-| CAP_REACHED | A daily cap (only if one is set) | The server's message |
+| CAP_REACHED | The 5 connect requests a day are used (or an optional hard received cap, if one is ever set) | "You have reached today's connect limit." |
 | IDEMPOTENCY_KEY_REQUIRED | The app forgot the unique key | (a bug if ever seen) |
 | VALIDATION_FAILED | Input does not fit the rules | The server's message |
 | NETWORK_ERROR | No connection | "Could not reach Perspective. Check your connection and try again." |
@@ -684,6 +683,16 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-20: beta step 1, the daily set and ranking
+- **Daily set of 1, 2 or 3** by how many people could be put into it (15 or more: 3; 6 to 14: 2; 1 to 5: 1; none: unlocked straight away).
+- **Boost** only for someone active in the last 3 days with **no perspectives in the last 3 days**; if nobody qualifies there is no boost slot. The "hasn't had many perspectives yet" note is gone: the boost card looks like any other.
+- People who have **not opened the app for 7 days**, and people who already **received 10 perspectives today**, are not put into daily sets (they can still be shown after the set; give-backs always work).
+- **5 connect requests a day.**
+- After the set: **5 more profiles** (15+ people left), **4** (6 to 14), or as many as are left up to 3; the last one is a random discovery pick. This replaces the 10-a-day batch.
+- **New ranking:** shared interests, need, recently active, new member and giving quality, minus reports. Daily rhythm, social energy, relationship goals and post categories are no longer used, and the relationship-goal dealbreaker no longer hides anyone.
+- **Reports on posts, perspectives and messages** now count against the person, like reports on their profile.
+- Seed data: everyone opened the app yesterday. (Sections 2, 9, 12.2, 14.1, 16, 17, 18; ADR-018.)
 
 ### 2026-10-20: beta decisions written down (no app change)
 - The product owner decided the beta model: a private goal question, one audience setting, optional private orientation, new daily-set and ranking rules, beta caps, holds and admin-decided bans with appeals (`docs/PRODUCT.md`, `docs/SECURITY.md`, `docs/BETA_PLAN.md`, ADR-018 and ADR-019). Nothing in the app has changed yet, so section 17 lists what the code still does differently.

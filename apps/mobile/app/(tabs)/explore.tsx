@@ -13,8 +13,9 @@ import { useExplore, useSkip } from '../../src/features/hooks';
 import { errorMessage } from '../../src/lib/errors';
 import { theme } from '../../src/theme';
 
+// The boost card looks like any other card in the set (decided 2026-10-20); the API already sends it as "mandatory".
 const SLOT_NOTE = {
-  boost: 'This person hasn’t had many perspectives yet. Yours could be their first.',
+  boost: 'Part of today’s set. Give a perspective on any one post.',
   mandatory: 'Part of today’s set. Give a perspective on any one post.',
   optional: 'Bonus profile. Give a perspective if you want to.',
 } as const;
