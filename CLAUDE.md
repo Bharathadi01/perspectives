@@ -3,7 +3,7 @@
 ## Product
 Perspective is an 18+ app where selfie-verified users give each other honest, text-only perspectives on how they look, dress, sound, and show up, and can then connect. It is a dating app at its core with a unique hook (perspectives), marketed perspectives-first and not as "a dating app." The same open Connect also serves friends, gym buddies, and networking.
 
-The canonical business rules are in `docs/PRODUCT.md`. If any other doc, comment, or the current skeleton disagrees with it, `docs/PRODUCT.md` wins. In brief: a profile has basics plus 1 to 6 posts (photo or 15-second audio plus a prompt or question). Each day a user gives perspectives on a mandatory set of profiles (default 3, including one boost slot for a low-response profile) to unlock the perspectives they received. A user may ask to connect only after giving the other person a perspective; the other person gives one back to accept, or declines; chat opens only on accept.
+The canonical business rules are in `docs/PRODUCT.md`. If any other doc, comment, or the current skeleton disagrees with it, `docs/PRODUCT.md` wins. In brief: a profile has basics plus 1 to 6 posts (photo or 15-second audio plus a prompt or question). Each day a user gives perspectives on a mandatory set of up to 3 profiles (one may be a boost slot for an active person who has had no perspectives in 3 days) to unlock the perspectives they received. A user may ask to connect only after giving the other person a perspective; the other person gives one back to accept, or declines; chat opens only on accept.
 
 Hinge is the UI and structural reference. For the initial development phase, the UI should look and feel similar to Hinge: the same overall layout patterns, structure, and interaction model (deep profiles of photos and prompts, audio prompts, one-profile-at-a-time discovery, responding to a specific element, incoming review, mutual consent before chat, private outcome feedback). This is a temporary placeholder. The product owner will redesign the UI to Perspective's own look once all logic and algorithms are done, so keep UI code componentized and put styling in design tokens so the redesign is mostly a restyle. Limits that stay: never use Hinge's name or logo, never claim any affiliation, and never copy actual Hinge files (images, screenshots used as assets, exported icons, fonts, sounds, animation files). Write Perspective's own copy and use our own tokens. The Hinge-like UI must be replaced with Perspective's own design before any public release or store submission.
 
@@ -13,13 +13,13 @@ Hinge is the UI and structural reference. For the initial development phase, the
 - No public attractiveness scoring, leaderboards, public follower counts, or public comments. A perspective is visible only to the post owner and the giver.
 - Perspectives are text-only, honest, and unfiltered. Criticism is allowed; body shaming, abuse, and sexual content are not.
 - No nudity or sexual content. Shirtless, gym, and swimwear photos are allowed.
-- Connect is open. There are no connection intents, modes, or labels (no "date," "friends," "networking" tags).
+- Connect is open. There are no connection intents, modes, or labels (no "date," "friends," "networking" tags). The private onboarding goal ("Get perspectives" and/or "Meet new people", decided 2026-10-20) only changes matching; it is never shown and never labels a person or a connection. The old "dating intention" and its dealbreaker are removed. Orientation is optional and private, and not used for matching during the beta.
 - A user may ask to connect only after giving the other person a perspective. The other person gives one back to accept, or declines. Chat opens only after accept. After a decline, the same sender cannot send another request to that person for 14 days (configurable).
 - Only selfie-verified, 18+ users have an active profile.
-- Audience (gender and age range) is set at profile level. Users are never forced to see profiles outside their own filters, blocks, or mutes.
+- Audience (gender and age range) is one setting at profile level, used both ways: two people see each other only when each is inside the other's audience. Users are never forced to see profiles outside their own filters, blocks, or mutes. The one exception is the automatic age widening (2 years at a time, at most 4 beyond their choice, never below 18, never by gender), always with a notice.
 - No profile should be left without perspectives; the daily assignment must push low-response profiles to others.
-- Caps (connects per day, perspectives received per profile per day) are config values that default to unlimited until tuned.
-- Safety features are P0: moderation, report, block, age gate, selfie verification, contact information, and in-app account deletion.
+- Caps are server config values. Beta values (decided 2026-10-20): 5 connect requests sent per day; a person who received 10 perspectives today stops being put into mandatory sets (soft: chosen perspectives and give-backs still go through); at most 6 mandatory sets per person per day.
+- Safety features are P0: moderation, report, block, age gate, selfie verification, contact information, and in-app account deletion. Automatic steps only put a profile on hold; every ban is decided by an admin on the separate admin dashboard, and banned people can always appeal (`docs/PRODUCT.md` → Reports, holds and bans).
 - Optimize helpful perspectives and meaningful connections, not time spent.
 - Precise location, phone, email, birthday, moderation notes, verification media, and private settings must never appear in public DTOs.
 
@@ -29,7 +29,7 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Contracts first:** types and validation live in `packages/contracts` (Zod). The API validates bodies with them; `packages/api-client` validates responses with them; mobile imports them. Rebuild contracts after editing.
 - **Stubs:** selfie verification and text moderation (`apps/api/src/moderation/moderation.ts`) and local-disk media storage (`apps/api/src/media/media.storage.ts`). Replace the provider class, not the callers.
 - **Schema:** the first migration exists, so schema changes are additive forward migrations only (`jana_claude.md` rule 4.2). Never edit an applied migration.
-- **Do not reintroduce** connection intents or modes, structured responses, lens-based qualification, public scores or comments.
+- **Do not reintroduce** connection intents or modes, relationship goals or dating intentions, structured responses, lens-based qualification, public scores or comments.
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
 - **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-19 all passed: 106 unit and 27 end-to-end tests.
 

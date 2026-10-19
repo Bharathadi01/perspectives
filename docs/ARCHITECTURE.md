@@ -21,6 +21,8 @@ This table is the single source for the stack. If README, CLAUDE.md, BLUEPRINT.m
 | Moderation, selfie verification | Stubs (`TextModerator`, `SelfieVerifier`) | A vendor API for text and image moderation and for liveness selfie checks, rather than building ML |
 | AI service | `apps/ai-service` FastAPI skeleton, not called by anything | Activate only for Python-only models, GPU inference, or independent AI scaling |
 | Local infra | PostgreSQL only | Redis only with its first real use |
+| Matching | Rule-based formulas in `apps/api/src/domain` (no machine learning) | After the beta: a Python batch job (scikit-learn logistic regression) trained on our own outcomes, used only as an input to the formula and only if it beats the formula in a shadow test (ADR-018) |
+| Admin | None | `apps/admin`, a web-only Expo Router project; separate admin identities with an authenticator-app code (a TOTP library); admin-only API under `/v1/admin` (ADR-019) |
 
 ## Repository
 ```text
@@ -31,6 +33,7 @@ packages/contracts
 packages/design-tokens
 packages/config
 apps/ai-service     # FastAPI skeleton, not wired in v1
+apps/admin          # planned: admin web page (ADR-019)
 docs
 ```
 

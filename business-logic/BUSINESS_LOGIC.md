@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-19 (after: the boost slot no longer piles onto one person, and skips reported or inactive profiles)
+**Last updated:** 2026-10-20 (product decisions for the beta written down; the app itself has not changed yet)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -623,14 +623,22 @@ Seed state: Ravi starts with yesterday's perspectives already visible, one more 
 - Terms, privacy and guidelines screens; data download.
 - Dark mode; an accessibility review; Android has not been tried.
 - Payments.
+- The private goal question, the goal-worded audience step, and automatic age widening (decided 2026-10-20).
+- An in-app notices list (for widening, weak-giver tips, holds and bans).
+- Holds, temporary and permanent bans, the ban screen, appeals, and the separate admin dashboard (decided 2026-10-20, `docs/SECURITY.md`).
+- The weak-giver loop (notice, fewer new members, review).
 
-**Conflicts with the product rules** (code vs `docs/PRODUCT.md`)
-1. **Relationship goals are public and used for matching.** Every profile shows a "dating intention", and there is a "strict dealbreaker" that hides incompatible people. `docs/PRODUCT.md` says Connect has **no intents or labels**, and the project rules say not to reintroduce them. *Needs the product owner's decision.*
-2. **More profile questions than the product defines:** interests, daily rhythm, social energy, personality answers, pronouns. They feed ranking. Not in `docs/PRODUCT.md`.
-3. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
-4. **The report confirmation promises to hide the content**, but the server does not.
-5. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
-6. **`docs/PRODUCT.md` does not yet describe** the six-step onboarding, the matching score, or the extra profile fields.
+**Conflicts with the product rules** (code vs `docs/PRODUCT.md`). On 2026-10-20 the product owner decided the beta model (ADR-018), so most of these are now **decided but not built yet**:
+1. **Relationship goals are public and used for matching.** Every profile shows a "dating intention", and a "strict dealbreaker" hides incompatible people. *Decided:* replace them with a private goal question (Get perspectives / Meet new people) and remove the dealbreaker.
+2. **Orientation is required and shown on profiles.** *Decided:* optional, private, not used for matching during the beta.
+3. **Ranking uses more than the product allows:** daily rhythm, social energy, relationship goals, post-category overlap and account age. *Decided:* shared interests, need, recently active, new member and giving quality only (`PRODUCT.md` → Algorithms).
+4. **The daily set does not match the decided rules yet:** the mandatory count is always 3 (decided 1, 2 or 3 by people available); the boost picks among the least-served over 7 days and shows "hasn't had many perspectives yet" (decided: only active people with no perspectives in 3 days, otherwise none, with no such note); people inactive for 7 days can still fill normal slots (decided: skipped); the daily batch is 10 (decided: the set plus 4 to 5).
+5. **Caps are unlimited** (decided for the beta: 5 connect requests a day; stop pushing someone who received 10 today).
+6. **Reports:** a profile reported by 3 different people is not put on hold, a single serious report does nothing automatic, and only profile reports count (decided: holds, serious-report fast path, and reports on posts, perspectives and messages count). There is no admin review, ban or appeal (section 17, not built).
+7. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
+8. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
+9. **The report confirmation promises to hide the content**, but the server does not.
+10. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
 
 ---
 
@@ -676,6 +684,9 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-20: beta decisions written down (no app change)
+- The product owner decided the beta model: a private goal question, one audience setting, optional private orientation, new daily-set and ranking rules, beta caps, holds and admin-decided bans with appeals (`docs/PRODUCT.md`, `docs/SECURITY.md`, `docs/BETA_PLAN.md`, ADR-018 and ADR-019). Nothing in the app has changed yet, so section 17 lists what the code still does differently.
 
 ### 2026-10-19: the boost slot no longer piles onto one person
 - The boost used to be the single profile with the fewest perspectives, so everyone opening the app the same morning got the same person. It now also counts the sets a person is already in today, picks at random (fixed per person per day) among the few least-served with a small preference for shared interests, and stops at 6 sets per person per day.

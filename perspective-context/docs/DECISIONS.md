@@ -108,6 +108,28 @@ Consequences: one additive index (`daily_assignments(targetId, dayKey)`); six ne
 Alternatives: a hard received cap (kept as the existing optional config); a nightly batch allocator (later, once there is a job runner); a "needs it" threshold that leaves the boost empty (product owner to decide; it changes the "each set has a boost slot" rule).
 Activation/rollback: set `BOOST_CANDIDATE_POOL=1`, `MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY=0`, `BOOST_ACTIVE_DAYS=0` and `REPORT_PAUSE_REPORTERS=0` to return to the old pick (counting today's sets stays).
 
+## ADR-018: The beta product model (goal, one audience, rule-based matching, safety holds)
+Status: accepted (product owner, 2026-10-20).
+Context: an algorithm review (two external research reports, a speed-dating sandbox and our own simulation) found that at 50 to 200 users the pool size and gender balance matter more than ranking weights. Machine learning did not beat a constant guess on the sandbox data, and several profile fields conflicted with the "no intents or labels" rule.
+Decision:
+- A private onboarding goal (Get perspectives and/or Meet new people) replaces the "dating intention" and its dealbreaker. It only changes matching and never labels anyone.
+- One audience setting, used both ways, worded by the goal. "Perspectives only" people start with all genders selected. Orientation becomes optional and private and is not used for matching during the beta; the beta decides whether orientation-based matching is needed (`BETA_PLAN.md`).
+- Automatic age widening: 2 years at a time, at most 4 beyond the person's choice, never below 18, never gender, always with a notice.
+- Rule-based matching only. Ranking starts at 0.45 shared interests, 0.20 need, 0.15 recently active, 0.10 new member and 0.10 giving quality, minus distinct-reporter penalties. Daily rhythm and social energy are not used.
+- Mandatory count 1/2/3 by eligible people available; the boost goes to active people with no perspectives in 3 days or is not used; people inactive for 7 days are skipped; then 4 to 5 more profiles a day.
+- Caps: 5 connect requests a day; a soft received limit of 10 a day; 6 mandatory sets per person per day.
+- Safety: automatic steps only hold; admins decide every ban; banned people can always appeal.
+Consequences: schema changes (goal, optional orientation, account hold and suspension state, admin tables), a new admin web app (ADR-019), and in-app notices. The "national launch" exclusion is replaced by a worldwide public launch after the beta.
+Alternatives: two settings ("hear from" and "interested in"); an open perspective pool; an orientation-driven feed; logistic-regression ranking from the start (rejected for now: no data of our own, and no gain on the sandbox).
+Activation/rollback criteria: reviewed after the 4-week beta using `BETA_PLAN.md`.
+
+## ADR-019: Admin access through separate identities and a separate web page
+Status: accepted (product owner, 2026-10-20); not built.
+Context: bans need a human review tool. Giving normal accounts an admin role would put ban powers one stolen phone or missed role check away, and admin screens in the mobile app would ship to every user.
+Decision: separate admin identities (own table, own password, created only by a server command), an authenticator-app code at each sign-in, a web-only `apps/admin` project, admin-only endpoints under `/v1/admin` with a separate token, short sessions, and an audit log of every admin action (`SECURITY.md` → Admin access and enforcement).
+Consequences: one new app in the workspace and one new dependency (a TOTP library), both added to the stack table when built.
+Alternatives: an admin role on user accounts with admin screens in the mobile app (rejected for the risk above); editing the database by hand (no audit trail, error-prone).
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded
