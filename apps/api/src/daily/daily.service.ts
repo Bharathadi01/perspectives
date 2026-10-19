@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { DailyStatus } from '@perspective/contracts';
 import { addDays, todayKey } from '../common/day';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
-import { pickDailySet, pickReplacement } from '../domain/assignment';
+import { AssignmentPolicy, mayHoldMandatorySlot, pickDailySet, pickReplacement } from '../domain/assignment';
 import { dailyStatus, mandatoryCount, requiredAfterUnfilledSlot } from '../domain/daily';
 import { PrismaService } from '../prisma/prisma.service';
 import { Person, SocialService } from '../social/social.service';
@@ -51,6 +51,7 @@ export class DailyService {
       ? pickDailySet(
           await this.candidates.eligible(viewer, await this.recentlySkipped(userId, now), now),
           mandatoryCount(userId, this.config.DAILY_MANDATORY_COUNT),
+          this.policy(userId, dayKey),
         )
       : [];
 
@@ -74,9 +75,20 @@ export class DailyService {
     }
   }
 
+  /** Over-exposure and safety rules for building this viewer's set today (seeded per viewer and day). */
+  private policy(userId: string, dayKey: string): AssignmentPolicy {
+    const cap = this.config.MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY;
+    return {
+      seed: `${userId}:${dayKey}`,
+      assignCap: cap === 0 ? null : cap,
+      boostPoolSize: this.config.BOOST_CANDIDATE_POOL,
+      pauseReporters: this.config.REPORT_PAUSE_REPORTERS,
+    };
+  }
+
   /**
    * The next mandatory profile to show. Slots whose profile became ineligible (blocked, went
-   * offline, nothing left to answer) are replaced first.
+   * offline, nothing left to answer, or reported by enough different people) are replaced first.
    */
   async nextPendingSlot(userId: string, now: Date = new Date()): Promise<PendingSlot | null> {
     const dayKey = this.today(now);
@@ -90,7 +102,8 @@ export class DailyService {
         orderBy: { slotIndex: 'asc' },
       });
       if (!slot) return null;
-      if (await this.candidates.isEligible(viewer, slot.targetId, now)) {
+      const candidate = await this.candidates.findEligible(viewer, slot.targetId, now);
+      if (candidate && mayHoldMandatorySlot(candidate, this.policy(userId, dayKey))) {
         return { targetId: slot.targetId, slot: slot.slot };
       }
       await this.prisma.dailyAssignment.update({ where: { id: slot.id }, data: { status: 'replaced' } });
@@ -173,15 +186,21 @@ export class DailyService {
   private async refillSlot(viewer: Person, slot: 'boost' | 'mandatory', now: Date): Promise<void> {
     const dayKey = this.today(now);
     const exclude = await this.excludedToday(viewer.id, now);
-    const replacement = pickReplacement(await this.candidates.eligible(viewer, exclude, now), slot);
+    const last = await this.prisma.dailyAssignment.findFirst({
+      where: { userId: viewer.id, dayKey },
+      orderBy: { slotIndex: 'desc' },
+      select: { slotIndex: true },
+    });
+    const slotIndex = (last?.slotIndex ?? -1) + 1;
+    const replacement = pickReplacement(
+      await this.candidates.eligible(viewer, exclude, now),
+      slot,
+      this.policy(viewer.id, dayKey),
+      slotIndex,
+    );
     if (replacement) {
-      const last = await this.prisma.dailyAssignment.findFirst({
-        where: { userId: viewer.id, dayKey },
-        orderBy: { slotIndex: 'desc' },
-        select: { slotIndex: true },
-      });
       await this.prisma.dailyAssignment.create({
-        data: { userId: viewer.id, dayKey, slotIndex: (last?.slotIndex ?? -1) + 1, targetId: replacement, slot },
+        data: { userId: viewer.id, dayKey, slotIndex, targetId: replacement.id, slot: replacement.slot },
       });
       return;
     }

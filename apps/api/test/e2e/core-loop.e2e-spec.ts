@@ -57,6 +57,21 @@ describe('core loop (e2e)', () => {
     expect(res.body.card.slot).toBe('boost');
   });
 
+  it('keeps a profile reported by two different people out of the daily set, but not one reported three times by one person', async () => {
+    const w = await world();
+    const report = (by: Client, targetId: string) =>
+      by.post('/v1/reports', { targetType: 'profile', targetId, reason: 'harassment_hate' }).expect(201);
+    await report(w.kabir, w.meera.id);
+    await report(w.asha, w.meera.id);
+    for (let i = 0; i < 3; i++) await report(w.kabir, w.priya.id);
+
+    await w.ravi.get('/v1/explore').expect(200);
+    const targets = (await prisma.dailyAssignment.findMany({ where: { userId: w.ravi.id } })).map((s) => s.targetId);
+    expect(targets).toHaveLength(3);
+    expect(targets).not.toContain(w.meera.id);
+    expect(targets).toContain(w.priya.id);
+  });
+
   it('enforces the giving rules', async () => {
     const w = await world();
     const own = await give(w.ravi, w.ravi.postIds[0]).expect(403);
@@ -85,6 +100,9 @@ describe('core loop (e2e)', () => {
     await give(w.ravi, w.asha.postIds[0]).expect(201);
     await give(w.ravi, w.meera.postIds[0]).expect(201);
     await prisma.perspective.updateMany({ where: { giverId: w.ravi.id }, data: { receivedDayKey: '2000-01-01' } });
+    // Giving built yesterday's set; start Ravi's day fresh so today's set is built now.
+    await prisma.dailyAssignment.deleteMany({ where: { userId: w.ravi.id } });
+    await prisma.dailyProgress.deleteMany({ where: { userId: w.ravi.id } });
 
     await w.ravi.get('/v1/explore').expect(200);
     const targets = (await prisma.dailyAssignment.findMany({ where: { userId: w.ravi.id } })).map((s) => s.targetId);

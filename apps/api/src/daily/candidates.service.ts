@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { addDays, todayKey } from '../common/day';
+import { addDays, dayKeyFor, todayKey } from '../common/day';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { AssignmentCandidate } from '../domain/assignment';
 import { mutuallyVisible } from '../domain/eligibility';
@@ -78,8 +78,9 @@ export class CandidatesService {
     if (pool.length === 0) return [];
 
     const poolIds = pool.map((p) => p.person.id);
+    const tz = this.config.APP_TIMEZONE;
     const since = addDays(now, -this.config.BOOST_LOOKBACK_DAYS);
-    const [recent, verdicts, reports] = await Promise.all([
+    const [recent, verdicts, reporters, assignedToday, activeOwners] = await Promise.all([
       this.prisma.perspective.groupBy({
         by: ['ownerId'],
         where: { ownerId: { in: poolIds }, createdAt: { gte: since } },
@@ -90,27 +91,51 @@ export class CandidatesService {
         where: { giverId: { in: poolIds }, verdict: { not: null } },
         _count: { _all: true },
       }),
-      this.prisma.report.groupBy({
+      // One row per distinct reporter; reports a reviewer allowed, and those whose reporter deleted their account, do not count.
+      this.prisma.report.findMany({
+        where: {
+          targetType: 'profile',
+          targetId: { in: poolIds },
+          reporterId: { not: null },
+          status: { not: 'allowed' },
+          createdAt: { gte: addDays(now, -this.config.REPORT_LOOKBACK_DAYS) },
+        },
+        distinct: ['targetId', 'reporterId'],
+        select: { targetId: true },
+      }),
+      // Mandatory slots already holding each profile today, across every viewer (over-exposure).
+      this.prisma.dailyAssignment.groupBy({
         by: ['targetId'],
-        where: { targetType: 'profile', targetId: { in: poolIds } },
+        where: { targetId: { in: poolIds }, dayKey: todayKey(tz, now), status: { in: ['pending', 'given'] } },
         _count: { _all: true },
+      }),
+      // Owners who opened the app recently: a daily-progress row exists once they open Explore or the Inbox.
+      this.prisma.dailyProgress.findMany({
+        where: { userId: { in: poolIds }, dayKey: { gte: dayKeyFor(addDays(now, -this.config.BOOST_ACTIVE_DAYS), tz) } },
+        distinct: ['userId'],
+        select: { userId: true },
       }),
     ]);
     const recentBy = new Map(recent.map((r) => [r.ownerId, r._count._all]));
-    const reportsBy = new Map(reports.map((r) => [r.targetId, r._count._all]));
+    const reportersBy = new Map<string, number>();
+    for (const r of reporters) reportersBy.set(r.targetId, (reportersBy.get(r.targetId) ?? 0) + 1);
+    const assignedBy = new Map(assignedToday.map((a) => [a.targetId, a._count._all]));
+    const active = new Set(activeOwners.map((a) => a.userId));
     const verdictCount = (giverId: string, verdict: 'helpful' | 'not_helpful') =>
       verdicts.find((v) => v.giverId === giverId && v.verdict === verdict)?._count._all ?? 0;
 
     return pool.map(({ person }) => {
       const recentReceived = recentBy.get(person.id) ?? 0;
-      const ageDays = (now.getTime() - person.createdAt.getTime()) / 86400000;
+      const assigned = assignedBy.get(person.id) ?? 0;
+      const recentReporters = reportersBy.get(person.id) ?? 0;
+      const ageMs = now.getTime() - person.createdAt.getTime();
       const compatibility = computeCompatibility(viewer, person);
       const score = rankingScore({
         compatibility: compatibility.score,
-        reciprocityNeed: reciprocityNeed(recentReceived),
-        freshness: freshness(ageDays),
+        reciprocityNeed: reciprocityNeed(recentReceived + assigned),
+        freshness: freshness(ageMs / 86400000),
         qualityPrior: qualityPrior(verdictCount(person.id, 'helpful'), verdictCount(person.id, 'not_helpful')),
-        penalties: reportPenalty(reportsBy.get(person.id) ?? 0),
+        penalties: reportPenalty(recentReporters),
       });
       return {
         id: person.id,
@@ -119,14 +144,20 @@ export class CandidatesService {
         createdAt: person.createdAt,
         compatibilityScore: compatibility.score,
         matchReasons: compatibility.reasons,
+        assignedToday: assigned,
+        boostReady:
+          this.config.BOOST_ACTIVE_DAYS === 0 ||
+          active.has(person.id) ||
+          ageMs < this.config.BOOST_NEW_PROFILE_HOURS * 3600000,
+        recentReporters,
       };
     });
   }
 
-  /** Whether a specific target is still eligible for this viewer (used to validate a pending slot). */
-  async isEligible(viewer: Person, targetId: string, now: Date = new Date()): Promise<boolean> {
+  /** The target as a candidate if it is still eligible for this viewer (used to validate a pending slot). */
+  async findEligible(viewer: Person, targetId: string, now: Date = new Date()): Promise<AssignmentCandidate | null> {
     const list = await this.eligible(viewer, new Set(), now);
-    return list.some((c) => c.id === targetId);
+    return list.find((c) => c.id === targetId) ?? null;
   }
 
   /** Owners who already reached the optional per-day received cap. */

@@ -1,5 +1,6 @@
 import { dayKeyFor } from '../../src/common/day';
-import { pickDailySet, pickReplacement, AssignmentCandidate } from '../../src/domain/assignment';
+import { pickDailySet, pickReplacement, served, AssignmentCandidate, AssignmentPolicy } from '../../src/domain/assignment';
+import { seededUnit, weightedPick } from '../../src/domain/random';
 import { cooldownUntil, evaluateAccept, evaluateConnect, ConnectState } from '../../src/domain/connect';
 import { dailyStatus, isRevealed, mandatoryCount, requiredAfterUnfilledSlot } from '../../src/domain/daily';
 import { audienceIncludes, missingRequirements, mutuallyVisible, AudiencePerson } from '../../src/domain/eligibility';
@@ -108,9 +109,106 @@ describe('daily set assignment', () => {
 
   it('keeps the purpose of a replaced slot', () => {
     const pool = [c('a', 4, 0.9), c('b', 0, 0.2)];
-    expect(pickReplacement(pool, 'boost')).toBe('b');
-    expect(pickReplacement(pool, 'mandatory')).toBe('a');
+    expect(pickReplacement(pool, 'boost')).toEqual({ id: 'b', slot: 'boost' });
+    expect(pickReplacement(pool, 'mandatory')).toEqual({ id: 'a', slot: 'mandatory' });
     expect(pickReplacement([], 'mandatory')).toBeNull();
+  });
+});
+
+describe('daily set assignment with the over-exposure policy', () => {
+  const policy: AssignmentPolicy = { seed: 'viewer:2026-10-19', assignCap: 6, boostPoolSize: 5, pauseReporters: 2 };
+  const c = (id: string, o: Partial<AssignmentCandidate> = {}): AssignmentCandidate => ({
+    id,
+    recentReceived: 0,
+    score: 0.5,
+    createdAt: new Date('2026-10-01'),
+    ...o,
+  });
+
+  /** Builds sets for many viewers one after another, counting assignments as they land. */
+  function buildForViewers(pool: AssignmentCandidate[], viewers: number): Map<string, number> {
+    const assigned = new Map<string, number>();
+    for (let v = 0; v < viewers; v++) {
+      const view = pool.map((p) => ({ ...p, assignedToday: assigned.get(p.id) ?? 0 }));
+      for (const pick of pickDailySet(view, 3, { ...policy, seed: `viewer-${v}:2026-10-19` })) {
+        assigned.set(pick.id, (assigned.get(pick.id) ?? 0) + 1);
+      }
+    }
+    return assigned;
+  }
+
+  it('counts slots already assigned today as served', () => {
+    expect(served(c('a', { recentReceived: 2, assignedToday: 3 }))).toBe(5);
+    const set = pickDailySet([c('busy', { assignedToday: 4 }), c('quiet', { recentReceived: 1 })], 1, policy);
+    expect(set).toEqual([{ id: 'quiet', slot: 'boost' }]);
+  });
+
+  it('spreads the boost across viewers instead of piling onto one profile', () => {
+    const pool = Array.from({ length: 30 }, (_, i) => c(`p${i}`, { recentReceived: i % 4, score: i / 30 }));
+    const assigned = buildForViewers(pool, 50);
+    expect(Math.max(...assigned.values())).toBeLessThanOrEqual(6);
+    expect(assigned.size).toBeGreaterThan(20);
+  });
+
+  it('goes over the cap only when nobody else is left', () => {
+    const set = pickDailySet([c('full', { assignedToday: 6 }), c('open', { assignedToday: 2 })], 2, policy);
+    expect(set.map((s) => s.id)).toEqual(['open', 'full']);
+    expect(set[1].slot).toBe('mandatory');
+  });
+
+  it('picks the same boost for the same viewer and day', () => {
+    const pool = Array.from({ length: 8 }, (_, i) => c(`p${i}`, { compatibilityScore: i / 8 }));
+    expect(pickDailySet(pool, 3, policy)).toEqual(pickDailySet(pool, 3, policy));
+  });
+
+  it('chooses the boost only from the least-served, within one perspective of the lowest', () => {
+    const pool = [c('zero'), c('one', { recentReceived: 1 }), c('two', { recentReceived: 2 }), c('five', { recentReceived: 5 })];
+    for (let v = 0; v < 40; v++) {
+      const [boost] = pickDailySet(pool, 1, { ...policy, seed: `v${v}` });
+      expect(['zero', 'one']).toContain(boost.id);
+    }
+  });
+
+  it('never boosts or assigns a profile reported by two different people', () => {
+    const reported = c('reported', { recentReporters: 2, score: 0.99 });
+    const set = pickDailySet([reported, c('a', { recentReceived: 3 }), c('b', { recentReceived: 4 })], 3, policy);
+    expect(set.map((s) => s.id)).not.toContain('reported');
+    expect(pickReplacement([reported], 'boost', policy)).toBeNull();
+    expect(pickDailySet([c('once', { recentReporters: 1 })], 1, policy)).toEqual([{ id: 'once', slot: 'boost' }]);
+  });
+
+  it('never boosts an owner who has not opened the app recently, but may still rank them', () => {
+    const set = pickDailySet([c('away', { boostReady: false }), c('here', { recentReceived: 3, score: 0.1 })], 2, policy);
+    expect(set).toEqual([
+      { id: 'here', slot: 'boost' },
+      { id: 'away', slot: 'mandatory' },
+    ]);
+  });
+
+  it('turns the boost into a relevance slot when nobody qualifies', () => {
+    const set = pickDailySet([c('away', { boostReady: false, score: 0.9 }), c('also', { boostReady: false })], 2, policy);
+    expect(set.every((s) => s.slot === 'mandatory')).toBe(true);
+    expect(pickReplacement([c('away', { boostReady: false })], 'boost', policy)).toEqual({ id: 'away', slot: 'mandatory' });
+  });
+});
+
+describe('seeded randomness', () => {
+  it('is deterministic and stays in [0, 1)', () => {
+    expect(seededUnit('a')).toBe(seededUnit('a'));
+    expect(seededUnit('a')).not.toBe(seededUnit('b'));
+    for (let i = 0; i < 100; i++) {
+      const u = seededUnit(`s${i}`);
+      expect(u).toBeGreaterThanOrEqual(0);
+      expect(u).toBeLessThan(1);
+    }
+  });
+
+  it('picks in proportion to weight', () => {
+    let heavy = 0;
+    for (let i = 0; i < 2000; i++) if (weightedPick(['light', 'heavy'], (x) => (x === 'heavy' ? 3 : 1), `w${i}`) === 'heavy') heavy++;
+    expect(heavy / 2000).toBeGreaterThan(0.68);
+    expect(heavy / 2000).toBeLessThan(0.82);
+    expect(weightedPick([], () => 1, 'x')).toBeNull();
   });
 });
 

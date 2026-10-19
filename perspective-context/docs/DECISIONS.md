@@ -94,6 +94,20 @@ Decision: to accept a connect request the receiver must have given the asker a p
 Consequences: more effort to accept, so some requests may sit unanswered or be declined; stronger give-to-get. Older connections have no `reply`. Declining is unchanged.
 Alternatives: only show both when both exist (kept the old rule), or leave the chat showing one perspective (rejected).
 
+## ADR-017: The boost slot spreads out and skips reported or inactive profiles
+Status: accepted (product owner, 2026-10-19).
+Context: every viewer's boost went to the single least-served profile, and "served" only counted perspectives already received, so everyone opening the app the same morning got the same person (a simulation showed about 44 sets for one profile at 200 users and about 250 at 1,000). The boost also ignored reports and whether the owner still used the app, and one reporter could apply the full report penalty. `PRODUCT.md` already lists an over-exposure penalty that was never built.
+Decision:
+- "Served" counts perspectives received in the lookback window plus mandatory slots already holding the profile today. Need in the ranking score uses the same count.
+- The boost is chosen from up to 5 least-served profiles (those at most one above the lowest), at random with weight 0.5 + compatibility, seeded by viewer and day (`apps/api/src/domain/random.ts`), so a replay gives the same set.
+- A soft cap of 6 mandatory slots per profile per day; an over-cap profile is used only when nobody else is left.
+- The boost only goes to owners with a daily-progress row in the last 3 days, or accounts under 48 hours old.
+- Reports count distinct reporters in the last 30 days (ignoring reports a reviewer allowed and reports whose reporter deleted their account). 2 or more keep a profile out of every mandatory slot; it may still appear as a bonus profile.
+- When no profile qualifies for the boost, the slot becomes a relevance slot.
+Consequences: one additive index (`daily_assignments(targetId, dayKey)`); six new config values. The cap is soft under concurrency (two sets built at the same instant can exceed it by one). Fit drops slightly at small pools because the boost spreads to less-matched people.
+Alternatives: a hard received cap (kept as the existing optional config); a nightly batch allocator (later, once there is a job runner); a "needs it" threshold that leaves the boost empty (product owner to decide; it changes the "each set has a boost slot" rule).
+Activation/rollback: set `BOOST_CANDIDATE_POOL=1`, `MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY=0`, `BOOST_ACTIVE_DAYS=0` and `REPORT_PAUSE_REPORTERS=0` to return to the old pick (counting today's sets stays).
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded

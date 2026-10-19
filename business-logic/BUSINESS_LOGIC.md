@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-18 (after: both people must give before a connection opens)
+**Last updated:** 2026-10-19 (after: the boost slot no longer piles onto one person, and skips reported or inactive profiles)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -72,6 +72,12 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 | `MAX_PERSPECTIVES_RECEIVED_PER_DAY` | none (unlimited) | Optional cap on perspectives one profile can receive per day |
 | `SKIP_HIDE_DAYS` | 7 | A skipped profile stays out of your Explore for this long |
 | `BOOST_LOOKBACK_DAYS` | 7 | The window used to count "recent" perspectives when picking the boost profile and scoring |
+| `MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY` | 6 | The most daily sets one person can be put into per day, across everyone (0 = no limit). Only broken when nobody else is left |
+| `BOOST_CANDIDATE_POOL` | 5 | The boost person is picked from up to this many of the people who received the fewest perspectives (1 = always the single fewest) |
+| `BOOST_ACTIVE_DAYS` | 3 | The boost only goes to someone who opened Explore or the Inbox today or in this many days before (0 = no check) |
+| `BOOST_NEW_PROFILE_HOURS` | 48 | An account younger than this can take the boost even without that check |
+| `REPORT_LOOKBACK_DAYS` | 30 | The window for counting how many different people reported a profile |
+| `REPORT_PAUSE_REPORTERS` | 2 | A profile reported by this many different people in that window is not put into anyone's daily set (0 = off) |
 | `ACCESS_TOKEN_TTL_SEC` | 900 (15 minutes) | How long a sign-in token works before it is renewed |
 | `REFRESH_TOKEN_TTL_DAYS` | 30 | How long you stay signed in without opening the app |
 | `MEDIA_URL_TTL_SEC` | 3600 (1 hour) | How long a photo or voice link stays valid |
@@ -299,10 +305,17 @@ On each profile, a person gives a perspective on **one specific post** by tappin
 1. The server finds everyone **eligible** for this viewer (9.4).
 2. The viewer must be live and have at least one audience gender chosen, or the set is empty.
 3. It picks up to **3** people (`DAILY_MANDATORY_COUNT`):
-   - **Boost slot (1):** the eligible person who received the **fewest perspectives in the last 7 days**. If tied, the one whose profile is oldest; if still tied, by id. It does not look at how well they match you.
-   - **The other 2:** the eligible people with the **highest scores** (9.5).
+   - **Boost slot (1):** someone who has received few perspectives. "Few" counts the perspectives they received in the last 7 days **plus the daily sets they are already in today** (so 50 people opening the app the same morning do not all get the same person). Only people who can take it:
+     - opened Explore or the Inbox today or in the 3 days before (or have an account under 48 hours old),
+     - are in fewer than 6 daily sets today,
+     - and were not reported by 2 or more different people in the last 30 days.
+     From those, the app takes the ones with the lowest count (and anyone just one above them), at most 5, and picks one **at random**, giving someone who shares more of your interests a somewhat higher chance (at most about 3 to 1). The random pick is fixed per person per day: opening the app again gives the same pick.
+   - **The other 2:** the eligible people with the **highest scores** (9.5), skipping anyone already in 6 daily sets today unless nobody else is left. Someone reported by 2 or more different people is never used.
+   - If **nobody can take the boost slot** (for example everyone left has not opened the app for days), all slots are normal "highest score" slots.
 4. If **nobody** is eligible, the requirement is 0 and the person is **unlocked immediately** (they have nothing to give).
 5. If fewer than 3 are eligible, the set is smaller and the requirement is that smaller number.
+
+Code: `apps/api/src/domain/assignment.ts` (the rule), `domain/random.ts` (the fixed-per-day random pick), `daily/candidates.service.ts` (the counts).
 
 ### 9.4 Who is eligible for you
 All must be true:
@@ -317,20 +330,20 @@ All must be true:
 ### 9.5 How people are ranked (for the 2 normal slots and for bonus profiles)
 Score = **45% compatibility + 25% need + 15% freshness + 15% quality − report penalty.** The weights are guesses [Placeholder, to be tuned].
 - **Compatibility** (0 to 1): 40% shared interests (overlap divided by total), 25% relationship-goal match, 20% overlap of post categories, 15% daily rhythm and social energy. Anything one side left blank is simply left out and the rest is re-balanced; if nothing is known the score is 0.5. [Conflict: interests, goals, rhythm, social energy are not in the product rules.]
-- **Need:** 1 divided by (1 + perspectives received in the last 7 days). Fewer received means higher.
+- **Need:** 1 divided by (1 + perspectives received in the last 7 days + daily sets they are already in today). Fewer means higher.
 - **Freshness:** newer profiles score higher (halves roughly every 3 weeks: e to the power of minus age in days divided by 30).
 - **Quality:** the share of this person's own perspectives (the ones they gave others) that owners marked helpful. 0.5 when there is no data.
-- **Report penalty:** 0.1 for each report filed against the profile, up to 5 reports.
+- **Report penalty:** 0.1 for each **different person** who reported the profile in the last 30 days, up to 5 people. Several reports from the same person count once. Reports a reviewer marked as allowed, and reports whose reporter deleted their account, do not count.
 
 Bonus profiles in Explore simply show the highest-scoring eligible person.
 
 ### 9.6 Skipping
 Tapping X on a profile: the skip is recorded privately (the other person is never told), the profile is hidden for **7 days**, and:
-- If it was one of today's set, it is **replaced** by another eligible person in the same kind of slot (a boost slot gets another low-response profile; a normal slot gets the next best).
+- If it was one of today's set, it is **replaced** by another eligible person in the same kind of slot (a boost slot gets another low-response profile, chosen the same way as in 9.3; a normal slot gets the next best). If nobody can take a boost slot, it is refilled as a normal slot.
 - If **no replacement exists**, today's requirement drops by 1 (never below what you already gave), and if you have now given enough, you unlock.
 
 ### 9.7 Staying valid
-Every time the next profile in the set is about to be shown, the server re-checks it. If that person has since been blocked, gone offline, or has no unanswered post left, the slot is quietly **replaced** (or the requirement shrinks).
+Every time the next profile in the set is about to be shown, the server re-checks it. If that person has since been blocked, gone offline, has no unanswered post left, or has been reported by 2 or more different people, the slot is quietly **replaced** (or the requirement shrinks).
 
 ### 9.8 The finite batch
 You can act on up to **10 profiles a day** (given to or skipped, counting each person once). After that, Explore says you are done for today, even if more people exist. The daily set itself is always shown first, even if the batch count were used up.
@@ -341,7 +354,9 @@ Someone you gave a perspective to can reappear **on a later day** only while the
 ### 9.10 Unlocking
 The set unlocks the moment you have given a perspective to **every person currently required**. Only perspectives given to people **in your set** count toward the set; giving to a bonus profile does not.
 
-**Known behavior to watch:** every user's boost slot goes to the profile that received the fewest recently, so the same needy profile can be chosen as the boost for many people on the same day, with nothing to stop it except the optional cap. (To be reviewed with the algorithm work.)
+**Fixed 2026-10-19:** the boost used to go to the single profile with the fewest perspectives, so the same person could land in everyone's set on the same day (a simulation showed about 44 sets for one person at 200 users). It now counts today's sets, picks at random among the few least-served, and stops at 6 sets per person per day (9.3).
+
+**Still to decide (product owner):** the boost slot is filled even when the least-served person already has many perspectives, so its note ("hasn't had many perspectives yet") can be wrong in a busy pool. Normal slots can still go to people who have not opened the app for a long time.
 
 ---
 
@@ -512,7 +527,10 @@ Code: `apps/api/src/safety/*`, `apps/mobile/src/components/SafetyMenu.tsx`.
 ### 14.1 Reporting [Placeholder]
 On profiles, posts, perspectives and chats, a "..." menu offers **Report**. The person picks a reason: nudity or sexual content, body shaming, harassment or hate, threats or violence, self-harm, scam or fake profile, might be under 18, spam, something else (optional note up to 500 characters). The reporter's identity is stored; the reported person is never told.
 - **What the server does with it:** it **only saves it**. Nobody reviews reports yet; there is no moderation tool, warning, suspension or ban [Not built].
-- **The one effect:** each report filed against a **profile** adds 0.1 to that profile's ranking penalty (up to 5 reports), making them appear less in other people's Explore (section 9.5).
+- **Effects (automatic, for reports on a profile):**
+  - Each **different person** who reported the profile in the last 30 days adds 0.1 to its ranking penalty (up to 5 people), so it appears less in other people's Explore (section 9.5).
+  - Once **2 or more different people** reported it in the last 30 days, it is **never put into anyone's daily set** (not the boost, not a normal slot), and a pending slot holding it is replaced. It can still appear as an optional bonus profile.
+  - Several reports from the same person count once, so one person cannot push someone out alone.
 - [Conflict] The confirmation says "it's hidden for you", but the server does **not** hide reported content or people for the reporter.
 
 ### 14.2 Blocking [Built]
@@ -658,6 +676,12 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-19: the boost slot no longer piles onto one person
+- The boost used to be the single profile with the fewest perspectives, so everyone opening the app the same morning got the same person. It now also counts the sets a person is already in today, picks at random (fixed per person per day) among the few least-served with a small preference for shared interests, and stops at 6 sets per person per day.
+- The boost only goes to someone who opened the app in the last 3 days or is new (under 48 hours), so givers don't write to people who have left.
+- Reports now count **different people** in the last 30 days. A profile reported by 2 or more different people stays out of everyone's daily set. Before, one person reporting 5 times gave the full penalty, and reported people could even be boosted.
+- New settings in section 2. (Sections 9.3, 9.5, 9.6, 9.7, 9.10, 14.1; ADR-017.)
 
 ### 2026-10-18: this file was created
 - Written from the code as it stands, so the product owner can see how the app behaves without asking. From now on it is updated with every change (section 21 and `CLAUDE.md`).

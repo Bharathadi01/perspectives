@@ -32,6 +32,18 @@ const EnvSchema = z.object({
   SKIP_HIDE_DAYS: z.coerce.number().int().min(0).default(7),
   /** Window used to find low-response profiles for the boost slot. */
   BOOST_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(7),
+  /** Over-exposure (2026-10-19): most mandatory slots one profile may hold per day across all viewers (0 = no cap). */
+  MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY: z.coerce.number().int().min(0).default(6),
+  /** The boost is picked at random from this many of the least-served profiles (1 = always the single least-served). */
+  BOOST_CANDIDATE_POOL: z.coerce.number().int().min(1).default(5),
+  /** The boost only goes to owners who opened the app today or in this many days before (0 = no activity check). */
+  BOOST_ACTIVE_DAYS: z.coerce.number().int().min(0).default(3),
+  /** Profiles younger than this can take the boost slot even before their owner's activity is known. */
+  BOOST_NEW_PROFILE_HOURS: z.coerce.number().min(0).default(48),
+  /** Window for counting distinct people who reported a profile. */
+  REPORT_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(30),
+  /** Distinct recent reporters that keep a profile out of every mandatory slot (0 turns this off). */
+  REPORT_PAUSE_REPORTERS: z.coerce.number().int().min(0).default(2),
   /** Quiet connections (product decision 2026-10-18): hours after the quiet person opens the chat. */
   FIRST_REPLY_WARN_HOURS: z.coerce.number().positive().default(24),
   FIRST_REPLY_CLOSE_HOURS: z.coerce.number().positive().default(48),

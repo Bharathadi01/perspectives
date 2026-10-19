@@ -364,6 +364,8 @@ model DailyAssignment {
 
   @@unique([userId, dayKey, targetId])
   @@index([userId, dayKey, status])
+  /// Counts how many sets already hold a profile today (over-exposure cap).
+  @@index([targetId, dayKey])
   @@map("daily_assignments")
 }
 
