@@ -4,6 +4,7 @@ import { AppException } from '../common/app-exception';
 import { isoDate } from '../common/day';
 import { ConnectService } from '../connect/connect.service';
 import { DailyService } from '../daily/daily.service';
+import { EnforcementService } from '../enforcement/enforcement.service';
 import { missingRequirements, mutuallyVisible } from '../domain/eligibility';
 import { SelfieVerifier } from '../moderation/moderation';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,6 +19,7 @@ export class ProfilesService {
     private readonly social: SocialService,
     private readonly connect: ConnectService,
     private readonly daily: DailyService,
+    private readonly enforcement: EnforcementService,
     private readonly selfieVerifier: SelfieVerifier,
   ) {}
 
@@ -125,6 +127,10 @@ export class ProfilesService {
     const known = relationship.gaveToThem || relationship.theyGaveToMe || relationship.connectionId !== null;
     if (!known && !mutuallyVisible(viewer, target)) {
       throw new AppException('PROFILE_NOT_ELIGIBLE', 'This profile is not available.');
+    }
+    // On hold: hidden from anyone new until an admin decides (people who already know them still can).
+    if (!known && (await this.enforcement.isHeld(targetId))) {
+      throw new AppException('NOT_FOUND', 'This profile is not available.');
     }
     const row = await this.prisma.user.findUniqueOrThrow({ where: { id: targetId }, include: PROFILE_USER_INCLUDE });
     const given = await this.prisma.perspective.findMany({

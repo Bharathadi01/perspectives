@@ -1,5 +1,5 @@
 import { Global, Injectable, Module } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { NoticeKind, Prisma } from '@prisma/client';
 import { Notice, Notices } from '@perspective/contracts';
 import type { AgeRange } from '../domain/widening';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,31 +25,37 @@ export class NoticesService {
 
   /** Tells the person their age range was widened automatically. Written at most once a day. */
   async audienceWidened(userId: string, dayKey: string, range: AgeRange, chosen: AgeRange): Promise<void> {
-    await this.prisma.notice.createMany({
-      data: [
-        {
-          userId,
-          kind: 'audience_widened',
-          dedupeKey: `audience_widened:${dayKey}`,
-          data: { minAge: range.minAge, maxAge: range.maxAge, chosenMinAge: chosen.minAge, chosenMaxAge: chosen.maxAge },
-        },
-      ],
-      skipDuplicates: true,
-    });
+    await this.create(
+      userId,
+      'audience_widened',
+      { minAge: range.minAge, maxAge: range.maxAge, chosenMinAge: chosen.minAge, chosenMaxAge: chosen.maxAge },
+      `audience_widened:${dayKey}`,
+    );
+  }
+
+  /** Writes a notice once per `dedupeKey`. */
+  async create(userId: string, kind: NoticeKind, data: Prisma.InputJsonObject, dedupeKey: string): Promise<void> {
+    await this.prisma.notice.createMany({ data: [{ userId, kind, dedupeKey, data }], skipDuplicates: true });
   }
 
   private toDto(row: Prisma.NoticeGetPayload<object>): Notice {
-    const data = row.data as Record<string, number>;
-    return {
-      id: row.id,
-      kind: row.kind,
-      createdAt: row.createdAt.toISOString(),
-      read: row.readAt !== null,
-      minAge: data.minAge,
-      maxAge: data.maxAge,
-      chosenMinAge: data.chosenMinAge,
-      chosenMaxAge: data.chosenMaxAge,
-    };
+    const base = { id: row.id, createdAt: row.createdAt.toISOString(), read: row.readAt !== null };
+    const data = (row.data ?? {}) as Record<string, unknown>;
+    switch (row.kind) {
+      case 'audience_widened':
+        return {
+          ...base,
+          kind: 'audience_widened',
+          minAge: Number(data.minAge),
+          maxAge: Number(data.maxAge),
+          chosenMinAge: Number(data.chosenMinAge),
+          chosenMaxAge: Number(data.chosenMaxAge),
+        };
+      case 'weak_giver_tip':
+        return { ...base, kind: 'weak_giver_tip' };
+      case 'account_restored':
+        return { ...base, kind: 'account_restored', reason: String(data.reason ?? '') };
+    }
   }
 }
 

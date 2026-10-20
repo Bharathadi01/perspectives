@@ -17,6 +17,7 @@ import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { ConnectService } from '../connect/connect.service';
 import { CandidatesService } from '../daily/candidates.service';
 import { DailyService } from '../daily/daily.service';
+import { EnforcementService } from '../enforcement/enforcement.service';
 import { isRevealed } from '../domain/daily';
 import { mutuallyVisible } from '../domain/eligibility';
 import { TextModerator } from '../moderation/moderation';
@@ -40,6 +41,7 @@ export class PerspectivesService {
     private readonly connect: ConnectService,
     private readonly mapper: ProfileMapper,
     private readonly moderator: TextModerator,
+    private readonly enforcement: EnforcementService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -205,8 +207,11 @@ export class PerspectivesService {
         notHelpfulReason: helpful ? null : (input.reason ?? null),
         thankedAt: helpful ? (input.thankPrivately ? (row.thankedAt ?? new Date()) : row.thankedAt) : null,
         status: helpful ? 'helpful' : 'archived',
+        feedbackAt: new Date(),
       },
     });
+    // Insulting, sexual and unsafe marks count as reports; every mark re-checks the giver's quality.
+    await this.enforcement.onFeedback(row, updated.notHelpfulReason);
     return {
       verdict: input.verdict,
       reason: updated.notHelpfulReason,

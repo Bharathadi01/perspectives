@@ -3,6 +3,7 @@ import { CreateReportInput, DeleteAccountInput } from '@perspective/contracts';
 import { AuthService } from '../auth/auth.service';
 import { AppException } from '../common/app-exception';
 import { ConnectService } from '../connect/connect.service';
+import { EnforcementService } from '../enforcement/enforcement.service';
 import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialService } from '../social/social.service';
@@ -15,14 +16,12 @@ export class SafetyService {
     private readonly connect: ConnectService,
     private readonly media: MediaService,
     private readonly auth: AuthService,
+    private readonly enforcement: EnforcementService,
   ) {}
 
+  /** Saves the report; 3 different reporters, or one credible serious report, put the person on hold. */
   async report(reporterId: string, input: CreateReportInput): Promise<{ reportId: string }> {
-    const report = await this.prisma.report.create({
-      data: { reporterId, targetType: input.targetType, targetId: input.targetId, reason: input.reason, note: input.note },
-      select: { id: true },
-    });
-    return { reportId: report.id };
+    return this.enforcement.fileReport({ reporterId, ...input });
   }
 
   /**

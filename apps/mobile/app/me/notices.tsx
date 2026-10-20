@@ -52,26 +52,56 @@ export default function Notices() {
 }
 
 function NoticeCard({ notice }: { notice: Notice }) {
+  switch (notice.kind) {
+    case 'audience_widened':
+      return (
+        <NoticeShell
+          notice={notice}
+          icon="resize-outline"
+          title={`We widened your age range to ${notice.minAge}–${notice.maxAge}`}
+          body={`Very few people fit the ${notice.chosenMinAge}–${notice.chosenMaxAge} range you chose, so we added a couple of years at each end to bring in more people. Gender is never changed. You can set it back any time.`}
+          action={{ title: 'Open your audience', onPress: () => router.push({ pathname: '/me/edit', params: { section: 'audience' } }) }}
+        />
+      );
+    case 'weak_giver_tip':
+      // The quality loop's first step (decided 2026-10-21): private, with no names and no numbers.
+      return (
+        <NoticeShell
+          notice={notice}
+          icon="bulb-outline"
+          title="Make your perspectives count"
+          body="The most useful perspectives are specific: answer the question the person asked, say what works and what doesn’t, and why. Short or general comments like “nice pic” don’t help much."
+        />
+      );
+    case 'account_restored':
+      return <NoticeShell notice={notice} icon="checkmark-circle-outline" title="Your account is back to normal" body={notice.reason} />;
+  }
+}
+
+function NoticeShell({
+  notice,
+  icon,
+  title,
+  body,
+  action,
+}: {
+  notice: Notice;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  body: string;
+  action?: { title: string; onPress: () => void };
+}) {
   return (
-    <View style={s.card} accessible accessibilityLabel={`${notice.read ? '' : 'New. '}Age range widened to ${notice.minAge} to ${notice.maxAge}`}>
+    <View style={s.card} accessible accessibilityLabel={`${notice.read ? '' : 'New. '}${title}`}>
       <View style={s.cardTop}>
-        <Ionicons name="resize-outline" size={18} color={theme.colors.brand} />
-        <Text style={s.cardTitle}>
-          We widened your age range to {notice.minAge}–{notice.maxAge}
-        </Text>
+        <Ionicons name={icon} size={18} color={theme.colors.brand} />
+        <Text style={s.cardTitle}>{title}</Text>
         {!notice.read ? <View style={s.dot} /> : null}
       </View>
-      <Muted>
-        Very few people fit the {notice.chosenMinAge}–{notice.chosenMaxAge} range you chose, so we added a couple of years at each end to
-        bring in more people. Gender is never changed. You can set it back any time.
-      </Muted>
+      <Muted>{body}</Muted>
       <View style={s.cardBottom}>
         <Muted style={s.time}>{timeAgo(notice.createdAt)}</Muted>
-        <Button
-          title="Open your audience"
-          variant="secondary"
-          onPress={() => router.push({ pathname: '/me/edit', params: { section: 'audience' } })}
-        />
+        {action ? <Button title={action.title} variant="secondary" onPress={action.onPress} /> : null}
       </View>
     </View>
   );

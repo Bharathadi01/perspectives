@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { generateTotpSecret } from '../src/admin/totp';
 import { hashPassword } from '../src/auth/passwords';
 import { dayKeyFor } from '../src/common/day';
 import { gradientPng, toneWav } from './media-fixtures';
@@ -229,8 +230,17 @@ async function main(): Promise<void> {
     ],
   });
 
+  // A development admin for the admin page (decided 2026-10-21: password only for now). Never used
+  // on a real server: there, admins are made with `pnpm admin:create`.
+  await prisma.adminUser.upsert({
+    where: { email: 'admin@perspective.test' },
+    create: { email: 'admin@perspective.test', passwordHash, totpSecret: generateTotpSecret() },
+    update: { passwordHash, disabledAt: null },
+  });
+
   console.log(`Seeded ${USERS.length} verified users. Password for all: perspective123`);
   for (const u of USERS) console.log(`  ${u.name.padEnd(6)} ${u.email}`);
+  console.log('Admin page (http://localhost:8082): admin@perspective.test / perspective123');
 }
 
 main()

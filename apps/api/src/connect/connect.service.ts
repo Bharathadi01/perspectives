@@ -246,6 +246,11 @@ export class ConnectService {
     if (blocks.viewerBlocked || blocks.blockedByOther) {
       throw new AppException('BLOCKED_PAIR', 'This conversation is closed.');
     }
+    // A banned person's chats are paused, not deleted (decided 2026-10-20).
+    const partner = await this.prisma.user.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (partner?.status !== 'active') {
+      throw new AppException('CONNECTION_PAUSED', 'This conversation is paused. The other person can’t use Perspective right now.');
+    }
     const verdict = await this.moderator.check(text);
     if (!verdict.allowed) {
       throw new AppException('MODERATION_FAILED', 'That message breaks the community guidelines.');

@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-20 (beta step 2 built: private goal question, audience step worded by the goal, optional private orientation, dating intention removed, automatic age widening, in-app notices list. Step 1 earlier the same day: daily set of 1 to 3, new boost rule, new ranking)
+**Last updated:** 2026-10-21 (beta step 3 built: holds, bans, the ban screen, appeals, the weak-giver loop and the separate admin dashboard. Steps 1 and 2 on 2026-10-20)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -85,6 +85,17 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 | `BOOST_ACTIVE_DAYS` | 3 | The boost only goes to someone who opened Explore or the Inbox today or in this many days before (0 = no check) |
 | `BOOST_NEW_PROFILE_HOURS` | 48 | An account younger than this can take the boost even without that check |
 | `REPORT_LOOKBACK_DAYS` | 30 | The window for counting how many different people reported a profile |
+| `REPORT_HOLD_REPORTERS` | 3 | A person reported by this many different people in 30 days is put **on hold**: hidden from anyone new and put on the admin's list (0 = off; section 14.6) |
+| `BAN_TEMPORARY_DAYS` | 3 | Length of a temporary ban, and of each extension |
+| `WEAK_GIVER_LINE` | 0.6 | A giver is "weak" when more than this share of their low-effort plus helpful marks are low-effort (section 14.8) |
+| `WEAK_GIVER_MIN_MARKS`, `WEAK_GIVER_MIN_MARKERS` | 8, 5 | Judged only with this many low-effort marks, from this many different people |
+| `WEAK_GIVER_FLAG_MARKS` | 10 | More low-effort marks after the tip that put a still-weak giver on the admin's list |
+| `WEAK_GIVER_PENALTY` | 0.2 | How far back a weak giver is pushed in Explore (taken off their score) |
+| `MARK_FADE_DAYS` | 45 | Helpful / not-helpful marks older than this no longer count |
+| `HARSH_MARKER_SHARE`, `HARSH_MARKER_MIN_MARKS` | 0.8, 10 | Someone who marked more than 80% of what they received as not helpful (with at least 10 marks) counts half |
+| `ADMIN_REQUIRE_CODE` | false | Whether admin sign-in also needs the 6-digit authenticator code. **Off for now** (product owner, 2026-10-21): password only; turn on before the beta |
+| `ADMIN_SESSION_HOURS` | 8 | How long an admin sign-in lasts (no renewal) |
+| `ADMIN_JWT_SECRET` | derived | Optional separate secret for admin tokens; without it, one is derived from the user token secret (never the same) |
 | `REPORT_PAUSE_REPORTERS` | 2 | A person reported by this many different people in that window (on their profile, posts, perspectives or messages) is not put into anyone's daily set (0 = off) |
 | `RANK_WEIGHT_INTERESTS`, `_NEED`, `_ACTIVE`, `_NEW_MEMBER`, `_QUALITY`, `_FRESH` | 0.45, 0.20, 0.15, 0.10, 0.10, 0.10 | The ranking weights (section 9.5); `_FRESH` is the head start for people you never gave a perspective to |
 | `ACCESS_TOKEN_TTL_SEC` | 900 (15 minutes) | How long a sign-in token works before it is renewed |
@@ -133,6 +144,7 @@ Code: `apps/mobile/app/index.tsx`, `app/(tabs)/_layout.tsx`, `src/session/*`.
 3. **Signed in** → the app asks the server for "my profile":
    - If the profile is **live** → Explore (the home tab).
    - If it is **not live** → Onboarding.
+   - If the account is **suspended or banned** → the ban screen (section 14.7), and nothing else.
    - If the request fails (no internet) → an error screen with Retry.
 4. **The tabs** (only for a live profile): Explore, Inbox, Your posts, Connections, You. The tab bar redirects a signed-out person to Welcome and a not-live person to Onboarding, so a half-finished profile can never reach the tabs.
 5. **Tab badges.** Inbox shows the number of locked items plus waiting connect requests. Connections shows the number of new connections plus connections where you owe a reply.
@@ -155,7 +167,7 @@ Rules, in order:
 2. The password must be 8 to 128 characters.
 3. The date of birth must be a real date. The server calculates the age itself; **under 18 is refused** ("You must be 18 or older to use Perspective") even if the app was bypassed.
 4. The box must be ticked. The server records the time terms were accepted.
-5. If an account with that email exists: "An account with this email already exists."
+5. If an account with that email exists: "An account with this email already exists." If the email belonged to someone **banned permanently**, it can't sign up again: "This email can't be used to create an account."
 6. On success the server creates the account plus an **empty profile** and signs the person in. They go straight to onboarding.
 
 Not done: email is not verified, there is no phone number, no social login, no password reset [Not built]. The Terms, Community Guidelines and Privacy Notice are not shown anywhere as screens [Not built]; only the tick box exists.
@@ -165,7 +177,7 @@ The birthday is stored but never shown to anyone. Only the age is shown.
 ### 4.2 Signing in [Built]
 1. Email and password are checked. The password is never stored; only a salted hash is kept (scrypt). If the email does not exist, the server still does the same amount of work, so nobody can discover which emails exist by timing.
 2. Wrong email or password: "Email or password is incorrect."
-3. A **suspended** account cannot sign in ("This account is suspended."). Today nothing in the app suspends anyone; it can only be set directly in the database.
+3. A **suspended or banned** person **can** sign in, but only reaches the ban screen (section 14.7). Every other part of the app refuses them ("This account is suspended." / "This account is banned.").
 4. On success the server gives back two tokens: an **access token** (works 15 minutes) and a **refresh token** (works 30 days, used once).
 
 ### 4.3 Staying signed in [Built]
@@ -455,7 +467,11 @@ Code: `apps/api/src/perspectives/perspectives.service.ts` (inbox, feedback, give
 - **Not helpful:** needs a reason (vague, didn't answer my question, insulting or body shaming, sexual or inappropriate, spam, unsafe). The perspective is archived, and any earlier thank-you is cleared.
 - The owner can change their mind later; the newest answer replaces the old one.
 - **What the giver sees:** only whether they were **thanked** ("Thanked you"). They **never** see helpful / not helpful or the reason.
-- **What it affects:** how often a giver's perspectives were marked helpful feeds the **quality** part of that giver's own ranking when others look for profiles to see (section 9.5). There is no other penalty or reward yet [Placeholder].
+- **What it affects** (decided 2026-10-21):
+  - How often a giver's perspectives were marked helpful feeds the **quality** part of that giver's own ranking (section 9.5).
+  - **Vague, didn't answer, spam** count toward the **weak-giver line** (section 14.8). One mark changes nothing visible.
+  - **Insulting or body shaming** counts as **one report** against the giver. **Sexual** and **unsafe** count as a **serious report**: the giver is hidden at once and goes to the top of the admin's list (section 14.6). The owner does not need to press Report as well, and a mark counts once per perspective.
+  - The giver never learns who marked them or why.
 
 ### 11.4 Perspectives you gave
 **You → Perspectives you gave** lists up to the latest 100, each with the post's question and "Thanked you" when applicable. Tapping a person opens their profile (and from there you can connect if you have not). People you blocked are left out.
@@ -532,6 +548,7 @@ Active connections, newest activity first. Each row shows the photo, name, verif
 - **The top card, "How you connected":** the asker's perspective and the post it was on, and, below, the perspective the other person gave back (older connections may only have the first).
 - **Idea cards:** while the chat is empty, three small cards under "Ideas to start" suggest what to ask (for example, "Ask what got them into it"). They depend on the **category** of the post the connection started from and on whether you are the giver or the owner. They are **guidance only**: tapping does nothing, they never fill the message box, and they disappear after the first message. They are **hard-coded**; no AI reads any perspective.
 - **Messages:** text only, 1 to 1000 characters. Each message is checked by the text moderator (the same placeholder). Failing: "That message breaks the community guidelines." The conversation must be active and neither person may have blocked the other.
+- **Paused chats:** while one person is suspended or banned, the other can still open the chat, but sending says "This conversation is paused. The other person can't use Perspective right now." Nothing is deleted; it works again when the ban ends or is lifted.
 - **Refresh:** the chat asks the server for new messages every 4 seconds; it loads the **latest 200** messages [Placeholder: no older history, no instant delivery]. There are no read ticks, typing signs, photos, voice notes or reactions [Not built].
 - **Header menu:** tap the name to open their profile. The "..." menu offers **Unmatch** and **Report or block**.
 - **Unmatch** closes the conversation for both. Nothing is deleted. Either person may ask to connect again straight away (there is no cooldown after an unmatch).
@@ -569,14 +586,15 @@ So the list stays meaningful. The rule counts only messages since the two people
 
 Code: `apps/api/src/safety/*`, `apps/mobile/src/components/SafetyMenu.tsx`.
 
-### 14.1 Reporting [Placeholder]
+### 14.1 Reporting [Built]
 On profiles, posts, perspectives and chats, a "..." menu offers **Report**. The person picks a reason: nudity or sexual content, body shaming, harassment or hate, threats or violence, self-harm, scam or fake profile, might be under 18, spam, something else (optional note up to 500 characters). The reporter's identity is stored; the reported person is never told.
-- **What the server does with it:** it **only saves it**. Nobody reviews reports yet; there is no moderation tool, warning, suspension or ban [Not built].
+- **What the server does with it:** saves it with **who it is about** (the profile owner, post owner, perspective giver or message sender), applies the automatic steps below, and shows it to admins on the review list (section 14.6). Some "not helpful" marks count as reports too (section 11.3).
 - **Effects (automatic).** Reports on a person's **profile, posts, perspectives or messages** all count against that person (since 2026-10-20; before, only profile reports counted):
   - Each **different person** who reported them in the last 30 days adds 0.1 to their ranking penalty (up to 5 people), so they appear less in other people's Explore (section 9.5).
   - Once **2 or more different people** reported them in the last 30 days, they are **never put into anyone's daily set** (not the boost, not a normal slot), and a pending slot holding them is replaced. They can still appear after the set.
   - Several reports from the same person count once, so one person cannot push someone out alone.
-  - Holds (3 different reporters, or one serious report) are decided but not built yet (section 17).
+  - **3 different people**, or **one serious report**: a **hold** (section 14.6).
+  - Reports an admin **dismissed** stop counting.
 - [Conflict] The confirmation says "it's hidden for you", but the server does **not** hide reported content or people for the reporter.
 
 ### 14.2 Blocking [Built]
@@ -594,7 +612,7 @@ From the same menu: **Block this person**. Effect, immediately and in **both dir
 Used for post questions, perspectives and chat messages. It blocks a short fixed list of phrases (self-harm encouragement, requests for nude photos). Everything else passes. There is **no** check for photos, voice, or the chat context.
 
 ### 14.5 Deleting your account [Built, simplified]
-**You → Delete account:** type your password and the phrase DELETE MY ACCOUNT.
+**You → Delete account** (also on the ban screen): type your password and the phrase DELETE MY ACCOUNT.
 1. The password must be right ("Password is incorrect").
 2. A deletion record is created (it holds no personal data).
 3. All the person's photo and voice files are removed.
@@ -602,7 +620,43 @@ Used for post questions, perspectives and chat messages. It blocks a short fixed
 5. Reports they filed are kept, anonymous.
 6. The record is marked completed (or failed, and the error is shown).
 7. The person is returned to Welcome. Their old sign-in stops working.
-There is **no waiting period** and no way back [Placeholder: a grace period is planned].
+There is **no waiting period** and no way back [Placeholder: a grace period is planned]. After a **permanent ban**, the email stays blocked from signing up again even after deletion.
+
+### 14.6 Holds and the admin's review list [Built, decided 2026-10-20 and 2026-10-21]
+Code: `apps/api/src/enforcement/enforcement.service.ts`, `domain/enforcement.ts`.
+**The system only holds; a person decides.** Nothing automatic ever bans anyone.
+- **Hold after 3 different reporters** in 30 days, or **at once after one serious report** (nudity or sexual content, threats or violence, possibly under 18, self-harm, including "sexual" and "unsafe" marks) from a verified account that is not itself on hold or banned.
+- **What a hold does:** the person is hidden from **anyone new**: not in Explore (no set, no profiles after the set) and their profile page says "not available" to people who don't already know them. People who already exchanged perspectives or are connected still see them, and their **existing chats keep working**. They can still use the app normally.
+- **They are not told** they are on hold. If an admin dismisses it, it is lifted quietly.
+- **It lasts until an admin decides.** A serious report on someone already on hold moves them to the top.
+- **The review list** (admin dashboard) shows serious reports first (newest first), then open appeals, then 3-reporter holds, then weak givers.
+
+### 14.7 Bans, the ban screen and appeals [Built, decided 2026-10-20 and 2026-10-21]
+Code: `apps/api/src/admin/*`, `safety/restriction.service.ts`, `apps/mobile/app/restricted.tsx`.
+- **Only an admin can ban.** Choices: **3-day ban**, **permanent ban**, **extend** (3 more days each time, from the current end), **restore** (lift the ban). Each needs a reason, and the ban's reason is shown to the person as written.
+- **A temporary ban ends by itself** when its date passes (checked when they open the app and every 15 minutes).
+- **While banned:** their profile is hidden from everyone, their chats are paused (section 13.3), and they are out of every daily set. They can still sign in, but only see the **ban screen**: "Your account is suspended" (or banned), until when (or "This ban is permanent"), the reason, and:
+  - **This was a mistake**: one appeal per ban, 10 to 1000 characters. While it waits: "We're looking at it again." If the admin keeps the ban: "The decision stays" with the admin's reason, and that ban can't be appealed again. **An extension is a new ban**, so it can be appealed once more.
+  - **Sign out** and **Delete account**.
+- **When a ban is lifted** (after an appeal or by an admin), the account is active straight away and the person gets a notice "Your account is back to normal" with the admin's reason.
+- **A permanent ban** also blocks the email from signing up again; restoring removes that block.
+- **Dismissing** a hold lifts it, and the reports reviewed so far stop counting.
+
+### 14.8 Weak givers (the quality loop) [Built, decided 2026-10-21]
+Code: `domain/enforcement.ts` (`assessGiver`), `enforcement/enforcement.service.ts` (`reassessGiver`).
+1. **What counts:** "not helpful" marks with the reasons **vague, didn't answer, spam** (low effort), against **helpful** marks, from the last **45 days**. An owner who marked more than 80% of what they received as not helpful (at least 10 marks) counts **half**.
+2. **The line (fixed):** someone is a weak giver when **more than 60%** of those marks are low-effort, judged only once there are **at least 8 low-effort marks from at least 5 different people**.
+3. **First step** (the moment they cross the line): a private notice "Make your perspectives count" with tips, no names and no numbers; they are **pushed back in Explore** (0.2 off their score, like 2 reporters); and their **daily set skips brand-new members** (profiles in their first 7 days).
+4. **Second step:** if they get **10 more low-effort marks from at least 5 people** and are still over the line, they go on the admin's list (not hidden). The admin decides: nothing (dismiss; they then need 10 new marks to be flagged again), a 3-day ban, or a permanent ban.
+5. **It clears by itself:** checked after every mark on their perspectives and on their first visit of each day, so once old marks fade and they are back under the line, the push-back and the set rule stop.
+
+### 14.9 The admin dashboard [Built, decided 2026-10-20]
+Code: `apps/admin` (web only), `apps/api/src/admin/*`. It is **not part of the phone app**.
+- **Admins are not app accounts.** They are created only with a command on the server (`pnpm admin:create -- --email ...`), which prints a password and an authenticator secret once. There is no sign-up.
+- **Sign-in:** email and password. **For now the 6-digit authenticator code is switched off** (product owner, 2026-10-21) [Placeholder]; with `ADMIN_REQUIRE_CODE=true` the code from an authenticator app (Google Authenticator, the Mac Passwords app, 1Password, ...) is required too, and a code can't be used twice. Sessions last 8 hours and are not renewed. Admin sign-ins only work on the admin API, and app sign-ins never work there.
+- **Screens:** the review list; a person's page with their photo, email, age and status, the reports with the reported content (text, post question, and a 1-hour photo or voice link) and an anonymous label per reporter, their giving quality, their bans and appeals, the history of admin actions, and the action buttons (with a confirmation for bans).
+- **Audit log:** every sign-in, every view of a person's page and every action is recorded with the admin, time, person and reason. It can't be edited from the dashboard.
+- **Run it locally:** `pnpm --filter @perspective/admin web` opens it on port 8082.
 
 ---
 
@@ -611,6 +665,8 @@ There is **no waiting period** and no way back [Placeholder: a grace period is p
 1. **Default deny.** Every server route needs a valid sign-in except: creating an account, signing in/refreshing/out, the health check, and the signed media links. A suspended account is refused everywhere.
 2. **Live-profile routes.** These additionally require a live profile: Explore, everything about perspectives and the Inbox, everything about connecting and chat, and viewing another person's profile.
 3. **Routes open to a not-yet-live user** (so onboarding works): my profile, saving profile details, selfie, posts, uploading files, reports, blocks, account deletion.
+   - **Routes open to a suspended or banned person:** only the ban screen, the appeal, account deletion, and signing in, renewing and out.
+   - **Admin routes** (`/v1/admin`) accept only an admin token (section 14.9).
 4. **Idempotency.** Every signed-in change (create, update, delete) must carry a unique key. If the app retries the same action (for example a flaky connection), the server returns the first result instead of doing it twice. Failed actions are not stored, so they can be retried. Account deletion is exempt.
 5. **Passwords** are stored as salted scrypt hashes, compared in constant time.
 6. **Tokens:** short access token plus single-use rotating refresh token (section 4). On phones they live in the secure keychain/keystore; in the web preview, in the browser's storage.
@@ -637,6 +693,8 @@ There is **no waiting period** and no way back [Placeholder: a grace period is p
 
 Seed state: everyone "opened the app" yesterday (so they count as active). With only the seed people, widening never triggers for them (a wider range brings in nobody new); accounts you created yourself in the local database can change that. With 4 women in his audience, Ravi's daily set is **1** profile, then 3 more after it. Ravi starts with yesterday's perspectives already visible, one more perspective that is locked until he finishes today's set, a pending connect request from Priya, and a connection with Asha (connected 2 hours ago, with two messages). Photos are generated color gradients, not real people.
 
+**Admin (development):** the seed also creates `admin@perspective.test` with password `perspective123` for the admin page. On a real server admins are made only with `pnpm admin:create -- --email you@example.com`, which prints a password and an authenticator secret once (section 14.9). The admin page runs with `pnpm --filter @perspective/admin web` on port 8082.
+
 **Development-only shortcuts** (all off in a release build):
 - If no sign-in is saved, the app **signs in as Ravi automatically** (it calls the local server).
 - The login screen is pre-filled with Ravi and has quick sign-in buttons.
@@ -653,8 +711,9 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 - Photos and voice are stored on the server's disk; hidden location data is not removed.
 - Ranking weights (decided starting values, not yet tuned on real data).
 - Account deletion is instant and total.
-- Reports are saved but never reviewed.
+- Reports and holds are reviewed by hand on the admin dashboard; there is no automatic photo, voice or text moderation behind them yet.
 - Voice length is trusted from the app.
+- Admin sign-in is password only: the authenticator code exists but is switched off (`ADMIN_REQUIRE_CODE`) until before the beta.
 - Chat refreshes by asking every 4 seconds; only the latest 200 messages load.
 
 **Does not exist yet [Not built]**
@@ -664,21 +723,18 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 - Replacing a post's photo; pausing a post.
 - Push notifications, opening the app from a notification, emails.
 - Instant (real-time) chat, older message history, read receipts, typing signs, photos or voice in chat.
-- A way for the safety team to review reports, warn, suspend or ban; an audit trail.
+- Before public launch (docs/SECURITY.md): rate limits on admin sign-in, allow-listing or a VPN for the admin page, a named grievance contact and response times. An admin's password can only be reset with the server command (`--reset`).
 - Rate limits, restricted CORS, hosting, backups, monitoring, analytics.
 - Terms, privacy and guidelines screens; data download.
 - Dark mode; an accessibility review; Android has not been tried.
 - Payments.
-- Notices for holds, bans and weak-giver tips (the list exists; only the widening notice is built).
-- Holds, temporary and permanent bans, the ban screen, appeals, and the separate admin dashboard (decided 2026-10-20, `docs/SECURITY.md`).
-- The weak-giver loop (notice, fewer new members, review).
+- A hosted admin page: today it runs locally (`pnpm --filter @perspective/admin web`).
 
-**Conflicts with the product rules** (code vs `docs/PRODUCT.md`). On 2026-10-20 the product owner decided the beta model (ADR-018); steps 1 and 2 are built, so what is left here is **decided but not built yet**, or still open:
-1. **Reports:** a person reported by 3 different people is not put on hold, and a single serious report does nothing automatic (decided: holds and a serious-report fast path). There is no admin review, ban or appeal (not built). Reports on posts, perspectives and messages now count (built 2026-10-20).
-2. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
-3. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
-4. **The report confirmation promises to hide the content**, but the server does not.
-5. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
+**Conflicts with the product rules** (code vs `docs/PRODUCT.md`). On 2026-10-20 the product owner decided the beta model (ADR-018); steps 1 to 3 are built, so what is left here is still open:
+1. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
+2. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
+3. **The report confirmation promises to hide the content**, but the server does not.
+4. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
 
 ---
 
@@ -690,7 +746,10 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 | INVALID_CREDENTIALS | Wrong email/password, or wrong password on deletion | "Email or password is incorrect." |
 | EMAIL_TAKEN | Email already used | "An account with this email already exists." |
 | UNDERAGE | Under 18 | "You must be 18 or older to use Perspective." |
-| ACCOUNT_SUSPENDED | Suspended account | "This account is suspended." |
+| ACCOUNT_SUSPENDED / ACCOUNT_BANNED | A suspended or banned person tries anything but the ban screen | The app opens the ban screen |
+| EMAIL_BLOCKED | Signing up with the email of someone banned permanently | "This email can't be used to create an account." |
+| APPEAL_NOT_ALLOWED | A second appeal on the same ban | "You have already appealed this decision." |
+| CONNECTION_PAUSED | Sending to someone who is suspended or banned | "This conversation is paused…" |
 | SELFIE_VERIFICATION_REQUIRED / PROFILE_INCOMPLETE | Using the app before the profile is live | "Verify your selfie to continue" / "Finish your profile to continue" |
 | PRIMARY_POST_REQUIRED, POST_LIMIT_REACHED | Post list rules (section 6) | The server's message |
 | MEDIA_INVALID | Bad or unusable upload | The server's message |
@@ -714,7 +773,8 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 
 ## 19. Automatic background work
 
-Only one thing runs by itself:
+Two things run by themselves:
+- **Every 15 minutes** (the same setting) the server ends temporary bans whose date has passed.
 - **Every 15 minutes** (setting `EXPIRY_SWEEP_MINUTES`; 0 turns it off) the server closes quiet connections that are overdue (section 13.4). It runs inside the API process. With several servers each would run it, which is harmless.
 
 Everything else happens when someone does something: the daily set is built on a person's first visit of the day (and the age range widens then, if needed, section 8.1); locked items reveal when the set is finished; quiet connections are also checked whenever they are read.
@@ -724,6 +784,14 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-21: beta step 3, holds, bans, appeals, weak givers and the admin dashboard
+- **Holds:** 3 different reporters, or one serious report from a verified account, hide the person from anyone new until an admin decides. They are not told; their existing chats keep working.
+- **"Not helpful" marks:** insulting counts as one report, sexual and unsafe as a serious report.
+- **Bans** are admin decisions only: 3 days, permanent, extend by 3 days, restore. Temporary bans end by themselves. Banned people only see the ban screen (reason, end date, one appeal per ban, sign out, delete account); their profile is hidden and chats are paused. A permanent ban blocks the email.
+- **Weak givers:** over a fixed 60% line (8+ low-effort marks from 5+ people, harsh markers half, 45-day fade) → a private tip, 0.2 lower in Explore, no brand-new members in their set; 10 more low-effort marks → the admin's list. Clears by itself.
+- **The admin dashboard** (`apps/admin`, web only): separate admin sign-ins made by a server command (plus a seeded development admin), password sign-in (the 6-digit authenticator code is built but switched off for now, product owner 2026-10-21), 8-hour sessions, review list, person pages with the reported content, actions with reasons, and an audit log.
+- New notices: "Make your perspectives count" and "Your account is back to normal". (Sections 2, 3, 4, 11.3, 13.3, 14, 15, 17, 18, 19; database: review cases, bans, appeals, admins, audit log, blocked emails, giver quality; ADR-019.)
 
 ### 2026-10-20: fresh people first, and skips hidden for 2 days
 - **Fresh people first.** The daily set and the profiles after it come from people you never gave a perspective to while at least 6 are left. Below 6, people you gave to before (with a post still to answer) join, and the set size follows the combined pool.

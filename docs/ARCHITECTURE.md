@@ -16,13 +16,13 @@ This table is the single source for the stack. If README, CLAUDE.md, BLUEPRINT.m
 | API | NestJS 10, Zod validation (no class-validator), Swagger at `/docs`, JWT + rotating refresh tokens | Rate limiting: `@nestjs/throttler` in-process first; Redis-backed only with several API instances |
 | Database | PostgreSQL 16 + Prisma 6 (Homebrew or Docker) | pgvector only after a ranking experiment |
 | Media | Local disk behind `MediaStorage`, HMAC-signed URLs | Cloudinary (ADR-003) for signed upload and EXIF stripping; S3 + CDN only if cost or control demands |
-| Jobs | None, except an in-process timer that closes quiet connections every 15 minutes (`EXPIRY_SWEEP_MINUTES`) | pg-boss on PostgreSQL; Redis/BullMQ only at measured queue pressure |
+| Jobs | None, except in-process timers every 15 minutes (`EXPIRY_SWEEP_MINUTES`): one closes quiet connections, one ends temporary bans whose date passed | pg-boss on PostgreSQL; Redis/BullMQ only at measured queue pressure |
 | Chat | Polling (`GET /v1/connections/:id/messages` every 4 s; new connections every 15 s) | Socket.IO (or SSE) as transport; PostgreSQL stays canonical |
 | Moderation, selfie verification | Stubs (`TextModerator`, `SelfieVerifier`) | A vendor API for text and image moderation and for liveness selfie checks, rather than building ML |
 | AI service | `apps/ai-service` FastAPI skeleton, not called by anything | Activate only for Python-only models, GPU inference, or independent AI scaling |
 | Local infra | PostgreSQL only | Redis only with its first real use |
 | Matching | Rule-based formulas in `apps/api/src/domain` (no machine learning) | After the beta: a Python batch job (scikit-learn logistic regression) trained on our own outcomes, used only as an input to the formula and only if it beats the formula in a shadow test (ADR-018) |
-| Admin | None | `apps/admin`, a web-only Expo Router project; separate admin identities with an authenticator-app code (a TOTP library); admin-only API under `/v1/admin` (ADR-019) |
+| Admin | `apps/admin`, a web-only Expo Router project (port 8082); separate admin identities created by `pnpm admin:create`, password plus a 6-digit authenticator code (RFC 6238 on `node:crypto`, no library), 8-hour admin tokens, admin-only API under `/v1/admin`, audit log (ADR-019) | Hosting with allow-listing or a VPN, and admin sign-in rate limits, before public launch |
 
 ## Repository
 ```text
@@ -84,4 +84,4 @@ Only `EXPO_PUBLIC_*` may enter the mobile bundle, and none may be secret. Server
 | MEDIA_SIGNING_SECRET | api | Yes | signs short-lived media URLs |
 | MEDIA_STORAGE_DIR | api | No | development media storage folder |
 | TEST_DATABASE_URL | api tests | Yes | database truncated by e2e tests |
-| APP_TIMEZONE, DAILY_MANDATORY_COUNT, POOL_FULL_AT, POOL_PARTIAL_AT, AUDIENCE_WIDEN_*, CONNECT_DECLINE_COOLDOWN_DAYS, MAX_CONNECT_REQUESTS_PER_DAY, MAX_PERSPECTIVES_RECEIVED_PER_DAY, RECEIVED_SOFT_LIMIT_PER_DAY, MANDATORY_INACTIVE_DAYS, SKIP_HIDE_DAYS, BOOST_*, REPORT_*, RANK_WEIGHT_*, quiet-connection values | api | No | product configuration (see `.env.example` for every value and default); an empty cap means unlimited |
+| APP_TIMEZONE, DAILY_MANDATORY_COUNT, POOL_FULL_AT, POOL_PARTIAL_AT, AUDIENCE_WIDEN_*, REPORT_HOLD_REPORTERS, BAN_TEMPORARY_DAYS, WEAK_GIVER_*, MARK_FADE_DAYS, HARSH_MARKER_*, ADMIN_SESSION_HOURS, ADMIN_JWT_SECRET (optional, secret), CONNECT_DECLINE_COOLDOWN_DAYS, MAX_CONNECT_REQUESTS_PER_DAY, MAX_PERSPECTIVES_RECEIVED_PER_DAY, RECEIVED_SOFT_LIMIT_PER_DAY, MANDATORY_INACTIVE_DAYS, SKIP_HIDE_DAYS, BOOST_*, REPORT_*, RANK_WEIGHT_*, quiet-connection values | api | No | product configuration (see `.env.example` for every value and default); an empty cap means unlimited |

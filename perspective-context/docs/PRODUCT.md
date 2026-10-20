@@ -188,6 +188,14 @@ Connections close on their own when they go quiet, so the list stays meaningful:
 
 **Permanent ban:** the account is closed, the same email cannot sign up again, and only the records needed for safety are kept. Until real selfie verification exists, a banned person could return with a new email.
 
+*Details (decided 2026-10-21):*
+- **Weak-giver line:** a fixed line, not a ranking against others. A giver is weak when more than 60% of their low-effort marks plus helpful marks are low-effort (vague, didn't answer, spam), judged once there are at least 8 low-effort marks from at least 5 different people. An owner who marked more than 80% of what they received as not helpful (at least 10 marks) counts at half weight.
+- **First step for a weak giver:** a private tip in Notices (no names, no numbers), pushed back in Explore (minus 0.2 in the ranking, the same as 2 reporters), and their daily set skips members in their first 7 days. **Second step:** after 10 more low-effort marks from at least 5 people while still over the line, they go on the admin's list. Everything ends by itself once marks fade and they are back under the line.
+- **Each "not helpful" reason:** vague, didn't answer and spam only count toward the weak-giver line; one mark changes nothing visible. Insulting or body shaming counts as one report against the giver. Sexual and unsafe count as a serious report (hidden at once, top of the review list). The giver never learns who marked them or why.
+- **Holds** last until an admin decides, and the person is not told they are on hold. A held person keeps their existing chats and connections; they are only hidden from new people.
+- **Extending a ban** adds 3 more days each time.
+- **Appeals:** one appeal per ban. If the admin keeps the ban, that ban cannot be appealed again; an extension counts as a new ban with its own appeal.
+
 ## State machines
 - **Post:** `draft -> pending_moderation -> active -> paused | removed -> archived`
 - **Perspective:** `submitted -> pending_moderation -> delivered -> helpful | archived | reported | removed` (delivered perspectives stay hidden from the owner until the owner's daily unlock)

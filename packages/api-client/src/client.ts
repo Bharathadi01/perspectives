@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   ApiErrorEnvelopeSchema,
+  AppealInput,
   AuthTokens,
   AuthTokensSchema,
   ConnectionSchema,
@@ -24,6 +25,7 @@ import {
   PerspectiveFeedbackSchema,
   PostSchema,
   ProfileViewSchema,
+  RestrictionSchema,
   SignUpInput,
   UpdatePostInput,
   UpdateProfileInput,
@@ -242,6 +244,13 @@ export function createApiClient(options: ApiClientOptions) {
       unseen: () => call({ method: 'GET', path: '/v1/connections/unseen', schema: z.array(ConnectionSchema) }),
       markSeen: (connectionIds: string[], idempotencyKey?: string) =>
         call({ method: 'POST', path: '/v1/connections/seen', body: { connectionIds }, schema: NoContent, idempotencyKey }),
+    },
+
+    /** For a suspended or banned person: the ban screen and their one appeal per ban. */
+    account: {
+      restriction: () => call({ method: 'GET', path: '/v1/account/restriction', schema: RestrictionSchema }),
+      appeal: (input: AppealInput, idempotencyKey?: string) =>
+        call({ method: 'POST', path: '/v1/account/appeal', body: input, schema: RestrictionSchema, idempotencyKey }),
     },
 
     notices: {

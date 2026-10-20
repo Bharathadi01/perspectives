@@ -23,6 +23,8 @@ export interface AssignmentCandidate {
   atSoftLimit?: boolean;
   /** The viewer never gave this person a perspective (decided 2026-10-20). Missing means fresh. */
   fresh?: boolean;
+  /** A brand-new member kept out of a weak giver's daily set (decided 2026-10-21). */
+  shielded?: boolean;
 }
 
 export type SlotKind = 'boost' | 'mandatory';
@@ -65,10 +67,11 @@ function isPaused(c: AssignmentCandidate, p: AssignmentPolicy): boolean {
 
 /**
  * Whether a profile may hold a mandatory slot at all (also used to re-check a pending slot):
- * not paused by reports, not inactive for 7 days, not at today's soft received limit.
+ * not paused by reports, not inactive for 7 days, not at today's soft received limit, and not a
+ * brand-new member when the viewer is a weak giver.
  */
 export function mayHoldMandatorySlot(c: AssignmentCandidate, p: AssignmentPolicy): boolean {
-  return !isPaused(c, p) && !c.dormant && !c.atSoftLimit;
+  return !isPaused(c, p) && !c.dormant && !c.atSoftLimit && !c.shielded;
 }
 
 /** How many people could fill a mandatory slot for this viewer now (drives the 1/2/3 count). */

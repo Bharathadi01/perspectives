@@ -3,6 +3,7 @@ import { addDays, dayKeyFor, daysBetweenKeys, todayKey } from '../common/day';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { AssignmentCandidate } from '../domain/assignment';
 import { mutuallyVisible } from '../domain/eligibility';
+import { EnforcementService } from '../enforcement/enforcement.service';
 import {
   RankingWeights,
   computeCompatibility,
@@ -30,6 +31,7 @@ export class CandidatesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly social: SocialService,
+    private readonly enforcement: EnforcementService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -67,12 +69,16 @@ export class CandidatesService {
     const openIds = withOpenPost.map((p) => p.person.id);
     const receivedTodayBy = await this.receivedToday(openIds, now);
     const hardCap = this.config.MAX_PERSPECTIVES_RECEIVED_PER_DAY;
-    const pool = withOpenPost.filter(({ person }) => hardCap === null || (receivedTodayBy.get(person.id) ?? 0) < hardCap);
+    // People on hold are hidden from anyone new while an admin reviews them (decided 2026-10-20).
+    const held = await this.enforcement.heldIds(openIds);
+    const pool = withOpenPost.filter(
+      ({ person }) => !held.has(person.id) && (hardCap === null || (receivedTodayBy.get(person.id) ?? 0) < hardCap),
+    );
     if (pool.length === 0) return [];
 
     const poolIds = pool.map((p) => p.person.id);
     const activityWindow = Math.max(7, this.config.MANDATORY_INACTIVE_DAYS, this.config.BOOST_ACTIVE_DAYS);
-    const [recent, verdicts, reportersBy, assignedToday, lastActive] = await Promise.all([
+    const [recent, verdicts, reportersBy, assignedToday, lastActive, weak] = await Promise.all([
       this.prisma.perspective.groupBy({
         by: ['ownerId'],
         where: { ownerId: { in: poolIds }, createdAt: { gte: addDays(now, -this.config.BOOST_LOOKBACK_DAYS) } },
@@ -83,7 +89,7 @@ export class CandidatesService {
         where: { giverId: { in: poolIds }, verdict: { not: null } },
         _count: { _all: true },
       }),
-      this.distinctReporters(poolIds, now),
+      this.enforcement.distinctReporters(poolIds, now),
       // Mandatory slots already holding each profile today, across every viewer (over-exposure).
       this.prisma.dailyAssignment.groupBy({
         by: ['targetId'],
@@ -96,7 +102,10 @@ export class CandidatesService {
         where: { userId: { in: poolIds }, dayKey: { gte: dayKeyFor(addDays(now, -activityWindow), tz) } },
         _max: { dayKey: true },
       }),
+      // Weak givers are pushed back in Explore; a weak viewer is kept from brand-new members (decided 2026-10-21).
+      this.enforcement.weakIds([...poolIds, viewer.id]),
     ]);
+    const viewerIsWeak = weak.has(viewer.id);
     const recentBy = new Map(recent.map((r) => [r.ownerId, r._count._all]));
     const assignedBy = new Map(assignedToday.map((a) => [a.targetId, a._count._all]));
     const lastActiveBy = new Map(lastActive.map((a) => [a.userId, a._max.dayKey]));
@@ -124,7 +133,7 @@ export class CandidatesService {
           newMember: newMemberScore(ageMs / DAY_MS),
           givingQuality: givingQuality(verdictCount(person.id, 'helpful'), verdictCount(person.id, 'not_helpful')),
           fresh: givenBefore.has(person.id) ? 0 : 1,
-          penalties: reportPenalty(recentReporters),
+          penalties: reportPenalty(recentReporters) + (weak.has(person.id) ? this.config.WEAK_GIVER_PENALTY : 0),
         },
         weights,
       );
@@ -142,6 +151,7 @@ export class CandidatesService {
         dormant: inactiveDays > 0 && (daysSinceActive === null || daysSinceActive > inactiveDays),
         atSoftLimit: softLimit > 0 && (receivedTodayBy.get(person.id) ?? 0) >= softLimit,
         fresh: !givenBefore.has(person.id),
+        shielded: viewerIsWeak && newMemberScore(ageMs / DAY_MS) > 0,
       };
     });
   }
@@ -169,46 +179,6 @@ export class CandidatesService {
       _count: { _all: true },
     });
     return new Map(counts.map((c) => [c.ownerId, c._count._all]));
-  }
-
-  /**
-   * Distinct people who reported each person in the report window (decided 2026-10-20): reports on
-   * their profile, posts, perspectives or messages all count, each reporter once. Reports a reviewer
-   * allowed, and those whose reporter deleted their account, do not count.
-   */
-  private async distinctReporters(personIds: string[], now: Date): Promise<Map<string, number>> {
-    const people = new Set(personIds);
-    const reports = await this.prisma.report.findMany({
-      where: {
-        reporterId: { not: null },
-        status: { not: 'allowed' },
-        createdAt: { gte: addDays(now, -this.config.REPORT_LOOKBACK_DAYS) },
-      },
-      select: { targetType: true, targetId: true, reporterId: true },
-    });
-    if (reports.length === 0) return new Map();
-    const idsOf = (type: string) => reports.filter((r) => r.targetType === type).map((r) => r.targetId);
-    const [posts, perspectives, messages] = await Promise.all([
-      this.prisma.post.findMany({ where: { id: { in: idsOf('post') } }, select: { id: true, ownerId: true } }),
-      this.prisma.perspective.findMany({ where: { id: { in: idsOf('perspective') } }, select: { id: true, giverId: true } }),
-      this.prisma.message.findMany({ where: { id: { in: idsOf('message') } }, select: { id: true, senderId: true } }),
-    ]);
-    const personOf = new Map<string, string>([
-      ...posts.map((p): [string, string] => [`post:${p.id}`, p.ownerId]),
-      ...perspectives.map((p): [string, string] => [`perspective:${p.id}`, p.giverId]),
-      ...messages.map((m): [string, string] => [`message:${m.id}`, m.senderId]),
-    ]);
-    const pairs = new Set<string>();
-    for (const r of reports) {
-      const personId = r.targetType === 'profile' ? r.targetId : personOf.get(`${r.targetType}:${r.targetId}`);
-      if (personId && people.has(personId) && personId !== r.reporterId) pairs.add(`${personId}|${r.reporterId}`);
-    }
-    const counts = new Map<string, number>();
-    for (const pair of pairs) {
-      const personId = pair.split('|')[0];
-      counts.set(personId, (counts.get(personId) ?? 0) + 1);
-    }
-    return counts;
   }
 
   private weights(): RankingWeights {

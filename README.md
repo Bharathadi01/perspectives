@@ -25,6 +25,7 @@ The full table, with triggers, is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.
 ```text
 ├── apps/
 │   ├── mobile/         # Expo React Native mobile client (5-tab shell, design system)
+│   ├── admin/          # Admin dashboard, web only (review list, bans, appeals); never in the mobile app
 │   ├── api/            # NestJS modular monolith with REST & Swagger OpenAPI
 │   └── ai-service/     # FastAPI skeleton, not wired in v1
 ├── packages/
@@ -63,7 +64,10 @@ pnpm db:seed                        # 7 verified test users, password: perspecti
 ```bash
 pnpm dev:api                        # http://localhost:3000 (Swagger at /docs)
 pnpm dev:mobile                     # Expo; press w for web, or scan the QR code with Expo Go
+pnpm --filter @perspective/admin web  # admin dashboard on http://localhost:8082
 ```
+
+**Admin sign-in.** In development, sign in on the admin page as `admin@perspective.test` / `perspective123` (created by `pnpm db:seed`; the 6-digit code is switched off for now with `ADMIN_REQUIRE_CODE=false`). Admins are not app accounts. On a real server, create one with `pnpm admin:create -- --email you@example.com` (add `--reset` for a new password and secret). It prints a password and an authenticator secret once: add the secret (or the `otpauth://` link) to an authenticator app such as Google Authenticator or 1Password, then sign in on the admin page with the email, the password and the 6-digit code.
 Seed logins: `ravi@`, `meera@`, `asha@`, `kabir@`, `nisha@`, `priya@`, `arjun@perspective.test` (password `perspective123`). Ravi starts with yesterday's perspectives visible, one locked perspective plus a connect request from Priya, and a connection with Asha.
 
 ### iOS Simulator (Xcode 27)

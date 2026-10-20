@@ -3,12 +3,14 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { APP_CONFIG, AppConfig } from '../config/app-config';
 import { PrismaService } from '../prisma/prisma.service';
+import { isRestricted, suspensionOver } from '../domain/enforcement';
 import { AppException } from './app-exception';
-import { AuthedRequest, IS_PUBLIC, REQUIRES_LIVE_PROFILE } from './decorators';
+import { ALLOW_RESTRICTED, AuthedRequest, IS_PUBLIC, REQUIRES_LIVE_PROFILE } from './decorators';
 
 /**
  * Default-deny guard. Every route needs a valid access token unless marked @Public().
- * Suspended accounts are denied. @RequiresLiveProfile() routes also need a live profile.
+ * Suspended and banned people reach only @AllowRestricted() routes (the ban screen, the appeal and
+ * account deletion). @RequiresLiveProfile() routes also need a live profile.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -44,12 +46,17 @@ export class AuthGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, status: true, profile: { select: { isLive: true, selfieStatus: true } } },
+      select: { id: true, status: true, suspendedUntil: true, profile: { select: { isLive: true, selfieStatus: true } } },
     });
     if (!user) {
       throw new AppException('UNAUTHORIZED', 'Please sign in.');
     }
-    if (user.status === 'suspended') {
+    const now = new Date();
+    if (suspensionOver(user.status, user.suspendedUntil, now)) {
+      // A temporary ban that has ended: back to active straight away.
+      await this.prisma.user.update({ where: { id: user.id }, data: { status: 'active', suspendedUntil: null } });
+    } else if (isRestricted(user.status, user.suspendedUntil, now) && !this.reflector.getAllAndOverride<boolean>(ALLOW_RESTRICTED, targets)) {
+      if (user.status === 'banned') throw new AppException('ACCOUNT_BANNED', 'This account is banned.');
       throw new AppException('ACCOUNT_SUSPENDED', 'This account is suspended.');
     }
 

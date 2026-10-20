@@ -59,6 +59,38 @@ const EnvSchema = z.object({
   REPORT_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(30),
   /** Distinct recent reporters that keep a profile out of every mandatory slot (0 turns this off). */
   REPORT_PAUSE_REPORTERS: z.coerce.number().int().min(0).default(2),
+  /** Distinct recent reporters that put a person on hold: hidden from new people, on the admin's list (0 = off). */
+  REPORT_HOLD_REPORTERS: z.coerce.number().int().min(0).default(3),
+  /** Length of a temporary ban, and of each extension (decided 2026-10-21: 3 days). */
+  BAN_TEMPORARY_DAYS: z.coerce.number().int().min(1).default(3),
+  /** Weak-giver line (decided 2026-10-21): weak above this share of low-effort marks. */
+  WEAK_GIVER_LINE: weight(0.6),
+  /** Judged only with this many low-effort marks ... */
+  WEAK_GIVER_MIN_MARKS: z.coerce.number().int().min(1).default(8),
+  /** ... from this many different people (also for the admin flag). */
+  WEAK_GIVER_MIN_MARKERS: z.coerce.number().int().min(1).default(5),
+  /** More low-effort marks after the tip that put a still-weak giver on the admin's list. */
+  WEAK_GIVER_FLAG_MARKS: z.coerce.number().int().min(1).default(10),
+  /** Ranking penalty while someone is a weak giver (decided 2026-10-21: the same as 2 reporters). */
+  WEAK_GIVER_PENALTY: weight(0.2),
+  /** Marks older than this no longer count. */
+  MARK_FADE_DAYS: z.coerce.number().int().min(1).default(45),
+  /** An owner who marked more than this share of what they received as not helpful counts half ... */
+  HARSH_MARKER_SHARE: weight(0.8),
+  /** ... once they marked at least this many. */
+  HARSH_MARKER_MIN_MARKS: z.coerce.number().int().min(1).default(10),
+  /**
+   * Whether admin sign-in needs the 6-digit authenticator code (ADR-019). Off for now by the product
+   * owner's decision (2026-10-21): password only during development. Turn on before the beta.
+   */
+  ADMIN_REQUIRE_CODE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /** Admin sessions are short and cannot be renewed (docs/SECURITY.md). */
+  ADMIN_SESSION_HOURS: z.coerce.number().positive().max(24).default(8),
+  /** Optional separate secret for admin tokens; without it one is derived from JWT_ACCESS_SECRET. */
+  ADMIN_JWT_SECRET: z.string().min(32).optional(),
   /** Ranking weights (decided 2026-10-20). */
   RANK_WEIGHT_INTERESTS: weight(0.45),
   RANK_WEIGHT_NEED: weight(0.2),

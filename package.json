@@ -13,7 +13,8 @@
     "test": "pnpm -r run test",
     "test:e2e": "pnpm --filter @perspective/api test:e2e",
     "db:migrate": "pnpm --filter @perspective/api prisma:migrate",
-    "db:seed": "pnpm --filter @perspective/api db:seed"
+    "db:seed": "pnpm --filter @perspective/api db:seed",
+    "admin:create": "pnpm --filter @perspective/api admin:create"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

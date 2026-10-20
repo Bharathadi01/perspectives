@@ -14,6 +14,7 @@ import {
 } from '../domain/assignment';
 import { PoolThresholds, dailyStatus, mandatoryCount, requiredAfterUnfilledSlot } from '../domain/daily';
 import { AgeRange, WideningPolicy, needsWidening, nextWidening } from '../domain/widening';
+import { EnforcementService } from '../enforcement/enforcement.service';
 import { NoticesService } from '../notices/notices.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Person, SocialService } from '../social/social.service';
@@ -38,6 +39,7 @@ export class DailyService {
     private readonly social: SocialService,
     private readonly candidates: CandidatesService,
     private readonly notices: NoticesService,
+    private readonly enforcement: EnforcementService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -58,6 +60,8 @@ export class DailyService {
     const existing = await this.prisma.dailyProgress.findUnique({ where: { userId_dayKey: { userId, dayKey } } });
     if (existing) return existing;
 
+    // Once a day, re-check this person's own giving quality, so faded marks clear the weak-giver state.
+    await this.enforcement.reassessGiver(userId, now);
     const viewer = await this.social.person(userId);
     const policy = this.policy(userId, dayKey);
     // Skipped and already-given people stay out (matters when the set is rebuilt after an audience change).

@@ -243,6 +243,19 @@ export function useMarkConnectionsSeen() {
   });
 }
 
+// ---------- ban screen ----------
+/** For a suspended or banned person: the reason, the end date and their appeal. */
+export function useRestriction() {
+  return useQuery({ queryKey: queryKeys.restriction, queryFn: () => api.account.restriction(), retry: false });
+}
+
+export function useAppeal() {
+  const qc = useQueryClient();
+  return useIdempotentMutation((message: string, key: string) => api.account.appeal({ message }, key), {
+    onSuccess: (r) => qc.setQueryData(queryKeys.restriction, r),
+  });
+}
+
 // ---------- notices ----------
 /** The in-app notices list (You → Notices), refetched when the app comes back to the foreground. */
 export function useNotices(enabled = true) {
