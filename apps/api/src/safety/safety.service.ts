@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { CreateReportInput, DeleteAccountInput } from '@perspective/contracts';
+import { BlockedPerson, CreateReportInput, DeleteAccountInput } from '@perspective/contracts';
 import { AuthService } from '../auth/auth.service';
 import { AppException } from '../common/app-exception';
 import { ConnectService } from '../connect/connect.service';
 import { EnforcementService } from '../enforcement/enforcement.service';
 import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PROFILE_USER_INCLUDE, ProfileMapper } from '../profiles/profile.mapper';
 import { SocialService } from '../social/social.service';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class SafetyService {
     private readonly media: MediaService,
     private readonly auth: AuthService,
     private readonly enforcement: EnforcementService,
+    private readonly mapper: ProfileMapper,
   ) {}
 
   /** Saves the report; 3 different reporters, or one credible serious report, put the person on hold. */
@@ -43,8 +45,22 @@ export class SafetyService {
     await this.prisma.connection.updateMany({ where: { userAId, userBId }, data: { status: 'blocked' } });
   }
 
+  /**
+   * Unblocking lets the two of you see each other again wherever your audiences allow. What blocking
+   * ended stays ended: cancelled requests and the closed conversation do not come back.
+   */
   async unblock(blockerId: string, blockedId: string): Promise<void> {
     await this.prisma.block.deleteMany({ where: { blockerId, blockedId } });
+  }
+
+  /** People you blocked, newest first. Accounts deleted since are gone from the list. */
+  async blocked(blockerId: string): Promise<BlockedPerson[]> {
+    const rows = await this.prisma.block.findMany({
+      where: { blockerId },
+      orderBy: { createdAt: 'desc' },
+      include: { blocked: { include: PROFILE_USER_INCLUDE } },
+    });
+    return rows.map((r) => ({ person: this.mapper.summary(r.blocked), blockedAt: r.createdAt.toISOString() }));
   }
 
   /**

@@ -281,6 +281,19 @@ export function useBlock() {
   });
 }
 
+/** You → Blocked people. */
+export function useBlocked() {
+  return useQuery({ queryKey: queryKeys.blocked, queryFn: () => api.safety.blocked() });
+}
+
+/** Unblocking can bring the person back into Explore and profiles, so everything refreshes. */
+export function useUnblock() {
+  const qc = useQueryClient();
+  return useIdempotentMutation((userId: string, key: string) => api.safety.unblock(userId, key), {
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
 export function useDeleteAccount() {
   const setStatus = useSession((s) => s.setStatus);
   const qc = useQueryClient();

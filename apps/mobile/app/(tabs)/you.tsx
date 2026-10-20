@@ -68,6 +68,7 @@ export default function You() {
         <View style={s.section}>
           <Label>Privacy & account</Label>
           <Muted>Your email, exact birthday, exact location and selfie are never shown to anyone.</Muted>
+          <Button title="Blocked people" variant="secondary" onPress={() => router.push('/me/blocked')} />
           <Button title="Sign out" variant="secondary" onPress={() => void logOut.run(undefined).then(() => router.replace('/(auth)/welcome'))} />
           <Button title="Delete account" variant="ghost" onPress={() => setDeleting(true)} />
         </View>

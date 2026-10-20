@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-21 (beta step 3 built: holds, bans, the ban screen, appeals, the weak-giver loop and the separate admin dashboard. Steps 1 and 2 on 2026-10-20)
+**Last updated:** 2026-10-21 (beta step 4 built: You → Blocked people, with unblock. Step 3 earlier the same day: holds, bans, appeals, weak givers, the admin dashboard)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -234,6 +234,7 @@ If someone quits halfway: their basics are saved only if they reached step 7; th
 - **You → Your goal (private):** change the goal (one or both).
 - **You → the audience button** (its title is the goal-worded question): change genders and age range. The age range shown is the one in use, which may have been widened (section 8.1). Picking new ages makes them your chosen range; saving the range already shown (for example while changing genders) keeps your earlier chosen range, so widening never goes further than 4 years past what you actually chose.
 - **You → Notices:** the notices list (section 8.2). The button shows how many are new.
+- **You → Blocked people:** the people you blocked, with Unblock (section 14.2).
 - The birthday cannot be changed.
 
 ---
@@ -604,7 +605,8 @@ From the same menu: **Block this person**. Effect, immediately and in **both dir
 - An existing connection is closed (status blocked).
 - Today's daily-set slot with them is replaced the next time Explore loads.
 - Neither can give the other a perspective, ask to connect, or message.
-- **Unblocking** exists on the server but there is **no screen** for it, and no list of blocked people [Not built].
+- **You → Blocked people** [Built 2026-10-21] lists everyone you blocked, newest first, with their photo, name, age and when you blocked them. Only you see it; the people you blocked never see a list of who blocked them. If someone deleted their account they drop off the list.
+- **Unblock** (from that list, after a confirmation): you may see each other again in Explore and on profiles, if you are in each other's audience. They are not told. What blocking ended stays ended: the closed conversation and any cancelled connect requests do not come back.
 
 ### 14.3 Muting [Not built]
 
@@ -718,7 +720,7 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 
 **Does not exist yet [Not built]**
 - Password reset, email verification, "sign out everywhere", other sign-in methods.
-- Mute; a blocked-people list and an unblock screen.
+- Mute.
 - Using orientation to decide who sees whom.
 - Replacing a post's photo; pausing a post.
 - Push notifications, opening the app from a notification, emails.
@@ -784,6 +786,9 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-21: beta step 4, the blocked people list
+- **You → Blocked people** lists everyone you blocked (newest first) with **Unblock** after a confirmation. Unblocking lets you see each other again where your audiences allow; the old conversation and cancelled requests stay closed. (Sections 5.4, 14.2, 17.)
 
 ### 2026-10-21: beta step 3, holds, bans, appeals, weak givers and the admin dashboard
 - **Holds:** 3 different reporters, or one serious report from a verified account, hide the person from anyone new until an admin decides. They are not told; their existing chats keep working.

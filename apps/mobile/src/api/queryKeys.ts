@@ -9,4 +9,5 @@ export const queryKeys = {
   messages: (connectionId: string) => ['messages', connectionId] as const,
   notices: ['notices'] as const,
   restriction: ['restriction'] as const,
+  blocked: ['blocks'] as const,
 };

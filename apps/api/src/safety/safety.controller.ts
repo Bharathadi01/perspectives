@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
+  BlockedPerson,
   AppealInput,
   AppealInputSchema,
   CreateReportInput,
@@ -31,6 +32,12 @@ export class SafetyController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async block(@CurrentUser() user: AuthUser, @Param('userId', UuidPipe) userId: string): Promise<void> {
     await this.safety.block(user.id, userId);
+  }
+
+  /** You → Blocked people: everyone you blocked, newest first. */
+  @Get('blocks')
+  blocked(@CurrentUser() user: AuthUser): Promise<BlockedPerson[]> {
+    return this.safety.blocked(user.id);
   }
 
   @Delete('blocks/:userId')

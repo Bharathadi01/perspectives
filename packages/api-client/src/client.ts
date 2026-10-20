@@ -3,6 +3,7 @@ import {
   ApiErrorEnvelopeSchema,
   AppealInput,
   AuthTokens,
+  BlockedPersonSchema,
   AuthTokensSchema,
   ConnectionSchema,
   ConnectRequestResultSchema,
@@ -264,6 +265,7 @@ export function createApiClient(options: ApiClientOptions) {
         call({ method: 'POST', path: '/v1/reports', body: input, schema: z.object({ reportId: z.string() }), idempotencyKey }),
       block: (userId: string, idempotencyKey?: string) =>
         call({ method: 'POST', path: `/v1/blocks/${userId}`, schema: NoContent, idempotencyKey }),
+      blocked: () => call({ method: 'GET', path: '/v1/blocks', schema: z.array(BlockedPersonSchema) }),
       unblock: (userId: string, idempotencyKey?: string) =>
         call({ method: 'DELETE', path: `/v1/blocks/${userId}`, schema: NoContent, idempotencyKey }),
       deleteAccount: async (input: DeleteAccountInput) => {

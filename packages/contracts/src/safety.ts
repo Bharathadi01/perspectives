@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IdSchema } from './common';
+import { ProfileSummarySchema } from './profile';
 
 export const ReportTargetType = z.enum(['profile', 'post', 'perspective', 'message']);
 export type ReportTargetType = z.infer<typeof ReportTargetType>;
@@ -68,3 +69,10 @@ export const AppealInputSchema = z.object({
   message: z.string().trim().min(APPEAL_MIN_LENGTH).max(APPEAL_MAX_LENGTH),
 });
 export type AppealInput = z.infer<typeof AppealInputSchema>;
+
+/** Someone you blocked, for You → Blocked people (decided 2026-10-20). Only the blocker sees this list. */
+export const BlockedPersonSchema = z.object({
+  person: ProfileSummarySchema,
+  blockedAt: z.string(),
+});
+export type BlockedPerson = z.infer<typeof BlockedPersonSchema>;
