@@ -57,7 +57,11 @@ export function useMe(enabled = true) {
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useIdempotentMutation((input: UpdateProfileInput, key: string) => api.me.update(input, key), {
-    onSuccess: (me) => qc.setQueryData(queryKeys.me, me),
+    onSuccess: (me) => {
+      qc.setQueryData(queryKeys.me, me);
+      // A changed audience changes who Explore may show, so the card on screen can be out of date.
+      void qc.invalidateQueries({ queryKey: queryKeys.explore });
+    },
   });
 }
 
@@ -236,6 +240,19 @@ export function useMarkConnectionsSeen() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.connections });
     },
+  });
+}
+
+// ---------- notices ----------
+/** The in-app notices list (You → Notices), refetched when the app comes back to the foreground. */
+export function useNotices(enabled = true) {
+  return useQuery({ queryKey: queryKeys.notices, queryFn: () => api.notices.list(), enabled });
+}
+
+export function useMarkNoticesRead() {
+  const qc = useQueryClient();
+  return useIdempotentMutation((_: void, key: string) => api.notices.markAllRead(key), {
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.notices }),
   });
 }
 

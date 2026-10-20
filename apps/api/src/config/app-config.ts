@@ -29,6 +29,10 @@ const EnvSchema = z.object({
   POOL_FULL_AT: z.coerce.number().int().min(1).default(15),
   /** People available at which the daily set is 2 and the after-set gets 4; below it, fewer. */
   POOL_PARTIAL_AT: z.coerce.number().int().min(1).default(6),
+  /** Automatic age widening when fewer than POOL_PARTIAL_AT people are available: years added at each end per step. */
+  AUDIENCE_WIDEN_STEP_YEARS: z.coerce.number().int().min(1).default(2),
+  /** Most years the age range may widen beyond the chosen range at each end (decided 2026-10-20; 0 turns widening off). */
+  AUDIENCE_WIDEN_MAX_YEARS: z.coerce.number().int().min(0).default(4),
   /** Days before the same sender can re-request after a decline (product default 14; 0 disables). */
   CONNECT_DECLINE_COOLDOWN_DAYS: z.coerce.number().int().min(0).default(14),
   /** Connect requests a person may send per day (beta value 5, decided 2026-10-20). Empty = no cap. */
@@ -39,8 +43,8 @@ const EnvSchema = z.object({
   RECEIVED_SOFT_LIMIT_PER_DAY: z.coerce.number().int().min(0).default(10),
   /** People who have not opened the app for this many days are never put into a mandatory set (0 = off). */
   MANDATORY_INACTIVE_DAYS: z.coerce.number().int().min(0).default(7),
-  /** assumption: how long a skipped profile stays out of Explore */
-  SKIP_HIDE_DAYS: z.coerce.number().int().min(0).default(7),
+  /** How long a skipped profile stays out of Explore (decided 2026-10-20: 2 days for the beta). */
+  SKIP_HIDE_DAYS: z.coerce.number().int().min(0).default(2),
   /** "Recently" for the boost (no perspectives in this many days) and for need in the ranking (decided 2026-10-20: 3). */
   BOOST_LOOKBACK_DAYS: z.coerce.number().int().min(1).default(3),
   /** Over-exposure (2026-10-19): most mandatory slots one profile may hold per day across all viewers (0 = no cap). */
@@ -61,6 +65,8 @@ const EnvSchema = z.object({
   RANK_WEIGHT_ACTIVE: weight(0.15),
   RANK_WEIGHT_NEW_MEMBER: weight(0.1),
   RANK_WEIGHT_QUALITY: weight(0.1),
+  /** Head start for people the viewer never gave a perspective to (decided 2026-10-20). */
+  RANK_WEIGHT_FRESH: weight(0.1),
   /** Quiet connections (product decision 2026-10-18): hours after the quiet person opens the chat. */
   FIRST_REPLY_WARN_HOURS: z.coerce.number().positive().default(24),
   FIRST_REPLY_CLOSE_HOURS: z.coerce.number().positive().default(48),

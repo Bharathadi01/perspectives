@@ -1,58 +1,5 @@
 import { z } from 'zod';
 
-/** Dating Intentions: aligned with research into modern intentional dating */
-export const DatingIntention = z.enum([
-  'long_term', // Looking for a long-term partner
-  'long_term_open', // Long-term, but open to short
-  'short_term_open', // Short-term, but open to long
-  'casual', // Fun, casual dating
-  'friendship', // New friends & community
-  'figuring_out', // Still figuring it out
-]);
-export type DatingIntention = z.infer<typeof DatingIntention>;
-
-export const DATING_INTENTION_CONFIG: Record<
-  DatingIntention,
-  { label: string; description: string; badge: string; icon: string }
-> = {
-  long_term: {
-    label: 'Long-term partner',
-    description: 'Looking for a committed relationship and life partner',
-    badge: 'Long-term',
-    icon: 'heart',
-  },
-  long_term_open: {
-    label: 'Long-term, open to short',
-    description: 'Aiming for something lasting, but taking time to see where it goes',
-    badge: 'Long-term (flexible)',
-    icon: 'infinite',
-  },
-  short_term_open: {
-    label: 'Short-term, open to long',
-    description: 'Dating casually, open to deeper connection if chemistry is there',
-    badge: 'Short-term (open)',
-    icon: 'sparkles',
-  },
-  casual: {
-    label: 'Short-term fun',
-    description: 'Lighthearted dates, fun experiences, no pressure',
-    badge: 'Casual',
-    icon: 'wine',
-  },
-  friendship: {
-    label: 'New friends & community',
-    description: 'Looking to expand my social circle and meet kindred spirits',
-    badge: 'Friends',
-    icon: 'people',
-  },
-  figuring_out: {
-    label: 'Still figuring it out',
-    description: 'Open-minded, exploring connections authentically',
-    badge: 'Exploring',
-    icon: 'compass',
-  },
-};
-
 /** Lifestyle Pace: daily rhythm & energy */
 export const LifestylePace = z.enum([
   'early_bird',

@@ -52,14 +52,13 @@ export class CandidatesService {
     if (people.length === 0) return [];
 
     const ids = people.map((p) => p.person.id);
-    const answered = new Set(
-      (
-        await this.prisma.perspective.findMany({
-          where: { giverId: viewer.id, ownerId: { in: ids } },
-          select: { postId: true },
-        })
-      ).map((p) => p.postId),
-    );
+    const givenRows = await this.prisma.perspective.findMany({
+      where: { giverId: viewer.id, ownerId: { in: ids } },
+      select: { postId: true, ownerId: true },
+    });
+    const answered = new Set(givenRows.map((p) => p.postId));
+    // Fresh = the viewer never gave this person a perspective (decided 2026-10-20).
+    const givenBefore = new Set(givenRows.map((p) => p.ownerId));
     const withOpenPost = people.filter(({ postIds }) => postIds.some((id) => !answered.has(id)));
     if (withOpenPost.length === 0) return [];
 
@@ -124,6 +123,7 @@ export class CandidatesService {
           recentlyActive: recentlyActiveScore(daysSinceActive),
           newMember: newMemberScore(ageMs / DAY_MS),
           givingQuality: givingQuality(verdictCount(person.id, 'helpful'), verdictCount(person.id, 'not_helpful')),
+          fresh: givenBefore.has(person.id) ? 0 : 1,
           penalties: reportPenalty(recentReporters),
         },
         weights,
@@ -141,6 +141,7 @@ export class CandidatesService {
         recentReporters,
         dormant: inactiveDays > 0 && (daysSinceActive === null || daysSinceActive > inactiveDays),
         atSoftLimit: softLimit > 0 && (receivedTodayBy.get(person.id) ?? 0) >= softLimit,
+        fresh: !givenBefore.has(person.id),
       };
     });
   }
@@ -217,6 +218,7 @@ export class CandidatesService {
       recentlyActive: this.config.RANK_WEIGHT_ACTIVE,
       newMember: this.config.RANK_WEIGHT_NEW_MEMBER,
       givingQuality: this.config.RANK_WEIGHT_QUALITY,
+      fresh: this.config.RANK_WEIGHT_FRESH,
     };
   }
 }

@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-20 (beta step 1 built: daily set of 1 to 3, new boost rule, inactive and soft-limit rules, 5 connect requests a day, 4 to 5 profiles after the set, new ranking, reports on posts, perspectives and messages count)
+**Last updated:** 2026-10-20 (beta step 2 built: private goal question, audience step worded by the goal, optional private orientation, dating intention removed, automatic age widening, in-app notices list. Step 1 earlier the same day: daily set of 1 to 3, new boost rule, new ranking)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -23,7 +23,7 @@ Tags used throughout:
 5. Setting up a profile (onboarding)
 6. Posts: photos, voice and written questions
 7. Photos and voice files
-8. Who can see whom
+8. Who can see whom, automatic age widening, notices
 9. Explore and the daily set
 10. Giving a perspective
 11. The Inbox and giving feedback
@@ -49,8 +49,11 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 - **Post:** one card on a profile: a photo, a voice clip, or a written question, with a question, a category and focus areas. People give perspectives on one post at a time.
 - **Perspective:** a written, honest comment one person gives on another person's post. Only the post's owner and the giver ever see it.
 - **Giver / owner:** the person who wrote a perspective / the person whose post it was on.
-- **Daily set:** the profiles you must give a perspective to today (normally 3).
-- **Boost slot:** one slot in the daily set reserved for a profile that has received few perspectives.
+- **Daily set:** the profiles you must give a perspective to today (1, 2 or 3, by how many people are available).
+- **Boost slot:** at most one slot in the daily set for an active person who has had no perspectives in the last 3 days.
+- **Goal:** a private answer, "Get perspectives", "Meet new people" or both. Nobody else ever sees it.
+- **Audience:** the genders and age range you choose; used both ways (section 8).
+- **Notice:** a message from the app about a change it made for you, listed under You → Notices.
 - **Unlock:** finishing your daily set reveals the perspectives (and connect requests) you received.
 - **Connect request:** one person asking another to chat. It carries the perspective that earned it.
 - **Connection:** two people who both said yes. Chat opens.
@@ -68,12 +71,14 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 | `DAILY_MANDATORY_COUNT` | 3 | The most perspectives you must give in a day; the actual number is 1, 2 or 3 by how many people are available |
 | `POOL_FULL_AT` | 15 | People available at which the set is 3 and you get 5 more profiles after it |
 | `POOL_PARTIAL_AT` | 6 | People available at which the set is 2 and you get 4 more after it; below this, fewer |
+| `AUDIENCE_WIDEN_STEP_YEARS` | 2 | When fewer than `POOL_PARTIAL_AT` people are available, the age range widens by this many years at each end at a time (section 8.1) |
+| `AUDIENCE_WIDEN_MAX_YEARS` | 4 | The most the age range can widen beyond what the person chose, at each end (0 turns widening off) |
 | `CONNECT_DECLINE_COOLDOWN_DAYS` | 14 | After someone declines you, you cannot ask them again for this long (0 turns it off) |
 | `MAX_CONNECT_REQUESTS_PER_DAY` | 5 | Connect requests a person can send per day (empty = unlimited) |
 | `MAX_PERSPECTIVES_RECEIVED_PER_DAY` | none | Optional hard cap on perspectives one profile can receive per day; not set (the product has no hard cap) |
 | `RECEIVED_SOFT_LIMIT_PER_DAY` | 10 | After this many perspectives received today, a person is put into no more daily sets today (give-backs and chosen perspectives still work; 0 = off) |
 | `MANDATORY_INACTIVE_DAYS` | 7 | Someone who has not opened the app in this many days is never put into a daily set (0 = off) |
-| `SKIP_HIDE_DAYS` | 7 | A skipped profile stays out of your Explore for this long |
+| `SKIP_HIDE_DAYS` | 2 | A skipped profile stays out of your Explore for this long (2 days, counted from the skip, during the beta) |
 | `BOOST_LOOKBACK_DAYS` | 3 | "Recently": the boost needs no perspectives in this many days, and need in the ranking counts them over the same days |
 | `MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY` | 6 | The most daily sets one person can be put into per day, across everyone (0 = no limit). Only broken when nobody else is left |
 | `BOOST_CANDIDATE_POOL` | 5 | The boost person is picked at random from up to this many of the qualifying people in the fewest sets today |
@@ -81,7 +86,7 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 | `BOOST_NEW_PROFILE_HOURS` | 48 | An account younger than this can take the boost even without that check |
 | `REPORT_LOOKBACK_DAYS` | 30 | The window for counting how many different people reported a profile |
 | `REPORT_PAUSE_REPORTERS` | 2 | A person reported by this many different people in that window (on their profile, posts, perspectives or messages) is not put into anyone's daily set (0 = off) |
-| `RANK_WEIGHT_INTERESTS`, `_NEED`, `_ACTIVE`, `_NEW_MEMBER`, `_QUALITY` | 0.45, 0.20, 0.15, 0.10, 0.10 | The ranking weights (section 9.5) |
+| `RANK_WEIGHT_INTERESTS`, `_NEED`, `_ACTIVE`, `_NEW_MEMBER`, `_QUALITY`, `_FRESH` | 0.45, 0.20, 0.15, 0.10, 0.10, 0.10 | The ranking weights (section 9.5); `_FRESH` is the head start for people you never gave a perspective to |
 | `ACCESS_TOKEN_TTL_SEC` | 900 (15 minutes) | How long a sign-in token works before it is renewed |
 | `REFRESH_TOKEN_TTL_DAYS` | 30 | How long you stay signed in without opening the app |
 | `MEDIA_URL_TTL_SEC` | 3600 (1 hour) | How long a photo or voice link stays valid |
@@ -180,33 +185,43 @@ The server cancels that sign-in's tokens and the app returns to Welcome. Other d
 Code: `apps/mobile/app/onboarding/index.tsx`, `src/components/onboarding/*`, `src/session/onboardingStore.ts`, `apps/api/src/profiles/*`, `apps/api/src/domain/eligibility.ts`.
 
 ### 5.1 What makes a profile "live"
-A profile can be seen by others and can use the app only when **all four** are true:
-1. **Basics:** name, gender, height, orientation and city are all filled in.
-2. **Audience:** at least one gender and an age range are chosen.
-3. **Selfie:** a selfie has been verified.
-4. **A primary photo post:** the first post (position 1) is a photo.
+A profile can be seen by others and can use the app only when **all five** are true:
+1. **Basics:** name, gender, height and city are filled in. **Orientation is optional** (decided 2026-10-20).
+2. **Goal:** "Get perspectives", "Meet new people", or both.
+3. **Audience:** at least one gender and an age range are chosen.
+4. **Selfie:** a selfie has been verified.
+5. **A primary photo post:** the first post (position 1) is a photo.
 
-The server recomputes this every time something changes. Until it is live: the tabs are blocked, other people cannot see the profile, and the person is sent to onboarding. The server also refuses Explore, giving perspectives, connecting and viewing profiles until the profile is live ("Verify your selfie to continue" or "Finish your profile to continue").
+The server recomputes this every time something changes. **Profiles made before the goal question existed** stay live until the person next changes something on their profile; then the profile goes offline until they answer the goal, and the app opens onboarding straight at the goal step. Until it is live: the tabs are blocked, other people cannot see the profile, and the person is sent to onboarding. The server also refuses Explore, giving perspectives, connecting and viewing profiles until the profile is live ("Verify your selfie to continue" or "Finish your profile to continue").
 
-### 5.2 The six onboarding steps
+### 5.2 The seven onboarding steps
 A progress bar shows the step. "Back" works. The answers are kept in the phone's memory while moving between steps; on reopening, the app refills them from whatever was already saved on the server.
 
-1. **About you.** First name, pronouns (optional), height, orientation (starts as "Straight"), city, and the selfie. **Next stays disabled** until the name, gender, orientation, city and height are valid **and the selfie is verified**.
+1. **About you.** First name, gender, pronouns (optional), height, **orientation (optional and private)**, city, and the selfie. Orientation starts with nothing picked; tapping a picked option again clears it. A line says only you see it, it is not shown on your profile and it does not change who you see. **Continue stays disabled** until the name, gender, city and height are valid **and the selfie is verified**.
    - Selfie: a camera photo is uploaded and checked. **The check is a placeholder: it approves any photo** [Placeholder]. The selfie is stored privately and is never shown to anyone. In development builds a button skips the camera with a built-in test image (section 16).
-2. **Who would you like to meet?** Which genders (Woman, Man, Non-binary; starts as Woman), the age range (starts 18 to 35, steppers, the lowest is 18 and the highest 99, minimum can never exceed maximum), a "dating intention" (starts as "Long-term, open to short") and a "strict dealbreaker" switch. **Next** needs at least one gender and an intention. [Conflict] The intention and dealbreaker are not in the product rules (section 12).
-3. **Your interests.** Pick from 45 interests in 8 groups, with search. At least 3, at most 10. **Next** is disabled below 3.
-4. **What matters to you?** Daily rhythm (Early Riser, Night Owl, Flexible, Always on the Move, Easygoing) and social energy (Introverted, Extroverted, Ambivert, Intimate circles, Social butterfly). Both optional ("Skip for now").
-5. **A little more personality.** Choose from 5 questions and answer in up to 300 characters. Optional.
-6. **Review & finish.** A summary with "Edit" links back to each step and a short explanation of how matching works. Pressing **Complete & Set Up Profile** saves everything **at once** in one update (nothing in steps 1 to 5 is saved to the server until this moment, except the selfie, which uploaded straight away). Then the person goes to the profile editor.
+2. **What brings you here? (the goal, private).** Two tick cards: **Get perspectives** and **Meet new people**; pick one or both. A note says only you see it and it is never shown on your profile or to the people you connect with. **Continue** needs at least one. During the beta the goal **does not change matching** (decided 2026-10-20); it words the next step and is kept for the beta measurements.
+3. **The audience, worded by the goal.** The step title and question are:
+   - Get perspectives only: **"Whose perspectives do you want?"** All three genders start ticked, and a hint says "Including more people brings you more perspectives, faster." (If the person had already picked genders, they are kept.)
+   - Meet new people only: **"Who would you like to meet?"**
+   - Both: **"Who do you want in your feed?"**
+
+   Then the age range (starts 18 to 35, steppers, lowest 18, highest 99, minimum never above maximum), with a note that the range may be widened a little if very few people fit (section 8.1). **Continue** needs at least one gender. The old "dating intention" and "strict dealbreaker" questions are gone.
+4. **Your interests.** Pick from 45 interests in 8 groups, with search. At least 3, at most 10. **Next** is disabled below 3.
+5. **What matters to you?** Daily rhythm (Early Riser, Night Owl, Flexible, Always on the Move, Easygoing) and social energy (Introverted, Extroverted, Ambivert, Intimate circles, Social butterfly). Both optional ("Skip for now").
+6. **A little more personality.** Choose from 5 questions and answer in up to 300 characters. Optional.
+7. **Review & finish.** A summary with "Edit" links back to each step: basics, **your goal (private)** and orientation if given, the audience under its goal-worded question, interests, lifestyle and the personality answer, plus a short explanation that matching is mostly on shared interests and that the goal and orientation stay private. Pressing **Complete & Set Up Profile** saves everything **at once** in one update (nothing in steps 1 to 6 is saved to the server until this moment, except the selfie, which uploaded straight away). Then the person goes to the profile editor.
 
 ### 5.3 The profile editor and finishing
-After step 6, the person lands in the editor (`/me/edit`) to add posts. The profile still is not live until a **photo post** exists. Pressing "Done" with no photo gives "Please add at least one photo with a question." With a photo, the profile goes live and the person lands in Explore.
+After step 7, the person lands in the editor (`/me/edit`) to add posts. The profile still is not live until a **photo post** exists. Pressing "Done" with no photo gives "Please add at least one photo with a question." With a photo, the profile goes live and the person lands in Explore.
 
-If someone quits halfway: their basics are saved only if they reached step 6; the profile stays not-live, and next time they open the app they are sent back to onboarding with their saved answers refilled.
+If someone quits halfway: their basics are saved only if they reached step 7; the profile stays not-live, and next time they open the app they are sent back to onboarding with their saved answers refilled.
 
 ### 5.4 Changing details later
 - **You → Edit Profile & Live Preview:** the editor, with an **Edit** tab and a **View** tab that shows exactly what others see.
-- **You → Edit basics / Who sees you:** change name, height, gender, orientation, city, audience.
+- **You → Edit basics:** change name, height, gender, orientation (optional, can be cleared), city.
+- **You → Your goal (private):** change the goal (one or both).
+- **You → the audience button** (its title is the goal-worded question): change genders and age range. The age range shown is the one in use, which may have been widened (section 8.1). Picking new ages makes them your chosen range; saving the range already shown (for example while changing genders) keeps your earlier chosen range, so widening never goes further than 4 years past what you actually chose.
+- **You → Notices:** the notices list (section 8.2). The button shows how many are new.
 - The birthday cannot be changed.
 
 ---
@@ -277,14 +292,36 @@ Code: `apps/api/src/media/*`, `apps/mobile/src/lib/media.ts`.
 
 Code: `apps/api/src/domain/eligibility.ts`, `apps/api/src/profiles/profiles.service.ts`.
 
-1. **Audience.** Each profile chooses **genders** and an **age range** (18 to 99). That choice is used **both ways** [decided to keep for now, 2026-10-16]: it decides who can see you **and** whose profiles you see.
+1. **Audience.** Each profile chooses **genders** and an **age range** (18 to 99). That choice is used **both ways** (decided 2026-10-20: one setting): it decides who can see you **and** whose profiles you see. The age range can widen automatically (8.1).
 2. **Two people see each other only when each is inside the other's audience** (gender and age).
-3. **Orientation** is stored and shown on profiles but is **not used** to decide who sees whom [Not built as a filter].
+3. **Orientation** is optional and **private**: it is never shown to anyone and is **not used** to decide who sees whom (decided 2026-10-20 for the beta). The **goal** is private too and does not change who sees whom.
 4. **Blocks** hide people from each other in both directions, always.
 5. **Opening someone's profile page** (from the Inbox, a chat or your given list) is allowed when: you can see each other under rule 2, **or** you have already exchanged a perspective, **or** you are connected. Otherwise: "This profile is not available." You cannot open your own profile this way, a blocked person's, or a profile that is not live.
 6. A **give-back** is always allowed even outside your audience: if someone gave you a perspective, you can give them one back even if they are outside your audience. (This is how someone can accept a connect request from a person outside their own audience.)
 7. **Muting** someone does not exist yet [Not built].
-8. **What others can see on a profile:** name, age, gender, height, orientation, city, pronouns, relationship intention [Conflict], interests, daily rhythm, social energy, personality answers, the verified badge, and posts. **Never:** email, birthday, audience settings, the dealbreaker switch, the selfie, account status.
+8. **What others can see on a profile:** name, age, gender, height, city, pronouns, interests, daily rhythm, social energy, personality answers, the verified badge, and posts. **Never:** email, birthday, orientation, the goal, audience settings, the selfie, account status, notices.
+
+### 8.1 Automatic age widening [Built, decided 2026-10-20]
+Code: `apps/api/src/domain/widening.ts`, `daily/daily.service.ts` (`widenIfNeeded`).
+1. **When:** on a person's first visit of the day, while their daily set is being built, if **fewer than 6 people** could be put into their set (the point where the set would be 1 or 0; setting `POOL_PARTIAL_AT`).
+2. **How:** the age range widens **2 years at each end** at a time, up to **4 years beyond the range they chose** at each end, **never below 18** (and never above 99). **Genders are never changed.** Example: chosen 22 to 26 → 20 to 28 → 18 to 30 at most.
+3. **Only useful steps are kept:** the server tries the steps in order and keeps the widest one that actually brought in more people, stopping as soon as 6 or more are available. If widening would bring in nobody, nothing changes and no notice is sent.
+4. **It is saved:** the wider range becomes the range in use (it is what the audience screen shows and it works both ways, like any audience). The range the person chose is remembered separately, so the limit of 4 years is always counted from their own choice. There is no undo button; the person changes it back in their audience settings if they want.
+5. **It can continue on later days** (one check per day, plus the check when they save a new audience, see below) until it reaches the limit.
+6. **When someone saves a new audience during the day** [Built, decided 2026-10-20], today's set follows it:
+   - **No daily set yet today:** nothing to change; the first visit builds it from the new audience.
+   - **Nothing given yet:** the whole set is thrown away and rebuilt from the new audience, with the count (1 to 3) and the widening check done again.
+   - **Part of the set given:** what was given stays, and the number they owe stays the same. The age range may widen. Waiting slots that the new audience excludes are replaced the next time they would be shown; if nobody is left to replace them, the number owed shrinks, as with a skipped profile.
+   - **Set finished:** nothing is rebuilt and they stay unlocked. The age range may widen, and the profiles after the set are always picked from the current audience.
+   - People already given to or skipped today are never put back into a rebuilt set.
+7. **The person is told:** a notice "We widened your age range to 20–28" explaining that very few people fit the range they chose, that gender is never changed, and that they can set it back, with a button to the audience settings. At most one widening notice per day.
+
+### 8.2 Notices [Built, decided 2026-10-20]
+Code: `apps/api/src/notices/*`, `apps/mobile/app/me/notices.tsx`.
+- **You → Notices** lists the latest 50 notices, newest first, each with how long ago it came. New ones have a dot, and the You button shows "Notices (N new)".
+- Opening the list marks everything as read.
+- Today the only kind is the age-widening notice (8.1). Hold, ban and weak-giver notices come with the next steps [Not built].
+- Notices are private to their owner. There are no push notifications [Not built].
 
 ---
 
@@ -306,12 +343,12 @@ On each profile, a person gives a perspective on **one specific post** by tappin
 "Today" is the calendar date in `APP_TIMEZONE` (India time by default), decided by the server's clock. At midnight in that timezone the day changes and a fresh set is made on the person's first visit.
 
 ### 9.3 Building today's set (first visit of the day)
-1. The server finds everyone **eligible** for this viewer (9.4).
+1. The server finds everyone **eligible** for this viewer (9.4). It then decides **who the set is drawn from** (fresh people first, 9.9): only people you never gave a perspective to while at least 6 of them could be put into a set, otherwise those plus people you gave to before who still have a post to answer. If fewer than 6 people are in that pool, the viewer's age range may widen first (8.1), and the set is built from the wider range.
 2. **Who can be put into a set at all:** eligible people who
    - have **opened the app in the last 7 days** (today or the 7 days before; "opened" means they opened Explore or the Inbox, which the app does as soon as it starts; an account under 48 hours old counts as active),
    - have **not already received 10 perspectives today** (the soft limit: they can still receive perspectives people choose to give, and give-backs always work),
    - and were **not reported by 2 or more different people** in the last 30 days (9.5).
-3. **How many you must give (the count):** from how many people could be put into your set right now: **3** when 15 or more, **2** when 6 to 14, **1** when 1 to 5, and **0** when nobody (you are unlocked straight away).
+3. **How many you must give (the count):** from how many people in that pool could be put into your set right now: **3** when 15 or more, **2** when 6 to 14, **1** when 1 to 5, and **0** when nobody (you are unlocked straight away).
 4. **The boost slot (at most 1):** someone who can be put into a set **and** opened the app in the last 3 days (or is under 48 hours old) **and received no perspectives in the last 3 days**, and is in fewer than 6 daily sets today. From those, the app takes the ones in the fewest sets today (and anyone just one above them), at most 5, and picks one **at random**, giving someone who shares more of your interests a somewhat higher chance (at most about 3 to 1). The random pick is fixed per person per day: opening the app again gives the same pick. **If nobody qualifies, there is no boost slot**: every slot is a best match.
 5. **The other slots:** the people with the **highest scores** (9.5), skipping anyone already in 6 daily sets today unless nobody else is left.
 6. If fewer people are available than the count, the set is smaller and the requirement is that smaller number.
@@ -323,24 +360,25 @@ All must be true:
 1. Active account, not you, **live** profile.
 2. Their gender is one you chose, and **you are both inside each other's audience** (gender and age).
 3. Not blocked either way.
-4. Not already in today's set, not given to **today**, and not skipped in the last **7 days**.
+4. Not already in today's set, not given to **today**, and not skipped in the last **2 days**.
 5. They have **at least one active post you have not answered**.
 6. They have not reached the optional hard received cap (not set: the product has no hard cap).
 
-The relationship-goal "dealbreaker" no longer hides anyone (removed from matching 2026-10-20; the question itself is still asked in onboarding until the next round).
+The old relationship-goal "dealbreaker" is gone: it hid nobody from step 1 and the question was removed in step 2 (2026-10-20). The goal and orientation do not affect eligibility.
 
 ### 9.5 How people are ranked (for set slots and the profiles after the set)
-Score = **0.45 × shared interests + 0.20 × need + 0.15 × recently active + 0.10 × new member + 0.10 × giving quality − report penalty.** Weights are server settings (`RANK_WEIGHT_*`), to be tuned with the simulator and the beta.
+Score = **0.45 × shared interests + 0.20 × need + 0.15 × recently active + 0.10 × new member + 0.10 × giving quality + 0.10 × fresh − report penalty.** Weights are server settings (`RANK_WEIGHT_*`), to be tuned with the simulator and the beta.
 - **Shared interests** (0 to 1): the interests you both picked, divided by all the interests either of you picked. 0.5 when either of you picked none.
 - **Need:** 1 divided by (1 + perspectives received in the last 3 days + daily sets they are already in today). Fewer means higher.
 - **Recently active:** opened the app today or yesterday 1.0; 2 to 3 days ago 0.5; 4 to 7 days ago 0.2; longer 0. A new account (under 48 hours) counts as today.
 - **New member:** 1.0 during the first 7 days of their profile, then 0.
 - **Giving quality:** how often owners marked this person's own perspectives helpful, starting neutral: (helpful marks + 2.5) divided by (all helpful/not-helpful marks + 5). With no marks it is 0.5; it only moves away from 0.5 as marks build up.
+- **Fresh:** 1.0 when you never gave this person a perspective, else 0. It is a small head start (worth about the same as a third of a point of shared interests), so a clearly better older match can still come first. It only matters when seen-before people are in the pool (9.9).
 - **Report penalty:** 0.1 for each **different person** who reported them in the last 30 days, up to 5 people. Reports on their **profile, posts, perspectives or messages** all count, each reporter once. Reports a reviewer marked as allowed, and reports whose reporter deleted their account, do not count.
 - **Not used:** daily rhythm, social energy, relationship goals, orientation, post categories, or any attractiveness or popularity score.
 
 ### 9.6 Skipping
-Tapping X on a profile: the skip is recorded privately (the other person is never told), the profile is hidden for **7 days**, and:
+Tapping X on a profile: the skip is recorded privately (the other person is never told), the profile is hidden for **2 days** (48 hours from the skip; a skipped person who you never gave to counts as fresh again afterwards), and:
 - If it was one of today's set, it is **replaced** by another person in the same kind of slot (a boost slot gets another qualifying person, chosen as in 9.3; a normal slot gets the next best). If nobody qualifies for a boost slot, it is refilled as a normal slot.
 - If **no replacement exists**, today's requirement drops by 1 (never below what you already gave), and if you have now given enough, you unlock.
 
@@ -348,10 +386,17 @@ Tapping X on a profile: the skip is recorded privately (the other person is neve
 Every time the next profile in the set is about to be shown, the server re-checks it. If that person has since been blocked, gone offline, has no unanswered post left, has been reported by 2 or more different people, has not opened the app for 7 days, or has reached 10 perspectives today, the slot is quietly **replaced** (or the requirement shrinks).
 
 ### 9.8 After the set
-After the set, you get **5 more profiles** when 15 or more people are left for you that day, **4** when 6 to 14 are left, and when fewer than 6 are left, as many as are left up to 3. Each profile you give to or skip counts. They are the best matches (9.5), except the **last one of the day, which is a random "discovery" pick** (fixed for that day). These can include people who would not be put into a set (for example someone who has not opened the app for a while, or someone with 10 perspectives today). Random picks never appear in the daily set. A paid option for more is a later idea, not built.
+After the set (drawn from the same fresh-first pool, 9.9), you get **5 more profiles** when 15 or more people are left for you that day, **4** when 6 to 14 are left, and when fewer than 6 are left, as many as are left up to 3. Each profile you give to or skip counts. They are the best matches (9.5), except the **last one of the day, which is a random "discovery" pick** (fixed for that day). These can include people who would not be put into a set (for example someone who has not opened the app for a while, or someone with 10 perspectives today). Random picks never appear in the daily set. A paid option for more is a later idea, not built.
 
-### 9.9 Returning profiles
-Someone you gave a perspective to can reappear **on a later day** only while they still have a post you have not answered, and then only the unanswered posts show. If you answered all their posts, they never reappear.
+### 9.9 Fresh people first, returning profiles [Built, decided 2026-10-20]
+Code: `domain/assignment.ts` (`freshFirstPool`), `daily/daily.service.ts` (`freshFirst`), `explore/explore.service.ts`.
+- **Fresh** means you never gave that person a perspective. **Returning** means you gave to them on an earlier day and they still have a post you have not answered.
+- **While at least 6 fresh people are left**, both the daily set and the profiles after it are drawn from fresh people only. Someone seen before does not appear, however good the match.
+- **When fewer than 6 fresh people are left**, returning people join the same pool and the best score wins across everyone. Example: 4 fresh and 10 returning make a pool of 14, so a set of 2 and 4 more after it. Fresh people still get the small head start in the score (9.5), so a clearly better older match can come first.
+- **The count and the widening check use this pool.** Widening (8.1) happens only when the pool, with returning people included once they join, is under 6.
+- **Returning profiles show only the posts you have not answered.** If you answered all their posts, they never reappear.
+- **It stays steady through the day:** fresh people you already used up today still count towards the "6 left" check, so the allowance does not jump around while you scroll.
+- In the after-set count, the 6 is checked against fresh people left for that stage of the day (after the daily set was taken out).
 
 ### 9.10 Unlocking
 The set unlocks the moment you have given a perspective to **every person currently required**. Only perspectives given to people **in your set** count toward the set; giving to a profile after the set does not.
@@ -570,7 +615,7 @@ There is **no waiting period** and no way back [Placeholder: a grace period is p
 5. **Passwords** are stored as salted scrypt hashes, compared in constant time.
 6. **Tokens:** short access token plus single-use rotating refresh token (section 4). On phones they live in the secure keychain/keystore; in the web preview, in the browser's storage.
 7. **Photo and voice links** expire after 1 hour and cannot be guessed or altered.
-8. **Never in what other people see:** email, birthday, exact location (we only store a city name typed by the person), audience settings, the dealbreaker switch, the selfie, account status, moderation notes.
+8. **Never in what other people see:** email, birthday, exact location (we only store a city name typed by the person), orientation, the goal, audience settings, the selfie, account status, notices, moderation notes. There are no analytics events today, so orientation cannot leak there; when analytics are added it must stay out (`docs/BETA_PLAN.md`).
 9. **Rate limits: none** [Not built]. **CORS** (which websites may call the server) is open to all [Not built: to be restricted].
 10. **What is logged:** request ids and errors; the code is written not to log tokens, passwords or message and perspective text.
 
@@ -582,15 +627,15 @@ There is **no waiting period** and no way back [Placeholder: a grace period is p
 
 | Person | Email | About |
 |---|---|---|
-| Ravi | ravi@perspective.test | Man, 24, Bengaluru; audience: women 18 to 30; 3 posts (style, fitness, voice) |
-| Meera | meera@perspective.test | Woman, 23, Bengaluru; audience: men 21 to 32 |
-| Asha | asha@perspective.test | Woman (bisexual), 26, Mumbai; audience: men and women 22 to 35 |
-| Kabir | kabir@perspective.test | Man, 28, Bengaluru; audience: women 21 to 35 |
-| Nisha | nisha@perspective.test | Woman, 22, Delhi; audience: men 18 to 28 |
-| Priya | priya@perspective.test | Woman, 25, Bengaluru; audience: men 21 to 35 |
-| Arjun | arjun@perspective.test | Man (gay), 30, Bengaluru; audience: men 24 to 40 |
+| Ravi | ravi@perspective.test | Man, 24, Bengaluru; goal: meet; audience: women 18 to 30; 3 posts (style, fitness, voice) |
+| Meera | meera@perspective.test | Woman, 23, Bengaluru; goal: both; audience: men 21 to 32 |
+| Asha | asha@perspective.test | Woman (bisexual, private), 26, Mumbai; goal: perspectives; audience: men and women 22 to 35 |
+| Kabir | kabir@perspective.test | Man, 28, Bengaluru; goal: meet; audience: women 21 to 35 |
+| Nisha | nisha@perspective.test | Woman, 22, Delhi; goal: both; audience: men 18 to 28 |
+| Priya | priya@perspective.test | Woman, 25, Bengaluru; goal: perspectives; audience: men 21 to 35 |
+| Arjun | arjun@perspective.test | Man (gay, private), 30, Bengaluru; goal: meet; audience: men 24 to 40 |
 
-Seed state: everyone "opened the app" yesterday (so they count as active). With 4 women in his audience, Ravi's daily set is **1** profile, then 3 more after it. Ravi starts with yesterday's perspectives already visible, one more perspective that is locked until he finishes today's set, a pending connect request from Priya, and a connection with Asha (connected 2 hours ago, with two messages). Photos are generated color gradients, not real people.
+Seed state: everyone "opened the app" yesterday (so they count as active). With only the seed people, widening never triggers for them (a wider range brings in nobody new); accounts you created yourself in the local database can change that. With 4 women in his audience, Ravi's daily set is **1** profile, then 3 more after it. Ravi starts with yesterday's perspectives already visible, one more perspective that is locked until he finishes today's set, a pending connect request from Priya, and a connection with Asha (connected 2 hours ago, with two messages). Photos are generated color gradients, not real people.
 
 **Development-only shortcuts** (all off in a release build):
 - If no sign-in is saved, the app **signs in as Ravi automatically** (it calls the local server).
@@ -624,20 +669,16 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 - Terms, privacy and guidelines screens; data download.
 - Dark mode; an accessibility review; Android has not been tried.
 - Payments.
-- The private goal question, the goal-worded audience step, and automatic age widening (decided 2026-10-20).
-- An in-app notices list (for widening, weak-giver tips, holds and bans).
+- Notices for holds, bans and weak-giver tips (the list exists; only the widening notice is built).
 - Holds, temporary and permanent bans, the ban screen, appeals, and the separate admin dashboard (decided 2026-10-20, `docs/SECURITY.md`).
 - The weak-giver loop (notice, fewer new members, review).
 
-**Conflicts with the product rules** (code vs `docs/PRODUCT.md`). On 2026-10-20 the product owner decided the beta model (ADR-018), so most of these are now **decided but not built yet**:
-1. **Relationship goals are still asked and shown on profiles.** Every profile shows a "dating intention" and onboarding still asks for it and the dealbreaker switch. Since 2026-10-20 neither is used for matching any more (the dealbreaker hides nobody). *Decided, next round:* replace them with a private goal question (Get perspectives / Meet new people).
-2. **Orientation is required and shown on profiles.** *Decided:* optional, private, not used for matching during the beta.
-3. **Reports:** a person reported by 3 different people is not put on hold, and a single serious report does nothing automatic (decided: holds and a serious-report fast path). There is no admin review, ban or appeal (not built). Reports on posts, perspectives and messages now count (built 2026-10-20).
-4. **Automatic age widening and the in-app notices list** are decided but not built, so a very narrow audience can still leave someone with nobody to see.
-5. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
-6. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
-7. **The report confirmation promises to hide the content**, but the server does not.
-8. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
+**Conflicts with the product rules** (code vs `docs/PRODUCT.md`). On 2026-10-20 the product owner decided the beta model (ADR-018); steps 1 and 2 are built, so what is left here is **decided but not built yet**, or still open:
+1. **Reports:** a person reported by 3 different people is not put on hold, and a single serious report does nothing automatic (decided: holds and a serious-report fast path). There is no admin review, ban or appeal (not built). Reports on posts, perspectives and messages now count (built 2026-10-20).
+2. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
+3. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
+4. **The report confirmation promises to hide the content**, but the server does not.
+5. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
 
 ---
 
@@ -676,13 +717,29 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 Only one thing runs by itself:
 - **Every 15 minutes** (setting `EXPIRY_SWEEP_MINUTES`; 0 turns it off) the server closes quiet connections that are overdue (section 13.4). It runs inside the API process. With several servers each would run it, which is harmless.
 
-Everything else happens when someone does something: the daily set is built on a person's first visit of the day; locked items reveal when the set is finished; quiet connections are also checked whenever they are read.
+Everything else happens when someone does something: the daily set is built on a person's first visit of the day (and the age range widens then, if needed, section 8.1); locked items reveal when the set is finished; quiet connections are also checked whenever they are read.
 
 ---
 
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-20: fresh people first, and skips hidden for 2 days
+- **Fresh people first.** The daily set and the profiles after it come from people you never gave a perspective to while at least 6 are left. Below 6, people you gave to before (with a post still to answer) join, and the set size follows the combined pool.
+- **A small head start in the score for fresh people** (new `RANK_WEIGHT_FRESH`, 0.10), so a clearly better older match can still come first.
+- **A skipped profile stays hidden for 2 days** (was 7).
+- (Sections 2, 9.3, 9.4, 9.5, 9.6, 9.8, 9.9; `docs/PRODUCT.md`; ADR-018.)
+
+### 2026-10-20: beta step 2, the goal, the audience step, private orientation, widening and notices
+- **New onboarding step: the goal** ("Get perspectives", "Meet new people", or both). Private, required to go live, changeable under You. It does not change matching in the beta (decided 2026-10-20).
+- **The audience step is worded by the goal** ("Whose perspectives do you want?", "Who would you like to meet?", "Who do you want in your feed?"). Perspectives-only starts with every gender ticked and a hint that more people bring more perspectives.
+- **Orientation is optional and private:** no longer required, no longer shown on profiles, never used for matching.
+- **The dating intention and its dealbreaker are gone** from onboarding, profiles and the server's answers (the old saved values stay in the database, unused).
+- **Automatic age widening:** when fewer than 6 people are available, 2 years at each end at a time, at most 4 beyond the chosen range, never below 18, never by gender; only steps that bring in more people are kept; saved, with a notice.
+- **Notices list** under You, with a "new" count; opening it marks them read.
+- **Changing the audience during the day updates today's set** (see 8.1 point 6): rebuilt if nothing was given, otherwise given work is kept and waiting slots follow the new audience. Explore also refreshes straight after saving (before, the old card could stay on screen).
+- Onboarding now has 7 steps. Profiles made earlier stay live until their next change, then ask for the goal. (Sections 1, 2, 5, 8, 9.3, 9.4, 15, 16, 17, 19; ADR-018; database: new `goals` and chosen-range columns and a `notices` table.)
 
 ### 2026-10-20: beta step 1, the daily set and ranking
 - **Daily set of 1, 2 or 3** by how many people could be put into it (15 or more: 3; 6 to 14: 2; 1 to 5: 1; none: unlocked straight away).

@@ -12,7 +12,8 @@ import { computeCompatibility } from '../domain/ranking';
 
 /**
  * Explore shows one profile at a time: first today's mandatory set, then 4 to 5 more profiles
- * (fewer when the pool is small), the last being a random discovery pick. No infinite scroll.
+ * (fewer when the pool is small), the last being a random discovery pick. Fresh people come first;
+ * people already given to join only when fewer than 6 fresh ones are left. No infinite scroll yet.
  */
 @Injectable()
 export class ExploreService {
@@ -40,8 +41,13 @@ export class ExploreService {
     // After the set: 5 more at 15+ people left, 4 at 6 to 14, fewer below; the last one is a random discovery pick.
     const viewer = await this.social.person(viewerId);
     if (!viewer) throw new AppException('UNAUTHORIZED', 'Please sign in.');
-    const pool = await this.candidates.eligible(viewer, await this.daily.excludedToday(viewerId, now), now);
-    const used = await this.daily.afterSetActionsToday(viewerId, now);
+    const { used, usedFresh } = await this.daily.afterSetUsage(viewerId, now);
+    // Fresh people first; returning people (with a post still to answer) join when fewer than 6 fresh are left.
+    const pool = this.daily.freshFirst(
+      await this.candidates.eligible(viewer, await this.daily.excludedToday(viewerId, now), now),
+      undefined,
+      usedFresh,
+    );
     const left = Math.max(0, bonusCount(pool.length + used, this.daily.thresholds()) - used);
     const next = pickAfterSetProfile(pool, left, `${viewerId}:${daily.dayKey}`);
     return {

@@ -84,4 +84,4 @@ Only `EXPO_PUBLIC_*` may enter the mobile bundle, and none may be secret. Server
 | MEDIA_SIGNING_SECRET | api | Yes | signs short-lived media URLs |
 | MEDIA_STORAGE_DIR | api | No | development media storage folder |
 | TEST_DATABASE_URL | api tests | Yes | database truncated by e2e tests |
-| APP_TIMEZONE, DAILY_MANDATORY_COUNT, POOL_FULL_AT, POOL_PARTIAL_AT, CONNECT_DECLINE_COOLDOWN_DAYS, MAX_CONNECT_REQUESTS_PER_DAY, MAX_PERSPECTIVES_RECEIVED_PER_DAY, RECEIVED_SOFT_LIMIT_PER_DAY, MANDATORY_INACTIVE_DAYS, SKIP_HIDE_DAYS, BOOST_*, REPORT_*, RANK_WEIGHT_*, quiet-connection values | api | No | product configuration (see `.env.example` for every value and default); an empty cap means unlimited |
+| APP_TIMEZONE, DAILY_MANDATORY_COUNT, POOL_FULL_AT, POOL_PARTIAL_AT, AUDIENCE_WIDEN_*, CONNECT_DECLINE_COOLDOWN_DAYS, MAX_CONNECT_REQUESTS_PER_DAY, MAX_PERSPECTIVES_RECEIVED_PER_DAY, RECEIVED_SOFT_LIMIT_PER_DAY, MANDATORY_INACTIVE_DAYS, SKIP_HIDE_DAYS, BOOST_*, REPORT_*, RANK_WEIGHT_*, quiet-connection values | api | No | product configuration (see `.env.example` for every value and default); an empty cap means unlimited |

@@ -9,8 +9,25 @@ describe('Mobile Onboarding Store & Navigation State', () => {
     const state = useOnboardingStore.getState();
     expect(state.stepIndex).toBe(0);
     expect(state.selectedInterests).toEqual([]);
-    expect(state.datingIntention).toBe('long_term_open');
-    expect(state.intentionDealbreaker).toBe(false);
+    expect(state.goals).toEqual([]);
+    // Orientation is optional and private (decided 2026-10-20): nothing is pre-selected.
+    expect(state.orientation).toBeNull();
+    expect(state).not.toHaveProperty('datingIntention');
+  });
+
+  it('starts a perspectives-only audience with every gender selected, unless the person already chose', () => {
+    useOnboardingStore.getState().setGoals(['get_perspectives']);
+    expect(useOnboardingStore.getState().audienceGenders).toEqual(['woman', 'man', 'non_binary']);
+
+    useOnboardingStore.getState().reset();
+    useOnboardingStore.getState().setGoals(['meet_people']);
+    expect(useOnboardingStore.getState().audienceGenders).toEqual(['woman']);
+
+    useOnboardingStore.getState().reset();
+    useOnboardingStore.getState().setField('audienceGenders', ['man']);
+    useOnboardingStore.getState().setField('audienceTouched', true);
+    useOnboardingStore.getState().setGoals(['get_perspectives']);
+    expect(useOnboardingStore.getState().audienceGenders).toEqual(['man']);
   });
 
   it('progresses forward and preserves answers when navigating backward', () => {
@@ -25,19 +42,17 @@ describe('Mobile Onboarding Store & Navigation State', () => {
     expect(useOnboardingStore.getState().stepIndex).toBe(1);
     expect(useOnboardingStore.getState().displayName).toBe('Maya');
 
-    // Fill Step 1: Intentions
-    useOnboardingStore.getState().setField('datingIntention', 'long_term');
-    useOnboardingStore.getState().setField('intentionDealbreaker', true);
+    // Fill Step 1: Goal
+    useOnboardingStore.getState().setGoals(['get_perspectives', 'meet_people']);
     useOnboardingStore.getState().setStepIndex(2);
 
     expect(useOnboardingStore.getState().stepIndex).toBe(2);
-    expect(useOnboardingStore.getState().datingIntention).toBe('long_term');
-    expect(useOnboardingStore.getState().intentionDealbreaker).toBe(true);
+    expect(useOnboardingStore.getState().goals).toEqual(['get_perspectives', 'meet_people']);
 
     // Navigate back to Step 0
     useOnboardingStore.getState().setStepIndex(0);
     expect(useOnboardingStore.getState().displayName).toBe('Maya');
-    expect(useOnboardingStore.getState().datingIntention).toBe('long_term');
+    expect(useOnboardingStore.getState().goals).toEqual(['get_perspectives', 'meet_people']);
   });
 
   it('stores selected interests and enforces state consistency', () => {
@@ -53,7 +68,7 @@ describe('Mobile Onboarding Store & Navigation State', () => {
 
     // Check bound clamp
     store.setStepIndex(10);
-    expect(useOnboardingStore.getState().stepIndex).toBe(5); // clamped to max step 5
+    expect(useOnboardingStore.getState().stepIndex).toBe(6); // clamped to the last step (review)
 
     store.setStepIndex(-2);
     expect(useOnboardingStore.getState().stepIndex).toBe(0); // clamped to min step 0

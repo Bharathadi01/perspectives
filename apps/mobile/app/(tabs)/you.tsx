@@ -10,13 +10,14 @@ import { ErrorState, LoadingState } from '../../src/components/ui/States';
 import { Label, Muted, Title } from '../../src/components/ui/Text';
 import { TextField } from '../../src/components/ui/TextField';
 import { useToast } from '../../src/components/ui/Toast';
-import { useDeleteAccount, useLogOut, useMe } from '../../src/features/hooks';
+import { useDeleteAccount, useLogOut, useMe, useNotices } from '../../src/features/hooks';
 import { errorMessage } from '../../src/lib/errors';
+import { audienceQuestion } from '../../src/lib/labels';
 import { theme } from '../../src/theme';
 
 /** How others see you. Only a live profile has every basic set. */
 function asPublic(me: MyProfile): PublicProfile | null {
-  if (!me.displayName || !me.gender || !me.heightCm || !me.orientation || !me.city) return null;
+  if (!me.displayName || !me.gender || !me.heightCm || !me.city) return null;
   return {
     id: me.id,
     displayName: me.displayName,
@@ -24,10 +25,8 @@ function asPublic(me: MyProfile): PublicProfile | null {
     age: me.age,
     gender: me.gender,
     heightCm: me.heightCm,
-    orientation: me.orientation,
     city: me.city,
     verified: me.selfieStatus === 'verified',
-    datingIntention: me.datingIntention,
     interests: me.interests ?? [],
     lifestylePace: me.lifestylePace,
     socialPreference: me.socialPreference,
@@ -38,6 +37,7 @@ function asPublic(me: MyProfile): PublicProfile | null {
 
 export default function You() {
   const me = useMe();
+  const notices = useNotices();
   const logOut = useLogOut();
   const del = useDeleteAccount();
   const toast = useToast();
@@ -48,6 +48,7 @@ export default function You() {
   if (me.isLoading) return <LoadingState />;
   if (me.isError || !me.data) return <ErrorState error={me.error} onRetry={() => void me.refetch()} />;
   const profile = asPublic(me.data);
+  const unread = notices.data?.unreadCount ?? 0;
 
   const confirmDelete = async () => {
     try {
@@ -69,7 +70,14 @@ export default function You() {
           <Label>Profile</Label>
           <Button title="Edit Profile & Live Preview" onPress={() => router.push('/me/edit')} />
           <Button title="Edit basics" variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'basics' } })} />
-          <Button title="Who sees you" variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'audience' } })} />
+          <Button title="Your goal (private)" variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'goal' } })} />
+          <Button title={audienceQuestion(me.data.goals)} variant="secondary" onPress={() => router.push({ pathname: '/me/edit', params: { section: 'audience' } })} />
+          <Button
+            title={unread > 0 ? `Notices (${unread} new)` : 'Notices'}
+            variant="secondary"
+            accessibilityLabel={unread > 0 ? `Notices, ${unread} new` : 'Notices'}
+            onPress={() => router.push('/me/notices')}
+          />
           <Button title="Perspectives you gave" variant="secondary" onPress={() => router.push('/me/given')} />
         </View>
 

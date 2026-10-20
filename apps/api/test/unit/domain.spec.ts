@@ -2,6 +2,7 @@ import { dayKeyFor, daysBetweenKeys } from '../../src/common/day';
 import {
   mandatoryPoolSize,
   mayHoldMandatorySlot,
+  freshFirstPool,
   pickAfterSetProfile,
   pickDailySet,
   pickReplacement,
@@ -14,6 +15,7 @@ import { seededUnit, weightedPick } from '../../src/domain/random';
 import { cooldownUntil, evaluateAccept, evaluateConnect, ConnectState } from '../../src/domain/connect';
 import { bonusCount, dailyStatus, isRevealed, mandatoryCount, requiredAfterUnfilledSlot } from '../../src/domain/daily';
 import { audienceIncludes, missingRequirements, mutuallyVisible, AudiencePerson } from '../../src/domain/eligibility';
+import { needsWidening, nextWidening, WideningPolicy } from '../../src/domain/widening';
 
 describe('audience and eligibility', () => {
   const womenUnder26 = { genders: ['woman' as const], minAge: 18, maxAge: 25 };
@@ -38,24 +40,60 @@ describe('audience and eligibility', () => {
       displayName: null,
       gender: null,
       heightCm: null,
-      orientation: null,
       city: null,
+      goals: [],
       audience: { genders: [], minAge: null, maxAge: null },
       selfieVerified: false,
       hasPrimaryPhotoPost: false,
     });
-    expect(empty).toEqual(['basics', 'audience', 'selfie', 'primary_photo_post']);
+    expect(empty).toEqual(['basics', 'goal', 'audience', 'selfie', 'primary_photo_post']);
     const live = missingRequirements({
       displayName: 'Ravi',
       gender: 'man',
       heightCm: 178,
-      orientation: 'straight',
       city: 'Bengaluru',
+      goals: ['meet_people'],
       audience: womenUnder26,
       selfieVerified: true,
       hasPrimaryPhotoPost: true,
     });
+    // Orientation is optional and private (decided 2026-10-20): a profile goes live without it.
     expect(live).toEqual([]);
+  });
+});
+
+describe('automatic age widening', () => {
+  const policy: WideningPolicy = { stepYears: 2, maxYears: 4, floor: 18, ceiling: 99 };
+
+  it('widens 2 years at each end at a time, at most 4 beyond the chosen range', () => {
+    const chosen = { minAge: 22, maxAge: 26 };
+    const first = nextWidening(chosen, chosen, policy);
+    expect(first).toEqual({ minAge: 20, maxAge: 28 });
+    const second = nextWidening(chosen, first!, policy);
+    expect(second).toEqual({ minAge: 18, maxAge: 30 });
+    expect(nextWidening(chosen, second!, policy)).toBeNull();
+  });
+
+  it('never goes below 18 and keeps widening the other end', () => {
+    const chosen = { minAge: 19, maxAge: 24 };
+    expect(nextWidening(chosen, chosen, policy)).toEqual({ minAge: 18, maxAge: 26 });
+    expect(nextWidening(chosen, { minAge: 18, maxAge: 26 }, policy)).toEqual({ minAge: 18, maxAge: 28 });
+    expect(nextWidening(chosen, { minAge: 18, maxAge: 28 }, policy)).toBeNull();
+  });
+
+  it('stops at the oldest allowed age and when turned off', () => {
+    expect(nextWidening({ minAge: 18, maxAge: 99 }, { minAge: 18, maxAge: 99 }, policy)).toBeNull();
+    expect(nextWidening({ minAge: 22, maxAge: 26 }, { minAge: 22, maxAge: 26 }, { ...policy, maxYears: 0 })).toBeNull();
+  });
+
+  it('measures from the chosen range, so a range already widened only grows to the limit', () => {
+    expect(nextWidening({ minAge: 22, maxAge: 26 }, { minAge: 20, maxAge: 28 }, policy)).toEqual({ minAge: 18, maxAge: 30 });
+  });
+
+  it('widens only when fewer people than a set of 2 needs are available', () => {
+    expect(needsWidening(0, 6)).toBe(true);
+    expect(needsWidening(5, 6)).toBe(true);
+    expect(needsWidening(6, 6)).toBe(false);
   });
 });
 
@@ -300,6 +338,40 @@ describe('profiles after the set', () => {
   it('shows nothing when the allowance is used up or nobody is left', () => {
     expect(pickAfterSetProfile(pool, 0, 'v')).toBeNull();
     expect(pickAfterSetProfile([], 3, 'v')).toBeNull();
+  });
+});
+
+describe('fresh people first', () => {
+  const c = (id: string, fresh: boolean): AssignmentCandidate => ({ id, recentReceived: 0, score: 0.5, createdAt: new Date('2026-10-01'), fresh });
+  const freshOnes = (n: number) => Array.from({ length: n }, (_, i) => c(`f${i}`, true));
+  const returning = (n: number) => Array.from({ length: n }, (_, i) => c(`r${i}`, false));
+  const ids = (list: AssignmentCandidate[]) => list.map((x) => x.id);
+
+  it('uses only fresh people while at least 6 are left', () => {
+    expect(freshFirstPool([...freshOnes(12), ...returning(8)], 6)).toHaveLength(12);
+    expect(ids(freshFirstPool([...freshOnes(6), ...returning(3)], 6))).toEqual(ids(freshOnes(6)));
+  });
+
+  it('adds returning people when fewer than 6 fresh people are left (4 fresh + 10 returning = 14)', () => {
+    expect(freshFirstPool([...freshOnes(4), ...returning(10)], 6)).toHaveLength(14);
+    expect(freshFirstPool([...freshOnes(5), ...returning(1)], 6)).toHaveLength(6);
+    expect(freshFirstPool(returning(3), 6)).toHaveLength(3);
+  });
+
+  it('counts fresh people already used up today, so the choice stays steady through the day', () => {
+    expect(freshFirstPool([...freshOnes(4), ...returning(10)], 6, 2)).toHaveLength(4);
+    expect(freshFirstPool([...freshOnes(4), ...returning(10)], 6, 1)).toHaveLength(14);
+  });
+
+  it('counts only the fresh people the caller says can fill a slot', () => {
+    const pool = [...freshOnes(8), ...returning(2)];
+    const onlyFirstFour = (x: AssignmentCandidate) => ['f0', 'f1', 'f2', 'f3'].includes(x.id);
+    expect(freshFirstPool(pool, 6, 0, onlyFirstFour)).toHaveLength(10);
+  });
+
+  it('treats a candidate without the flag as fresh', () => {
+    const plain: AssignmentCandidate = { id: 'x', recentReceived: 0, score: 0.5, createdAt: new Date('2026-10-01') };
+    expect(freshFirstPool([plain, ...returning(2)], 1)).toEqual([plain]);
   });
 });
 

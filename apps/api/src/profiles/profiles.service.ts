@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { MyProfile, ProfileView, UpdateProfileInput, ageFromBirthDate } from '@perspective/contracts';
+import { Audience, MyProfile, ProfileView, UpdateProfileInput, ageFromBirthDate } from '@perspective/contracts';
 import { AppException } from '../common/app-exception';
 import { isoDate } from '../common/day';
 import { ConnectService } from '../connect/connect.service';
+import { DailyService } from '../daily/daily.service';
 import { missingRequirements, mutuallyVisible } from '../domain/eligibility';
 import { SelfieVerifier } from '../moderation/moderation';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +17,7 @@ export class ProfilesService {
     private readonly mapper: ProfileMapper,
     private readonly social: SocialService,
     private readonly connect: ConnectService,
+    private readonly daily: DailyService,
     private readonly selfieVerifier: SelfieVerifier,
   ) {}
 
@@ -34,12 +36,11 @@ export class ProfilesService {
       heightCm: p?.heightCm ?? null,
       orientation: p?.orientation ?? null,
       city: p?.city ?? null,
+      goals: p?.goals ?? [],
       audience:
         p && p.audienceGenders.length > 0 && p.audienceMinAge !== null && p.audienceMaxAge !== null
           ? { genders: p.audienceGenders, minAge: p.audienceMinAge, maxAge: p.audienceMaxAge }
           : null,
-      datingIntention: p?.datingIntention ?? null,
-      intentionDealbreaker: p?.intentionDealbreaker ?? false,
       interests: p?.interests ?? [],
       lifestylePace: p?.lifestylePace ?? null,
       socialPreference: p?.socialPreference ?? null,
@@ -58,12 +59,12 @@ export class ProfilesService {
       data: {
         ...basics,
         ...(personalityPrompts !== undefined ? { personalityPrompts: personalityPrompts as any } : {}),
-        ...(audience
-          ? { audienceGenders: audience.genders, audienceMinAge: audience.minAge, audienceMaxAge: audience.maxAge }
-          : {}),
+        ...(audience ? await this.audienceData(userId, audience) : {}),
       },
     });
     await this.recomputeLive(userId);
+    // Today's daily set follows the new audience (see DailyService.onAudienceChanged).
+    if (audience) await this.daily.onAudienceChanged(userId);
     return this.mine(userId);
   }
 
@@ -83,6 +84,26 @@ export class ProfilesService {
     ]);
     await this.recomputeLive(userId);
     return this.mine(userId);
+  }
+
+  /**
+   * A saved audience. A new age range becomes the person's chosen range (automatic widening is
+   * measured from it). Saving the range already in use, for example a widened one while changing
+   * genders, keeps the chosen range, so widening never goes more than 4 years past the choice.
+   */
+  private async audienceData(userId: string, audience: Audience) {
+    const current = await this.prisma.profile.findUnique({
+      where: { userId },
+      select: { audienceMinAge: true, audienceMaxAge: true, audienceChosenMinAge: true, audienceChosenMaxAge: true },
+    });
+    const sameRange = current?.audienceMinAge === audience.minAge && current?.audienceMaxAge === audience.maxAge;
+    const keepChosen = sameRange && current?.audienceChosenMinAge != null && current?.audienceChosenMaxAge != null;
+    return {
+      audienceGenders: audience.genders,
+      audienceMinAge: audience.minAge,
+      audienceMaxAge: audience.maxAge,
+      ...(keepChosen ? {} : { audienceChosenMinAge: audience.minAge, audienceChosenMaxAge: audience.maxAge }),
+    };
   }
 
   async recomputeLive(userId: string): Promise<void> {
@@ -119,8 +140,8 @@ export class ProfilesService {
       displayName: p?.displayName ?? null,
       gender: p?.gender ?? null,
       heightCm: p?.heightCm ?? null,
-      orientation: p?.orientation ?? null,
       city: p?.city ?? null,
+      goals: p?.goals ?? [],
       audience: {
         genders: p?.audienceGenders ?? [],
         minAge: p?.audienceMinAge ?? null,

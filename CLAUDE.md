@@ -31,7 +31,7 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Schema:** the first migration exists, so schema changes are additive forward migrations only (`jana_claude.md` rule 4.2). Never edit an applied migration.
 - **Do not reintroduce** connection intents or modes, relationship goals or dating intentions, structured responses, lens-based qualification, public scores or comments.
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
-- **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-20 all passed: 106 unit and 33 end-to-end tests.
+- **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-20 all passed: 119 unit and 46 end-to-end tests.
 
 ## Business logic document (MANDATORY after every change)
 `business-logic/BUSINESS_LOGIC.md` explains, in plain words, everything the app does today: every screen flow, rule, number, error and edge case, plus what is fake or missing. The product owner reads it to know what is happening instead of asking.

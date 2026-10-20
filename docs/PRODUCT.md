@@ -34,7 +34,7 @@ Perspective is a dating app at its core, with one unique hook: perspectives. Peo
 **Profile basics shown to givers:** age (or age band), height, city-level location, gender, and the verification badge. Givers need this context to give a useful perspective. The exact birthday and precise location are never shown.
 
 **Private answers, never shown to anyone (decided 2026-10-20):**
-- **Goal:** Get perspectives and/or Meet new people. It replaces the earlier "dating intention" question and its dealbreaker, which are removed.
+- **Goal:** Get perspectives and/or Meet new people. It replaces the earlier "dating intention" question and its dealbreaker, which are removed. *Detail (decided 2026-10-20):* during the beta the goal does not change matching; it words the audience question and is used for the beta measurements.
 - **Orientation:** optional. During the beta it is collected only to learn how people use the app (see `BETA_PLAN.md`); it is not used for matching and is not shown. It is sensitive personal data and never goes into analytics events.
 - **Interests** are shown on the profile and used for matching. **Daily rhythm** and **social energy** are shown on the profile but not used for matching.
 
@@ -52,7 +52,7 @@ Perspective is a dating app at its core, with one unique hook: perspectives. Peo
 
 A separate "who I want to meet" setting, orientation-based matching, and an open perspective pool were considered and left out for the beta; the beta decides whether they are needed (`BETA_PLAN.md`).
 
-**Automatic widening (decided 2026-10-20):** when someone's audience leaves too few people, the age range widens automatically by 2 years at a time, at most 4 years beyond what the person chose, never below 18, and never by gender. The person gets a notice that names the new range and links to the setting; there is no undo button (they change it back in their profile if they want).
+**Automatic widening (decided 2026-10-20):** when someone's audience leaves too few people, the age range widens automatically by 2 years at a time, at most 4 years beyond what the person chose, never below 18, and never by gender. The person gets a notice that names the new range and links to the setting; there is no undo button (they change it back in their profile if they want). *Detail (decided 2026-10-20):* "too few people" means fewer than 6 could fill a set slot (the point where the set drops to 1); each step widens both ends by 2 years (22–26 → 20–28 → 18–30 at most). *Detail (decided 2026-10-20):* when someone saves a new audience during the day, today's set is rebuilt from it if nothing was given yet; if part was given, what was given stays and only the waiting slots follow the new audience; a finished set is left alone, and the profiles after the set always use the current audience.
 
 **Location:** ignored during the beta. Later, for people whose goal includes meeting, the city they pick comes first, then the nearest region, then the state, with a notice when the area widens. People who only want perspectives are matched regardless of location.
 
@@ -86,6 +86,7 @@ A separate "who I want to meet" setting, orientation-based matching, and an open
 No profile should be left without perspectives. A profile that gets few or none must be pushed into other people's mandatory sets so its owner gets something to read quickly. This is a retention requirement (the "my profile gets no likes" problem on other apps). The promise covers people who opened the app in the last 3 days; people who left get perspectives again when they return.
 - **Boost slot (decided 2026-10-20):** one slot goes to someone eligible for you who **opened the app in the last 3 days and received no perspectives in the last 3 days**. It is picked at random among the few who qualify, with a slight preference for shared interests, and the pick stays the same if you reopen the app that day. **If nobody qualifies, all slots are best matches.** The card never says the person has had few perspectives (that note is removed); it looks like any other profile in the set.
 - The remaining slots are the best relevance matches for you.
+- **Fresh people first (decided 2026-10-20):** people you never gave a perspective to come before people you gave to earlier. While at least 6 fresh people are left, the set and the profiles after it use fresh people only. Below 6, people you gave to before (who still have a post to answer) join the same pool, and the set size follows the combined pool (for example 4 fresh and 10 returning make 14: a set of 2 and 4 more). Fresh people also get a small head start in the ranking, so a clearly better older match can still come first.
 - **Never put into anyone's mandatory set:** someone who has not opened the app in 7 days; someone already in 6 mandatory sets today (unless nobody else is left; built 2026-10-19); someone who already received 10 perspectives today (they can still receive perspectives people choose to give, and give-backs always work); someone on hold (see Trust and safety).
 - **Narrow audience:** the audience widens automatically (see Audience).
 
@@ -149,7 +150,7 @@ Connections close on their own when they go quiet, so the list stays meaningful:
 - Marking perspectives unhelpful feeds the quality loop (decided 2026-10-20, details in Trust and safety → Weak givers). Only the reasons vague, didn't answer the question, and spam count toward it; insulting, sexual and unsafe go to the safety track. The giver never learns how anyone marked them, and no score is ever shown.
 
 ## Five tabs
-- **Explore:** one profile at a time, finite daily batch: the mandatory set, then 4 to 5 more (see Explore after the set). A profile you already gave a perspective to can come back on a later day only while it still has a post you have not answered, and then shows only those posts (decided 2026-10-18). A skipped profile stays hidden for 7 days.
+- **Explore:** one profile at a time, finite daily batch: the mandatory set, then 4 to 5 more (see Explore after the set). A profile you already gave a perspective to can come back on a later day only while it still has a post you have not answered, and then shows only those posts (decided 2026-10-18). A skipped profile stays hidden for 2 days during the beta (decided 2026-10-20).
 - **Inbox:** received perspectives and connect requests.
 - **Create:** add or edit your profile posts (up to six).
 - **Connections:** accepted connections and conversations.
@@ -210,7 +211,7 @@ Perspective lenses, response-style preferences (gentle, direct, and so on), lang
 ## Implementation assumptions (to confirm with the product owner)
 These were not decided in the product discussion. They are implemented as stated and easy to change:
 - **Lock rule:** received perspectives and connect requests stay hidden until you finish the set on the day they arrived (or a later day). Once revealed they stay visible.
-- **Numbers:** comment minimum 40 characters, up to 3 quick-pick chips, 1 to 3 focus areas per post, prompts 5 to 150 characters, a skipped profile stays hidden for 7 days, "today" is computed in Asia/Kolkata time.
+- **Numbers:** comment minimum 40 characters, up to 3 quick-pick chips, 1 to 3 focus areas per post, prompts 5 to 150 characters, a skipped profile stays hidden for 2 days, "today" is computed in Asia/Kolkata time.
 - **Option lists:** genders (woman, man, non-binary), orientations, optional and private (straight, gay, lesbian, bisexual, pansexual, queer, asexual, prefer not to say), the categories and their focus areas, hints and chips in `packages/contracts/src/post.ts`, and the conversation ideas in `packages/contracts/src/conversationIdeas.ts`.
 - **Connect edge case:** if the other person already asked you, a new request from you is refused and you are pointed to their request instead.
 - **Give-back:** you can always give a perspective back to someone who gave you one, even if they are outside your audience. This is what lets a receiver outside the asker's audience still accept. The received limit never blocks a give-back.

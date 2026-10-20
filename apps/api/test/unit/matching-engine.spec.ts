@@ -85,12 +85,29 @@ describe('ranking (beta formula)', () => {
   });
 
   describe('score', () => {
-    const neutral = { sharedInterests: 0.5, need: 0.5, recentlyActive: 0.5, newMember: 0, givingQuality: 0.5, penalties: 0 };
+    const neutral = { sharedInterests: 0.5, need: 0.5, recentlyActive: 0.5, newMember: 0, givingQuality: 0.5, fresh: 0, penalties: 0 };
 
-    it('uses the decided weights (0.45, 0.20, 0.15, 0.10, 0.10)', () => {
-      expect(DEFAULT_RANKING_WEIGHTS).toEqual({ sharedInterests: 0.45, need: 0.2, recentlyActive: 0.15, newMember: 0.1, givingQuality: 0.1 });
-      const all = rankingScore({ sharedInterests: 1, need: 1, recentlyActive: 1, newMember: 1, givingQuality: 1, penalties: 0 });
-      expect(all).toBeCloseTo(1);
+    it('uses the decided weights (0.45, 0.20, 0.15, 0.10, 0.10) plus a 0.10 head start for fresh people', () => {
+      expect(DEFAULT_RANKING_WEIGHTS).toEqual({
+        sharedInterests: 0.45,
+        need: 0.2,
+        recentlyActive: 0.15,
+        newMember: 0.1,
+        givingQuality: 0.1,
+        fresh: 0.1,
+      });
+      const base = { sharedInterests: 1, need: 1, recentlyActive: 1, newMember: 1, givingQuality: 1, penalties: 0 };
+      expect(rankingScore({ ...base, fresh: 0 })).toBeCloseTo(1);
+      expect(rankingScore({ ...base, fresh: 1 })).toBeCloseTo(1.1);
+    });
+
+    it('gives fresh people a small head start that a clearly better older match can beat', () => {
+      const fresh = rankingScore({ ...neutral, fresh: 1 });
+      expect(fresh).toBeGreaterThan(rankingScore(neutral));
+      // An older match with clearly more in common (+0.3 shared interests = +0.135) still comes first.
+      expect(rankingScore({ ...neutral, sharedInterests: 0.8, fresh: 0 })).toBeGreaterThan(fresh);
+      // A slightly better older match (+0.1 shared interests = +0.045) does not.
+      expect(rankingScore({ ...neutral, sharedInterests: 0.6, fresh: 0 })).toBeLessThan(fresh);
     });
 
     it('prefers shared interests most, then need', () => {
@@ -106,7 +123,7 @@ describe('ranking (beta formula)', () => {
     });
 
     it('accepts tuned weights from config', () => {
-      const onlyNeed = { sharedInterests: 0, need: 1, recentlyActive: 0, newMember: 0, givingQuality: 0 };
+      const onlyNeed = { sharedInterests: 0, need: 1, recentlyActive: 0, newMember: 0, givingQuality: 0, fresh: 0 };
       expect(rankingScore({ ...neutral, need: 0.25 }, onlyNeed)).toBeCloseTo(0.25);
     });
   });

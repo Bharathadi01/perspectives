@@ -40,7 +40,7 @@ Builds step 1 of `docs/BETA_PLAN.md` exactly as `docs/PRODUCT.md` (2026-10-20) d
 - [x] `pnpm test`: 106 passing (contracts 23, API 57, api-client 6, mobile 20).
 - [x] `pnpm test:e2e`: 33 passing (7 new beta-rule tests), run twice.
 - [x] Seeded database: Ravi (4 women in his audience) gets a set of 1 shown as a normal card, then 3 more profiles, then "done".
-- [ ] Not committed: waiting for the product owner's review.
+- [x] Committed locally as 8c2f77b (not pushed) before step 2, at the product owner's request; reviewed and tested together with step 2.
 
 ## 7. Potential Overlap / Conflict Warning
 `apps/api/src/domain/ranking.ts` (Bharath's matching engine replaced by the beta formula) and its tests; `daily/candidates.service.ts`; `config/app-config.ts` and `.env.example` (a key removed, defaults changed). Anyone with a local `.env` that sets `MAX_CONNECT_REQUESTS_PER_DAY=` (empty) keeps unlimited requests; remove the line or set 5.

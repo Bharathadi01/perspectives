@@ -21,6 +21,8 @@ export interface AssignmentCandidate {
   dormant?: boolean;
   /** The person already received the soft daily limit of perspectives today: no more mandatory slots today. */
   atSoftLimit?: boolean;
+  /** The viewer never gave this person a perspective (decided 2026-10-20). Missing means fresh. */
+  fresh?: boolean;
 }
 
 export type SlotKind = 'boost' | 'mandatory';
@@ -176,4 +178,21 @@ export function pickAfterSetProfile(
   if (remaining <= 0 || candidates.length === 0) return null;
   if (remaining === 1) return weightedPick(candidates, () => 1, `${seed}:discovery`);
   return [...candidates].sort(byScore)[0];
+}
+
+/**
+ * Fresh people first (decided 2026-10-20). While at least `partialAt` fresh people are left, the pool
+ * is the fresh people only. Below that, people the viewer gave to before (who still have a post to
+ * answer) join the pool, and the best score wins across everyone. `usedFresh` adds fresh people
+ * already used up today, so the choice stays steady as the day goes on; `counts` limits which fresh
+ * people count (for the daily set: those who may hold a mandatory slot).
+ */
+export function freshFirstPool<T extends AssignmentCandidate>(
+  candidates: readonly T[],
+  partialAt: number,
+  usedFresh = 0,
+  counts: (c: T) => boolean = () => true,
+): T[] {
+  const fresh = candidates.filter((c) => c.fresh !== false);
+  return fresh.filter(counts).length + usedFresh >= partialAt ? fresh : [...candidates];
 }

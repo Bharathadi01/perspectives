@@ -19,6 +19,7 @@ import {
   MediaUploadResultSchema,
   MessageSchema,
   MyProfileSchema,
+  NoticesSchema,
   PerspectiveFeedbackInput,
   PerspectiveFeedbackSchema,
   PostSchema,
@@ -241,6 +242,12 @@ export function createApiClient(options: ApiClientOptions) {
       unseen: () => call({ method: 'GET', path: '/v1/connections/unseen', schema: z.array(ConnectionSchema) }),
       markSeen: (connectionIds: string[], idempotencyKey?: string) =>
         call({ method: 'POST', path: '/v1/connections/seen', body: { connectionIds }, schema: NoContent, idempotencyKey }),
+    },
+
+    notices: {
+      list: () => call({ method: 'GET', path: '/v1/notices', schema: NoticesSchema }),
+      markAllRead: (idempotencyKey?: string) =>
+        call({ method: 'POST', path: '/v1/notices/read', schema: NoContent, idempotencyKey }),
     },
 
     safety: {

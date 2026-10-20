@@ -12,3 +12,4 @@ export * from './safety';
 export * from './interests';
 export * from './personality';
 export * from './conversationIdeas';
+export * from './notice';

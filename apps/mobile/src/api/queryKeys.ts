@@ -7,4 +7,5 @@ export const queryKeys = {
   connections: ['connections'] as const,
   unseenConnections: ['connections', 'unseen'] as const,
   messages: (connectionId: string) => ['messages', connectionId] as const,
+  notices: ['notices'] as const,
 };

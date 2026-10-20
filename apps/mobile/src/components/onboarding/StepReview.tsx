@@ -2,13 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
-  DATING_INTENTION_CONFIG,
   getInterestById,
   LIFESTYLE_PACE_LABELS,
   SOCIAL_PREFERENCE_LABELS,
 } from '@perspective/contracts';
 import { useUpdateProfile } from '../../features/hooks';
 import { errorMessage } from '../../lib/errors';
+import { GOAL_LABEL, ORIENTATION_LABEL, audienceQuestion } from '../../lib/labels';
 import { useOnboardingStore } from '../../session/onboardingStore';
 import { theme } from '../../theme';
 import { Button } from '../ui/Button';
@@ -33,8 +33,6 @@ export function StepReview({
   const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
 
-  const intentionConfig = store.datingIntention ? DATING_INTENTION_CONFIG[store.datingIntention] : null;
-
   const handleFinish = async () => {
     setSubmitting(true);
     try {
@@ -43,15 +41,14 @@ export function StepReview({
         gender: store.gender ?? undefined,
         pronouns: store.pronouns.trim() || null,
         heightCm: Number(store.heightCm),
-        orientation: store.orientation ?? undefined,
+        orientation: store.orientation,
         city: store.city.trim(),
+        goals: store.goals,
         audience: {
           genders: store.audienceGenders,
           minAge: store.audienceMinAge,
           maxAge: store.audienceMaxAge,
         },
-        datingIntention: store.datingIntention,
-        intentionDealbreaker: store.intentionDealbreaker,
         interests: store.selectedInterests,
         lifestylePace: store.lifestylePace,
         socialPreference: store.socialPreference,
@@ -102,39 +99,46 @@ export function StepReview({
         </View>
       </View>
 
-      {/* 2. Who you want to meet & Relationship Goal */}
+      {/* 2. Goal (private) and orientation (private, optional) */}
       <View style={s.reviewCard}>
         <View style={s.cardHeader}>
           <View style={s.cardHeaderLeft}>
-            <Ionicons name="heart-outline" size={20} color={theme.colors.brand} />
-            <Text style={s.cardTitle}>Dating Intentions & Audience</Text>
+            <Ionicons name="lock-closed-outline" size={20} color={theme.colors.brand} />
+            <Text style={s.cardTitle}>Your goal (private)</Text>
           </View>
           <Pressable onPress={() => onJumpToStep(1)}>
             <Text style={s.editLink}>Edit</Text>
           </Pressable>
         </View>
-
-        <View style={s.detailRow}>
-          <Text style={s.detailLabel}>Seeking:</Text>
-          <Text style={s.detailValue}>
-            {store.audienceGenders.map((g) => GENDER_LABEL[g]).join(', ')} (Ages {store.audienceMinAge}–
-            {store.audienceMaxAge})
-          </Text>
-        </View>
-
-        {intentionConfig && (
-          <View style={s.intentionRow}>
-            <View style={s.intentionPill}>
-              <Ionicons name={intentionConfig.icon as any} size={14} color={theme.colors.brand} />
-              <Text style={s.intentionPillText}>{intentionConfig.label}</Text>
+        <View style={s.chipsRow}>
+          {store.goals.map((g) => (
+            <View key={g} style={s.goalPill}>
+              <Text style={s.goalPillText}>{GOAL_LABEL[g].title}</Text>
             </View>
-            {store.intentionDealbreaker ? (
-              <Text style={s.dealbreakerFlag}>Strict Dealbreaker</Text>
-            ) : (
-              <Text style={s.flexibleFlag}>Flexible</Text>
-            )}
+          ))}
+        </View>
+        {store.orientation ? (
+          <View style={s.detailRow}>
+            <Text style={s.detailLabel}>Orientation (private):</Text>
+            <Text style={s.detailValue}>{ORIENTATION_LABEL[store.orientation]}</Text>
           </View>
-        )}
+        ) : null}
+      </View>
+
+      {/* 3. Audience, worded by the goal */}
+      <View style={s.reviewCard}>
+        <View style={s.cardHeader}>
+          <View style={s.cardHeaderLeft}>
+            <Ionicons name="people-outline" size={20} color={theme.colors.brand} />
+            <Text style={s.cardTitle}>{audienceQuestion(store.goals)}</Text>
+          </View>
+          <Pressable onPress={() => onJumpToStep(2)}>
+            <Text style={s.editLink}>Edit</Text>
+          </Pressable>
+        </View>
+        <Text style={s.detailValue}>
+          {store.audienceGenders.map((g) => GENDER_LABEL[g]).join(', ')} (Ages {store.audienceMinAge}–{store.audienceMaxAge})
+        </Text>
       </View>
 
       {/* 3. Passions & Interests */}
@@ -144,7 +148,7 @@ export function StepReview({
             <Ionicons name="sparkles-outline" size={20} color={theme.colors.brand} />
             <Text style={s.cardTitle}>Passions ({store.selectedInterests.length})</Text>
           </View>
-          <Pressable onPress={() => onJumpToStep(2)}>
+          <Pressable onPress={() => onJumpToStep(3)}>
             <Text style={s.editLink}>Edit</Text>
           </Pressable>
         </View>
@@ -172,7 +176,7 @@ export function StepReview({
               <Ionicons name="cafe-outline" size={20} color={theme.colors.brand} />
               <Text style={s.cardTitle}>Lifestyle & Rhythm</Text>
             </View>
-            <Pressable onPress={() => onJumpToStep(3)}>
+            <Pressable onPress={() => onJumpToStep(4)}>
               <Text style={s.editLink}>Edit</Text>
             </Pressable>
           </View>
@@ -204,7 +208,7 @@ export function StepReview({
               <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.colors.brand} />
               <Text style={s.cardTitle}>Perspective Prompt</Text>
             </View>
-            <Pressable onPress={() => onJumpToStep(4)}>
+            <Pressable onPress={() => onJumpToStep(5)}>
               <Text style={s.editLink}>Edit</Text>
             </Pressable>
           </View>
@@ -224,8 +228,8 @@ export function StepReview({
         <View style={s.transparencyText}>
           <Text style={s.transparencyTitle}>How Perspective Recommends People</Text>
           <Text style={s.transparencyDesc}>
-            We match you using your stated dating goals, shared passions, and respectful feedback
-            exchanges. We never rank members by popularity or vanity scores.
+            We match you mostly on shared interests, and we make sure everyone gets perspectives.
+            Your goal and orientation stay private. We never rank members by popularity or looks.
           </Text>
         </View>
       </View>
@@ -321,13 +325,7 @@ const s = StyleSheet.create({
     fontSize: theme.typography.fontSize.xs,
     color: theme.colors.ink,
   },
-  intentionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    marginTop: 2,
-  },
-  intentionPill: {
+  goalPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -336,19 +334,10 @@ const s = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: theme.radius.pill,
   },
-  intentionPillText: {
+  goalPillText: {
     fontSize: theme.typography.fontSize.xs,
     fontWeight: theme.typography.fontWeight.semibold,
     color: theme.colors.brand,
-  },
-  dealbreakerFlag: {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.brand,
-  },
-  flexibleFlag: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.muted,
   },
   chipsRow: {
     flexDirection: 'row',

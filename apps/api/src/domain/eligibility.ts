@@ -1,4 +1,4 @@
-import type { Gender, ProfileRequirement } from '@perspective/contracts';
+import type { Gender, Goal, ProfileRequirement } from '@perspective/contracts';
 
 export interface AudienceRule {
   genders: readonly Gender[];
@@ -31,17 +31,21 @@ export interface CompletenessInput {
   displayName: string | null;
   gender: Gender | null;
   heightCm: number | null;
-  orientation: string | null;
   city: string | null;
+  goals: readonly Goal[];
   audience: AudienceRule;
   selfieVerified: boolean;
   hasPrimaryPhotoPost: boolean;
 }
 
-/** What is still missing before a profile can go live. Empty means live. */
+/**
+ * What is still missing before a profile can go live. Empty means live. Orientation is optional
+ * (decided 2026-10-20); the goal is required.
+ */
 export function missingRequirements(p: CompletenessInput): ProfileRequirement[] {
   const missing: ProfileRequirement[] = [];
-  if (!p.displayName || !p.gender || !p.heightCm || !p.orientation || !p.city) missing.push('basics');
+  if (!p.displayName || !p.gender || !p.heightCm || !p.city) missing.push('basics');
+  if (p.goals.length === 0) missing.push('goal');
   if (p.audience.genders.length === 0 || p.audience.minAge === null || p.audience.maxAge === null) {
     missing.push('audience');
   }

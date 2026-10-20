@@ -225,7 +225,7 @@ describe('core loop (e2e)', () => {
     }
     res = await w.ravi.post('/v1/explore/skip', { profileId: res.body.card.profile.id }).expect(200);
     expect(res.body.daily).toMatchObject({ requiredCount: 0, unlocked: true });
-    // Everyone was skipped (hidden 7 days), so nothing is left after the set either.
+    // Everyone was skipped (hidden 2 days), so nothing is left after the set either.
     expect(res.body.card).toBeNull();
   });
 

@@ -12,6 +12,7 @@ import { ExploreModule } from './explore/explore.module';
 import { HealthController } from './health/health.controller';
 import { MediaModule } from './media/media.module';
 import { ModerationModule } from './moderation/moderation';
+import { NoticesModule } from './notices/notices.controller';
 import { PerspectivesModule } from './perspectives/perspectives.module';
 import { PrismaModule } from './prisma/prisma.service';
 import { MapperModule } from './profiles/mapper.module';
@@ -28,6 +29,7 @@ import { SocialModule } from './social/social.service';
     ModerationModule,
     MediaModule,
     MapperModule,
+    NoticesModule,
     DailyModule,
     ConnectModule,
     ProfilesModule,

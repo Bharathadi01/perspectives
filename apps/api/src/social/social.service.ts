@@ -1,5 +1,5 @@
 import { Global, Injectable, Module } from '@nestjs/common';
-import type { DatingIntention, Gender, LifestylePace, PostCategory, SocialPreference } from '@perspective/contracts';
+import type { Gender, LifestylePace, PostCategory, SocialPreference } from '@perspective/contracts';
 import { ageFromBirthDate } from '@perspective/contracts';
 import { isoDate } from '../common/day';
 import { AudiencePerson } from '../domain/eligibility';
@@ -12,8 +12,6 @@ export interface Person extends AudiencePerson {
   createdAt: Date;
   postCategories: PostCategory[];
   interests: string[];
-  datingIntention: DatingIntention | null;
-  intentionDealbreaker: boolean;
   lifestylePace: LifestylePace | null;
   socialPreference: SocialPreference | null;
   heightCm: number | null;
@@ -31,8 +29,6 @@ type PersonRow = {
     audienceMinAge: number | null;
     audienceMaxAge: number | null;
     interests: string[];
-    datingIntention: DatingIntention | null;
-    intentionDealbreaker: boolean;
     lifestylePace: LifestylePace | null;
     socialPreference: SocialPreference | null;
     heightCm: number | null;
@@ -55,8 +51,6 @@ export const PERSON_SELECT = {
       audienceMinAge: true,
       audienceMaxAge: true,
       interests: true,
-      datingIntention: true,
-      intentionDealbreaker: true,
       lifestylePace: true,
       socialPreference: true,
       heightCm: true,
@@ -83,8 +77,6 @@ export function toPerson(row: PersonRow, now: Date = new Date()): Person {
     },
     postCategories: row.posts.map((p) => p.category),
     interests: row.profile?.interests ?? [],
-    datingIntention: row.profile?.datingIntention ?? null,
-    intentionDealbreaker: row.profile?.intentionDealbreaker ?? false,
     lifestylePace: row.profile?.lifestylePace ?? null,
     socialPreference: row.profile?.socialPreference ?? null,
     heightCm: row.profile?.heightCm ?? null,

@@ -6,7 +6,10 @@ import { getInterestById } from '@perspective/contracts';
  * weight tunable in config:
  *
  *   score = 0.45 × shared interests + 0.20 × need + 0.15 × recently active
- *         + 0.10 × new member + 0.10 × giving quality − report penalty
+ *         + 0.10 × new member + 0.10 × giving quality + 0.10 × fresh − report penalty
+ *
+ * "Fresh" (decided 2026-10-20) means the viewer never gave this person a perspective. It is a small
+ * head start on top of the other weights, so a very good older match can still come first.
  *
  * Not used: daily rhythm, social energy, relationship goals, orientation, post-category overlap,
  * and any attractiveness or popularity score.
@@ -18,6 +21,7 @@ export interface RankingWeights {
   recentlyActive: number;
   newMember: number;
   givingQuality: number;
+  fresh: number;
 }
 
 export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
@@ -26,6 +30,7 @@ export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
   recentlyActive: 0.15,
   newMember: 0.1,
   givingQuality: 0.1,
+  fresh: 0.1,
 };
 
 export interface RankingFactors {
@@ -39,6 +44,8 @@ export interface RankingFactors {
   newMember: number;
   /** 0..1, how often their own perspectives were marked helpful, neutral (0.5) until there are enough marks. */
   givingQuality: number;
+  /** 1 when the viewer never gave this person a perspective, else 0. */
+  fresh: number;
   /** Subtracted: distinct people who reported them. */
   penalties: number;
 }
@@ -49,7 +56,8 @@ export function rankingScore(f: RankingFactors, w: RankingWeights = DEFAULT_RANK
     w.need * f.need +
     w.recentlyActive * f.recentlyActive +
     w.newMember * f.newMember +
-    w.givingQuality * f.givingQuality -
+    w.givingQuality * f.givingQuality +
+    w.fresh * f.fresh -
     f.penalties
   );
 }

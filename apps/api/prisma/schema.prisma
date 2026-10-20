@@ -31,6 +31,18 @@ enum Orientation {
   prefer_not_to_say
 }
 
+/// The private onboarding goal (decided 2026-10-20). A person picks one or both; never shown to anyone.
+enum ProfileGoal {
+  get_perspectives
+  meet_people
+}
+
+/// Kinds of in-app notice. Step 2 of the beta adds the automatic age widening only.
+enum NoticeKind {
+  audience_widened
+}
+
+/// Unused since 2026-10-20 (replaced by ProfileGoal). Kept because migrations are additive only.
 enum DatingIntention {
   long_term
   long_term_open
@@ -218,6 +230,7 @@ model User {
   blocksReceived    Block[]             @relation("Blocked")
   reportsFiled      Report[]
   idempotency       IdempotencyRecord[]
+  notices           Notice[]
 
   @@map("users")
 }
@@ -247,9 +260,15 @@ model Profile {
   orientation          Orientation?
   city                 String?
   pronouns             String?
+  goals                ProfileGoal[]     @default([])
   audienceGenders      Gender[]          @default([])
+  /// The age range in use for matching. Equal to the chosen range unless it was widened automatically.
   audienceMinAge       Int?
   audienceMaxAge       Int?
+  /// The age range the person last chose themselves; automatic widening is measured from it.
+  audienceChosenMinAge Int?
+  audienceChosenMaxAge Int?
+  /// Unused since 2026-10-20: the dating intention and its dealbreaker were removed (ADR-018).
   datingIntention      DatingIntention?
   intentionDealbreaker Boolean           @default(false)
   interests            String[]          @default([])
@@ -266,6 +285,22 @@ model Profile {
 
   @@index([isLive, gender])
   @@map("profiles")
+}
+
+/// The in-app notices list (You → Notices). `dedupeKey` stops the same notice being written twice.
+model Notice {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NoticeKind
+  data      Json
+  dedupeKey String
+  readAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@map("notices")
 }
 
 model Media {
