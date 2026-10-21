@@ -87,6 +87,12 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  /** Push notifications (beta step 5): `expo` sends through Expo's push service, `log` only records (tests, local). */
+  PUSH_SENDER: z.enum(['expo', 'log']).default('expo'),
+  /** Optional Expo access token, only needed if push security is turned on for the Expo project. */
+  EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+  /** Local hour (APP_TIMEZONE) after which the daily "your profiles are ready" push goes out (0 = off). */
+  PUSH_DAILY_HOUR: z.coerce.number().int().min(0).max(23).default(9),
   /** Admin sessions are short and cannot be renewed (docs/SECURITY.md). */
   ADMIN_SESSION_HOURS: z.coerce.number().positive().max(24).default(8),
   /** Optional separate secret for admin tokens; without it one is derived from JWT_ACCESS_SECRET. */

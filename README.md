@@ -67,6 +67,8 @@ pnpm dev:mobile                     # Expo; press w for web, or scan the QR code
 pnpm --filter @perspective/admin web  # admin dashboard on http://localhost:8082
 ```
 
+**Push notifications.** They only arrive in an Expo development build on a real phone: run `eas init` in `apps/mobile` once (it adds the project id to `app.json`), then `eas build --profile development` (or `npx expo run:ios` with a device attached), install it and sign in. Expo Go, the simulator and the web preview register nothing. The API sends through Expo's push service (`PUSH_SENDER=expo`); set `PUSH_SENDER=log` to only print them.
+
 **Admin sign-in.** In development, sign in on the admin page as `admin@perspective.test` / `perspective123` (created by `pnpm db:seed`; the 6-digit code is switched off for now with `ADMIN_REQUIRE_CODE=false`). Admins are not app accounts. On a real server, create one with `pnpm admin:create -- --email you@example.com` (add `--reset` for a new password and secret). It prints a password and an authenticator secret once: add the secret (or the `otpauth://` link) to an authenticator app such as Google Authenticator or 1Password, then sign in on the admin page with the email, the password and the 6-digit code.
 Seed logins: `ravi@`, `meera@`, `asha@`, `kabir@`, `nisha@`, `priya@`, `arjun@perspective.test` (password `perspective123`). Ravi starts with yesterday's perspectives visible, one locked perspective plus a connect request from Priya, and a connection with Asha.
 

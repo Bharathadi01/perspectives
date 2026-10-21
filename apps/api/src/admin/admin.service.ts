@@ -9,6 +9,7 @@ import { banEndsAt, extendedEnd, isRestricted } from '../domain/enforcement';
 import { EnforcementService } from '../enforcement/enforcement.service';
 import { NoticesService } from '../notices/notices.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 import { POST_INCLUDE, PROFILE_USER_INCLUDE, ProfileMapper } from '../profiles/profile.mapper';
 
 const QUEUE_ORDER: Record<AdminQueueReason, number> = { serious_report: 0, appeal: 1, reporters: 2, weak_giver: 3 };
@@ -25,6 +26,7 @@ export class AdminService {
     private readonly enforcement: EnforcementService,
     private readonly notices: NoticesService,
     private readonly mapper: ProfileMapper,
+    private readonly push: PushService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -148,6 +150,10 @@ export class AdminService {
         break;
     }
     await this.audit(adminId, action, userId, reason);
+    // Push G (placeholder) for bans and extensions; a restore sends its notice, which pushes itself.
+    if (action === 'ban_temporary' || action === 'ban_permanent' || action === 'extend') {
+      this.push.notify(userId, { title: 'Perspective', body: 'There’s an update about your account.', data: { screen: 'account' }, account: true });
+    }
     return this.case(adminId, userId);
   }
 
@@ -162,6 +168,7 @@ export class AdminService {
         data: { status: 'upheld', decidedAt: now, decidedBy: adminId, decisionReason: reason },
       });
       await this.audit(adminId, 'appeal_upheld', appeal.userId, reason, appealId);
+      this.push.notify(appeal.userId, { title: 'Perspective', body: 'Your appeal was reviewed.', data: { screen: 'account' }, account: true });
       return this.case(adminId, appeal.userId);
     }
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: appeal.userId }, select: { email: true } });

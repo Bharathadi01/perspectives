@@ -269,6 +269,7 @@ model User {
   bans              Ban[]
   appeals           Appeal[]
   giverQuality      GiverQuality?
+  pushTokens        PushToken[]
 
   @@map("users")
 }
@@ -663,6 +664,33 @@ model AdminAuditEntry {
   @@index([targetUserId, createdAt])
   @@index([createdAt])
   @@map("admin_audit_log")
+}
+
+/// An Expo push token for one of the person's devices (beta step 5). Disabled when Expo says the
+/// device is no longer registered; removed when they sign out on that device.
+model PushToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  platform   String
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  disabledAt DateTime?
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
+/// Pushes that must go out at most once (the daily reminder, chat warnings). No message content.
+model PushLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  dedupeKey String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@map("push_log")
 }
 
 /// Emails that cannot sign up again after a permanent ban.

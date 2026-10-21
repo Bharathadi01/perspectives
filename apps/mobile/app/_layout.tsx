@@ -6,6 +6,7 @@ import React, { useEffect } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '../src/components/ui/Toast';
+import { configurePushDisplay, usePushNavigation } from '../src/push/push';
 import { tokenStore } from '../src/session/tokenStore';
 import { useSession } from '../src/session/sessionStore';
 import { theme } from '../src/theme';
@@ -15,6 +16,8 @@ const isRestricted = (err: unknown) => err instanceof ApiError && (err.code === 
 const toBanScreen = (err: unknown) => {
   if (isRestricted(err)) router.replace('/restricted');
 };
+
+configurePushDisplay();
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: toBanScreen }),
@@ -47,6 +50,7 @@ function useBootstrapSession() {
 export default function RootLayout() {
   useBootstrapSession();
   useAppFocus();
+  usePushNavigation();
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>

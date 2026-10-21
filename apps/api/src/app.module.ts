@@ -17,6 +17,8 @@ import { ModerationModule } from './moderation/moderation';
 import { NoticesModule } from './notices/notices.controller';
 import { PerspectivesModule } from './perspectives/perspectives.module';
 import { PrismaModule } from './prisma/prisma.service';
+import { PushApiModule } from './push/push.controller';
+import { PushModule } from './push/push.service';
 import { MapperModule } from './profiles/mapper.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { SafetyModule } from './safety/safety.module';
@@ -31,6 +33,8 @@ import { SocialModule } from './social/social.service';
     ModerationModule,
     MediaModule,
     MapperModule,
+    PushModule,
+    PushApiModule,
     NoticesModule,
     EnforcementModule,
     DailyModule,

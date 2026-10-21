@@ -26,6 +26,7 @@ import {
   PerspectiveFeedbackSchema,
   PostSchema,
   ProfileViewSchema,
+  RegisterPushTokenInput,
   RestrictionSchema,
   SignUpInput,
   UpdatePostInput,
@@ -252,6 +253,14 @@ export function createApiClient(options: ApiClientOptions) {
       restriction: () => call({ method: 'GET', path: '/v1/account/restriction', schema: RestrictionSchema }),
       appeal: (input: AppealInput, idempotencyKey?: string) =>
         call({ method: 'POST', path: '/v1/account/appeal', body: input, schema: RestrictionSchema, idempotencyKey }),
+    },
+
+    /** This device's push token: registered after sign-in, removed on sign-out. */
+    push: {
+      register: (input: RegisterPushTokenInput, idempotencyKey?: string) =>
+        call({ method: 'POST', path: '/v1/me/push-tokens', body: input, schema: NoContent, idempotencyKey }),
+      remove: (token: string, idempotencyKey?: string) =>
+        call({ method: 'DELETE', path: '/v1/me/push-tokens', body: { token }, schema: NoContent, idempotencyKey }),
     },
 
     notices: {

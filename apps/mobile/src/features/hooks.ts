@@ -13,6 +13,7 @@ import type {
 import { api } from '../api/client';
 import { queryKeys } from '../api/queryKeys';
 import { useIdempotentMutation } from '../lib/useIdempotentMutation';
+import { unregisterPush } from '../push/push';
 import { useSession } from '../session/sessionStore';
 
 // ---------- session ----------
@@ -41,7 +42,10 @@ export function useLogIn() {
 export function useLogOut() {
   const setStatus = useSession((s) => s.setStatus);
   const qc = useQueryClient();
-  return useIdempotentMutation(() => api.auth.logOut(), {
+  return useIdempotentMutation(async () => {
+    await unregisterPush();
+    await api.auth.logOut();
+  }, {
     onSettled: () => {
       qc.clear();
       setStatus('signedOut');

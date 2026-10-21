@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-21 (beta step 4 built: You → Blocked people, with unblock. Step 3 earlier the same day: holds, bans, appeals, weak givers, the admin dashboard)
+**Last updated:** 2026-10-21 (beta step 5 built: push notifications with placeholder texts. Steps 3 and 4 earlier the same day)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -23,7 +23,7 @@ Tags used throughout:
 5. Setting up a profile (onboarding)
 6. Posts: photos, voice and written questions
 7. Photos and voice files
-8. Who can see whom, automatic age widening, notices
+8. Who can see whom, automatic age widening, notices, push notifications
 9. Explore and the daily set
 10. Giving a perspective
 11. The Inbox and giving feedback
@@ -93,6 +93,9 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 | `WEAK_GIVER_PENALTY` | 0.2 | How far back a weak giver is pushed in Explore (taken off their score) |
 | `MARK_FADE_DAYS` | 45 | Helpful / not-helpful marks older than this no longer count |
 | `HARSH_MARKER_SHARE`, `HARSH_MARKER_MIN_MARKS` | 0.8, 10 | Someone who marked more than 80% of what they received as not helpful (with at least 10 marks) counts half |
+| `PUSH_SENDER` | expo | `expo` sends pushes through Expo's push service; `log` only prints them (no sending) |
+| `PUSH_DAILY_HOUR` | 9 | Local hour after which the daily "your profiles are ready" push goes out (0 = off) |
+| `EXPO_ACCESS_TOKEN` | none | Only needed if push security is turned on for the Expo project |
 | `ADMIN_REQUIRE_CODE` | false | Whether admin sign-in also needs the 6-digit authenticator code. **Off for now** (product owner, 2026-10-21): password only; turn on before the beta |
 | `ADMIN_SESSION_HOURS` | 8 | How long an admin sign-in lasts (no renewal) |
 | `ADMIN_JWT_SECRET` | derived | Optional separate secret for admin tokens; without it, one is derived from the user token secret (never the same) |
@@ -334,7 +337,28 @@ Code: `apps/api/src/notices/*`, `apps/mobile/app/me/notices.tsx`.
 - **You → Notices** lists the latest 50 notices, newest first, each with how long ago it came. New ones have a dot, and the You button shows "Notices (N new)".
 - Opening the list marks everything as read.
 - Today the only kind is the age-widening notice (8.1). Hold, ban and weak-giver notices come with the next steps [Not built].
-- Notices are private to their owner. There are no push notifications [Not built].
+- Notices are private to their owner. A new notice also sends a push (8.3).
+
+### 8.3 Push notifications [Built 2026-10-21, placeholder texts]
+Code: `apps/api/src/push/*`, `apps/mobile/src/push/push.ts`. Decided 2026-10-21: every event sends a push for now, to check delivery works; the real rules come later.
+- **When the app asks:** once the person is in the main app (after onboarding), the phone asks for permission. Saying no just means no pushes.
+- **Where they work:** only in an Expo **development build on a real phone**, with the Expo project set up (`eas init`). In Expo Go, the simulator and the web preview the app quietly registers nothing [Placeholder until a development build exists].
+- **What sends a push** (texts are placeholders; none ever contains message or perspective text):
+
+| Event | Who gets it | Text |
+|---|---|---|
+| Someone asked to connect | The receiver | "Someone wants to connect with you." (no name: requests stay locked until the daily set is done) |
+| A request was accepted | The person who asked | "You and Meera are connected. Say hi!" |
+| A new message | The other person | "Meera sent you a message." |
+| Daily reminder | People with a device who opened the app in the last 7 days and not yet today, after 9:00 local time | "Your profiles for today are ready." (once a day) |
+| A new perspective | The post owner | "You got a new perspective. Finish today's set to read it." |
+| Nobody wrote for 2 days after connecting | Both | "Say hi to Meera. This connection closes soon if nobody writes." (once) |
+| Someone is waiting for a reply (24 h after the quiet person opened the chat) | The quiet person | "Meera is waiting. This connection closes in about a day if you don't reply." (once) |
+| A ban, an extension, an appeal decision, or any new notice | The person | "There's an update about your account." / "Your appeal was reviewed." / "You have a new notice." |
+
+- **Tapping a push** opens the matching screen: Explore, the Inbox, the chat, Notices or the ban screen.
+- **Suspended or banned people** only get account updates. **Signing out** removes the device, so the next person on that phone doesn't get the pushes. A device Expo says is gone is switched off.
+- Sending never slows down or blocks the action that caused it. There are no push settings in the app, no quiet hours, and no grouping yet [Not built].
 
 ---
 
@@ -723,7 +747,7 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 - Mute.
 - Using orientation to decide who sees whom.
 - Replacing a post's photo; pausing a post.
-- Push notifications, opening the app from a notification, emails.
+- Push settings in the app, quiet hours, grouping several messages into one push; emails.
 - Instant (real-time) chat, older message history, read receipts, typing signs, photos or voice in chat.
 - Before public launch (docs/SECURITY.md): rate limits on admin sign-in, allow-listing or a VPN for the admin page, a named grievance contact and response times. An admin's password can only be reset with the server command (`--reset`).
 - Rate limits, restricted CORS, hosting, backups, monitoring, analytics.
@@ -775,7 +799,8 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 
 ## 19. Automatic background work
 
-Two things run by themselves:
+Three things run by themselves:
+- **Every 15 minutes** (same setting) the server checks whether it is past 9:00 local time and sends the daily "your profiles are ready" push to whoever hasn't had it today (section 8.3).
 - **Every 15 minutes** (the same setting) the server ends temporary bans whose date has passed.
 - **Every 15 minutes** (setting `EXPIRY_SWEEP_MINUTES`; 0 turns it off) the server closes quiet connections that are overdue (section 13.4). It runs inside the API process. With several servers each would run it, which is harmless.
 
@@ -786,6 +811,10 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-21: beta step 5, push notifications (placeholder)
+- **Pushes for every event for now**, to check they work: connect requests, new connections, messages, a daily "profiles ready" reminder, new perspectives, quiet-chat nudges, and account updates and notices. No push contains message or perspective text. They need a development build on a real phone (section 8.3).
+- Signing out removes the device; banned people only get account updates. (Sections 2, 8.3, 17, 19; database: `push_tokens`, `push_log`; ADR-020.)
 
 ### 2026-10-21: beta step 4, the blocked people list
 - **You → Blocked people** lists everyone you blocked (newest first) with **Unblock** after a confirmation. Unblocking lets you see each other again where your audiences allow; the old conversation and cancelled requests stay closed. (Sections 5.4, 14.2, 17.)

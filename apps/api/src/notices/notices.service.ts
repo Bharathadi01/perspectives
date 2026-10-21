@@ -3,13 +3,17 @@ import { NoticeKind, Prisma } from '@prisma/client';
 import { Notice, Notices } from '@perspective/contracts';
 import type { AgeRange } from '../domain/widening';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 
 const LIST_LIMIT = 50;
 
 /** The in-app notices list (decided 2026-10-20). Notices are private to their owner. */
 @Injectable()
 export class NoticesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {}
 
   async list(userId: string): Promise<Notices> {
     const [rows, unreadCount] = await Promise.all([
@@ -35,7 +39,11 @@ export class NoticesService {
 
   /** Writes a notice once per `dedupeKey`. */
   async create(userId: string, kind: NoticeKind, data: Prisma.InputJsonObject, dedupeKey: string): Promise<void> {
-    await this.prisma.notice.createMany({ data: [{ userId, kind, dedupeKey, data }], skipDuplicates: true });
+    const created = await this.prisma.notice.createMany({ data: [{ userId, kind, dedupeKey, data }], skipDuplicates: true });
+    // Push G (placeholder): the notice itself stays in the app; the push only says there is one.
+    if (created.count > 0) {
+      this.push.notify(userId, { title: 'Perspective', body: 'You have a new notice.', data: { screen: 'notices' }, account: true });
+    }
   }
 
   private toDto(row: Prisma.NoticeGetPayload<object>): Notice {

@@ -12,11 +12,12 @@ This table is the single source for the stack. If README, CLAUDE.md, BLUEPRINT.m
 | Area | Built and used now | Planned (switch on by ADR when the trigger is met) |
 |---|---|---|
 | Monorepo | pnpm workspaces, TypeScript; `turbo.json` exists but scripts use `pnpm -r` | Turborepo only if build times need caching |
-| Mobile | Expo SDK 58 (React 19, React Native 0.88), Expo Router 58, expo-audio, expo-haptics, TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | Expo Development Builds before the first native feature (real selfie SDK, push) |
+| Mobile | Expo SDK 58 (React 19, React Native 0.88), Expo Router 58, expo-audio, expo-haptics, expo-notifications and expo-device (push, ADR-020), TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | Expo Development Builds, needed now to receive pushes, and for a real selfie SDK |
 | API | NestJS 10, Zod validation (no class-validator), Swagger at `/docs`, JWT + rotating refresh tokens | Rate limiting: `@nestjs/throttler` in-process first; Redis-backed only with several API instances |
 | Database | PostgreSQL 16 + Prisma 6 (Homebrew or Docker) | pgvector only after a ranking experiment |
 | Media | Local disk behind `MediaStorage`, HMAC-signed URLs | Cloudinary (ADR-003) for signed upload and EXIF stripping; S3 + CDN only if cost or control demands |
-| Jobs | None, except in-process timers every 15 minutes (`EXPIRY_SWEEP_MINUTES`): one closes quiet connections, one ends temporary bans whose date passed | pg-boss on PostgreSQL; Redis/BullMQ only at measured queue pressure |
+| Jobs | None, except in-process timers every 15 minutes (`EXPIRY_SWEEP_MINUTES`): one closes quiet connections, one ends temporary bans whose date passed, one sends the daily push |
+| Push | Expo's push service over HTTPS from the API (`PushSender`), tokens in `push_tokens` (ADR-020) | Receipt checks, quiet hours and in-app push settings | pg-boss on PostgreSQL; Redis/BullMQ only at measured queue pressure |
 | Chat | Polling (`GET /v1/connections/:id/messages` every 4 s; new connections every 15 s) | Socket.IO (or SSE) as transport; PostgreSQL stays canonical |
 | Moderation, selfie verification | Stubs (`TextModerator`, `SelfieVerifier`) | A vendor API for text and image moderation and for liveness selfie checks, rather than building ML |
 | AI service | `apps/ai-service` FastAPI skeleton, not called by anything | Activate only for Python-only models, GPU inference, or independent AI scaling |
@@ -84,4 +85,4 @@ Only `EXPO_PUBLIC_*` may enter the mobile bundle, and none may be secret. Server
 | MEDIA_SIGNING_SECRET | api | Yes | signs short-lived media URLs |
 | MEDIA_STORAGE_DIR | api | No | development media storage folder |
 | TEST_DATABASE_URL | api tests | Yes | database truncated by e2e tests |
-| APP_TIMEZONE, DAILY_MANDATORY_COUNT, POOL_FULL_AT, POOL_PARTIAL_AT, AUDIENCE_WIDEN_*, REPORT_HOLD_REPORTERS, BAN_TEMPORARY_DAYS, WEAK_GIVER_*, MARK_FADE_DAYS, HARSH_MARKER_*, ADMIN_SESSION_HOURS, ADMIN_JWT_SECRET (optional, secret), CONNECT_DECLINE_COOLDOWN_DAYS, MAX_CONNECT_REQUESTS_PER_DAY, MAX_PERSPECTIVES_RECEIVED_PER_DAY, RECEIVED_SOFT_LIMIT_PER_DAY, MANDATORY_INACTIVE_DAYS, SKIP_HIDE_DAYS, BOOST_*, REPORT_*, RANK_WEIGHT_*, quiet-connection values | api | No | product configuration (see `.env.example` for every value and default); an empty cap means unlimited |
+| APP_TIMEZONE, DAILY_MANDATORY_COUNT, POOL_FULL_AT, POOL_PARTIAL_AT, AUDIENCE_WIDEN_*, REPORT_HOLD_REPORTERS, BAN_TEMPORARY_DAYS, WEAK_GIVER_*, MARK_FADE_DAYS, HARSH_MARKER_*, ADMIN_SESSION_HOURS, ADMIN_JWT_SECRET (optional, secret), ADMIN_REQUIRE_CODE, PUSH_SENDER, PUSH_DAILY_HOUR, EXPO_ACCESS_TOKEN (optional, secret), CONNECT_DECLINE_COOLDOWN_DAYS, MAX_CONNECT_REQUESTS_PER_DAY, MAX_PERSPECTIVES_RECEIVED_PER_DAY, RECEIVED_SOFT_LIMIT_PER_DAY, MANDATORY_INACTIVE_DAYS, SKIP_HIDE_DAYS, BOOST_*, REPORT_*, RANK_WEIGHT_*, quiet-connection values | api | No | product configuration (see `.env.example` for every value and default); an empty cap means unlimited |

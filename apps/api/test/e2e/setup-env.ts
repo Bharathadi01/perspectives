@@ -16,6 +16,8 @@ process.env.MANDATORY_INACTIVE_DAYS = '7';
 process.env.POOL_FULL_AT = '15';
 process.env.POOL_PARTIAL_AT = '6';
 process.env.EXPIRY_SWEEP_MINUTES = '0';
+// Pushes are recorded, never sent to Expo, in tests.
+process.env.PUSH_SENDER = 'log';
 process.env.REOPEN_COOLDOWN_DAYS = '0';
 process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? 'test-secret-at-least-32-chars-long-1234';
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? 'test-secret-at-least-32-chars-long-5678';

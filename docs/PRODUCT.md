@@ -149,6 +149,16 @@ Connections close on their own when they go quiet, so the list stays meaningful:
 - Incoming connect requests appear with the perspective that came with them.
 - Marking perspectives unhelpful feeds the quality loop (decided 2026-10-20, details in Trust and safety → Weak givers). Only the reasons vague, didn't answer the question, and spam count toward it; insulting, sexual and unsafe go to the safety track. The giver never learns how anyone marked them, and no score is ever shown.
 
+## Push notifications (decided 2026-10-21, placeholder)
+For now every event sends a push, to check delivery works; the real rules come once most of the build is done. Pushes never contain message or perspective text.
+- Someone asked to connect (no name, since requests stay locked until the daily set is done).
+- You are connected (to the person who asked).
+- A new chat message (the sender's name only).
+- Your profiles for today are ready (once a day, mornings, if you have not opened the app yet and were active in the last week).
+- You got a new perspective (no name or text).
+- A quiet chat is about to close (the nudge and the "is waiting" warning).
+- An update about your account (ban, appeal) or a new notice.
+
 ## Five tabs
 - **Explore:** one profile at a time, finite daily batch: the mandatory set, then 4 to 5 more (see Explore after the set). A profile you already gave a perspective to can come back on a later day only while it still has a post you have not answered, and then shows only those posts (decided 2026-10-18). A skipped profile stays hidden for 2 days during the beta (decided 2026-10-20).
 - **Inbox:** received perspectives and connect requests.

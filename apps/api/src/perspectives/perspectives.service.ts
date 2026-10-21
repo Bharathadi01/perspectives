@@ -18,6 +18,7 @@ import { ConnectService } from '../connect/connect.service';
 import { CandidatesService } from '../daily/candidates.service';
 import { DailyService } from '../daily/daily.service';
 import { EnforcementService } from '../enforcement/enforcement.service';
+import { PushService } from '../push/push.service';
 import { isRevealed } from '../domain/daily';
 import { mutuallyVisible } from '../domain/eligibility';
 import { TextModerator } from '../moderation/moderation';
@@ -42,6 +43,7 @@ export class PerspectivesService {
     private readonly mapper: ProfileMapper,
     private readonly moderator: TextModerator,
     private readonly enforcement: EnforcementService,
+    private readonly push: PushService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -110,6 +112,12 @@ export class PerspectivesService {
 
     await this.daily.markGiven(viewerId, post.ownerId, now);
     const connect = input.connect ? await this.connect.tryConnect(viewerId, post.ownerId, now) : null;
+    // Push E (placeholder): never the perspective text or the giver's name (it stays locked until the set is done).
+    this.push.notify(post.ownerId, {
+      title: 'Perspective',
+      body: 'You got a new perspective. Finish today’s set to read it.',
+      data: { screen: 'inbox' },
+    });
     const ownerRow = await this.prisma.user.findUniqueOrThrow({ where: { id: post.ownerId }, include: PROFILE_USER_INCLUDE });
     return {
       perspective: {
