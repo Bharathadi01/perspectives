@@ -16,6 +16,7 @@ The core loop in `docs/PRODUCT.md` is implemented end to end (branch `feature/ja
 - **Do not reintroduce** connection intents or modes, relationship goals or dating intentions, structured responses, lens-based qualification, public scores or comments.
 - **Do not invent business rules.** If `docs/PRODUCT.md` does not decide something, stop and ask the product owner (Jana). Assumptions already made are listed in `docs/PRODUCT.md` → Implementation assumptions.
 - **Checks:** `pnpm build`, `pnpm typecheck`, `pnpm test` (unit), and `pnpm test:e2e` (needs PostgreSQL; see README). On 2026-10-20 all passed: 134 unit and 61 end-to-end tests.
+- **Beta steps 1 to 5 are built on branch `jana`** (algorithm, goal/audience/widening, holds/bans/admin dashboard, blocked list, push notifications), not yet merged to `dev`. After pulling, run `pnpm db:seed:world` in addition to `pnpm db:seed`: it adds 100 fake people set up so every rule actually happens (sets of 1/2/3, boost, widening, holds, a ban with an appeal, weak givers, fresh-first, and more). See `business-logic/TEST_WORLD.md` for who to sign in as and what to expect, and `business-logic/BUSINESS_LOGIC.md` for the full rules it is testing.
 
 ## Business logic document (MANDATORY after every change)
 `business-logic/BUSINESS_LOGIC.md` explains, in plain words, everything the app does today: every screen flow, rule, number, error and edge case, plus what is fake or missing. The product owner reads it to know what is happening instead of asking.

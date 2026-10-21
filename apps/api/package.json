@@ -12,7 +12,8 @@
     "db:seed": "ts-node --transpile-only prisma/seed.ts",
     "test": "jest --config jest.config.js",
     "test:e2e": "jest --config jest.e2e.config.js --runInBand",
-    "admin:create": "ts-node --transpile-only prisma/create-admin.ts"
+    "admin:create": "ts-node --transpile-only prisma/create-admin.ts",
+    "db:seed:world": "ts-node --transpile-only prisma/seed-world.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

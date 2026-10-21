@@ -719,6 +719,8 @@ Code: `apps/admin` (web only), `apps/api/src/admin/*`. It is **not part of the p
 
 Seed state: everyone "opened the app" yesterday (so they count as active). With only the seed people, widening never triggers for them (a wider range brings in nobody new); accounts you created yourself in the local database can change that. With 4 women in his audience, Ravi's daily set is **1** profile, then 3 more after it. Ravi starts with yesterday's perspectives already visible, one more perspective that is locked until he finishes today's set, a pending connect request from Priya, and a connection with Asha (connected 2 hours ago, with two messages). Photos are generated color gradients, not real people.
 
+**The test world** (`pnpm db:seed:world`, guide: `business-logic/TEST_WORLD.md`): 100 more fake people (`name@world.test`, password `perspective123`), each set up so a rule actually happens: sets of 1, 2 and 3, a boost, widening, the soft limit, reports and holds, a ban with an appeal, weak givers, fresh-first, shared interests, inactive and brand-new members. Re-running it wipes and recreates only the `@world.test` people.
+
 **Admin (development):** the seed also creates `admin@perspective.test` with password `perspective123` for the admin page. On a real server admins are made only with `pnpm admin:create -- --email you@example.com`, which prints a password and an authenticator secret once (section 14.9). The admin page runs with `pnpm --filter @perspective/admin web` on port 8082.
 
 **Development-only shortcuts** (all off in a release build):
@@ -811,6 +813,9 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-21: the test world (no app change)
+- `pnpm db:seed:world` creates 100 fake people set up to show every rule from steps 1 to 5, with a guide in `business-logic/TEST_WORLD.md` listing who to sign in as and what to expect (checked against the running app). (Section 16.)
 
 ### 2026-10-21: beta step 5, push notifications (placeholder)
 - **Pushes for every event for now**, to check they work: connect requests, new connections, messages, a daily "profiles ready" reminder, new perspectives, quiet-chat nudges, and account updates and notices. No push contains message or perspective text. They need a development build on a real phone (section 8.3).
