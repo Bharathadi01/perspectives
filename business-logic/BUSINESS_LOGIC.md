@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-21 (beta step 5 built: push notifications with placeholder texts. Steps 3 and 4 earlier the same day)
+**Last updated:** 2026-10-24 (bug fix: Explore now actually shows the shared-interest note, section 9.1)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -813,6 +813,9 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-24: Explore now actually shows the shared-interest note
+- The server has always computed the "You both share passion for X & Y" line correctly (section 9.1), but `apps/mobile/app/(tabs)/explore.tsx` never passed it to the screen, so it silently never appeared on a real card. Found by an independent round of browser-driven testing of steps 1 to 5 (direct interaction with the running app, not just the API), separate from Bharath's own test pass. One-line fix; no rule changed, no server change. (Section 9.1.)
 
 ### 2026-10-21: the test world (no app change)
 - `pnpm db:seed:world` creates 100 fake people set up to show every rule from steps 1 to 5, with a guide in `business-logic/TEST_WORLD.md` listing who to sign in as and what to expect (checked against the running app). (Section 16.)

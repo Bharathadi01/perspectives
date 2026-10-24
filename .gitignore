@@ -9,6 +9,11 @@ build/
 web-build/
 *.tsbuildinfo
 
+# Generated native projects (expo prebuild / expo run:ios|android): regenerable,
+# machine- and Apple-ID-specific, never commit. Run `npx expo prebuild` to recreate.
+apps/mobile/ios/
+apps/mobile/android/
+
 # Environment variables
 .env
 .env.local

@@ -75,6 +75,8 @@ export default function Explore() {
               profile={card.profile}
               givenPostIds={card.givenPostIds}
               hideAnswered
+              compatibilityScore={card.compatibilityScore}
+              matchReasons={card.matchReasons}
               onGive={(post) => router.push({ pathname: '/give/[postId]', params: { postId: post.id, profileId: card.profile.id } })}
             />
           </ScrollView>
