@@ -4,6 +4,8 @@ export const typography = {
     sans: 'System',
   },
   fontSize: {
+    /** Floor for badge overlines; nothing may go below this. */
+    micro: 11,
     xs: 12,
     sm: 14,
     base: 16,

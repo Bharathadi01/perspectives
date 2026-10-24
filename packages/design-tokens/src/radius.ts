@@ -9,6 +9,8 @@ export const radius = {
 
 export const touchTarget = {
   min: 48,
+  /** Allowed only where a control sits inside an already-48px row. */
+  comfortable: 44,
 } as const;
 
 /** Floating round actions (skip, give perspective). */

@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-24 (bug fix: Explore now actually shows the shared-interest note, section 9.1)
+**Last updated:** 2026-10-26 (voice and written cards can be dragged to reorder; section 6.3)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -227,24 +227,35 @@ A progress bar shows the step. "Back" works. The answers are kept in the phone's
 7. **Review & finish.** A summary with "Edit" links back to each step: basics, **your goal (private)** and orientation if given, the audience under its goal-worded question, interests, lifestyle and the personality answer, plus a short explanation that matching is mostly on shared interests and that the goal and orientation stay private. Pressing **Complete & Set Up Profile** saves everything **at once** in one update (nothing in steps 1 to 6 is saved to the server until this moment, except the selfie, which uploaded straight away). Then the person goes to the profile editor.
 
 ### 5.3 The profile editor and finishing
-After step 7, the person lands in the editor (`/me/edit`) to add posts. The profile still is not live until a **photo post** exists. Pressing "Done" with no photo gives "Please add at least one photo with a question." With a photo, the profile goes live and the person lands in Explore.
+After step 7, the person lands on a one-off "Add your first photo" screen (`/me/edit?from=onboarding`) holding the same card editor described in section 6.3. The profile still is not live until a **photo post** exists, so **Finish** stays greyed out until there is one; pressing it anyway gives "Add at least one photo with a question." With a photo, the profile goes live and the person lands in Explore.
+
+This screen deliberately sits outside the five tabs. A profile without a first photo is not live, and the tabs send anyone who is not live back to onboarding, so hosting it inside the tabs would bounce the person between onboarding and the tab forever.
 
 If someone quits halfway: their basics are saved only if they reached step 7; the profile stays not-live, and next time they open the app they are sent back to onboarding with their saved answers refilled.
 
 ### 5.4 Changing details later
-- **You → Edit Profile & Live Preview:** the editor, with an **Edit** tab and a **View** tab that shows exactly what others see.
-- **You → Edit basics:** change name, height, gender, orientation (optional, can be cleared), city.
-- **You → Your goal (private):** change the goal (one or both).
-- **You → the audience button** (its title is the goal-worded question): change genders and age range. The age range shown is the one in use, which may have been widened (section 8.1). Picking new ages makes them your chosen range; saving the range already shown (for example while changing genders) keeps your earlier chosen range, so widening never goes further than 4 years past what you actually chose.
-- **You → Notices:** the notices list (section 8.2). The button shows how many are new.
-- **You → Blocked people:** the people you blocked, with Unblock (section 14.2).
+The **You** tab is only your profile now. At the top it has one switch with two sides:
+- **View** — exactly what others see, which is what the tab opens on.
+- **Edit** — your cards, described in section 6.3.
+
+Switching between them does not leave the tab. Leaving for another tab and coming back returns to View; stepping into Settings and coming back keeps Edit.
+
+Everything else moved behind the **gear in the top right**, which opens **Settings**:
+- **Settings → The basics:** change name, height, gender, orientation (optional, can be cleared), city.
+- **Settings → Your goal (private):** change the goal (one or both).
+- **Settings → the audience row** (its title is the goal-worded question): change genders and age range. The age range shown is the one in use, which may have been widened (section 8.1). Picking new ages makes them your chosen range; saving the range already shown (for example while changing genders) keeps your earlier chosen range, so widening never goes further than 4 years past what you actually chose.
+- **Settings → Notices:** the notices list (section 8.2). The row shows how many are new.
+- **Settings → Perspectives you gave:** the ones you wrote (section 11).
+- **Settings → Blocked people:** the people you blocked, with Unblock (section 14.2).
+- **Settings → Sign out** and **Delete account** (section 14.3).
+- Settings also shows greyed-out **Notifications** and **About** groups marked "Soon". These are layout placeholders: they take no tap and do nothing [Placeholder].
 - The birthday cannot be changed.
 
 ---
 
 ## 6. Posts: photos, voice and written questions
 
-Code: `apps/api/src/posts/posts.service.ts`, `packages/contracts/src/post.ts`, `apps/mobile/app/me/edit.tsx`, `app/(tabs)/create.tsx`, `app/post/new.tsx`, `src/components/profile/*`.
+Code: `apps/api/src/posts/posts.service.ts`, `packages/contracts/src/post.ts`, `apps/mobile/src/features/profile-editor/*`, `app/(tabs)/you.tsx`, `app/(tabs)/create.tsx`, `app/post/new.tsx`, `src/components/profile/*`.
 
 ### 6.1 What a post is
 Every post has: a **question** (5 to 150 characters), one **category**, and **1 to 3 focus areas** from that category. It is one of three kinds:
@@ -259,11 +270,26 @@ Every post has: a **question** (5 to 150 characters), one **category**, and **1 
 4. The photo or voice file must belong to the person, be unused, and be the right kind; otherwise "Upload the photo or audio for this post first."
 5. Making or changing a post recomputes whether the profile is live.
 
+### 6.2b Adding a card, step by step
+Adding a card is a full-screen flow with one question per screen and a bar at the top showing how far along you are.
+- **A photo card: three steps.** 1) Pick the photo. 2) Write the question, with the photo kept in view; the category is one row you open, and the focus areas sit behind another row you only open if you want them. 3) Record a voice note, or skip it.
+- **A voice card: two steps.** The question, then the recording (required here).
+- **A written card: one step.** Just the question.
+- **The voice note is added to the card, not instead of the written question.** Every card has a written question; a photo card can carry a voice note as well. The old screen showed "Written" and "Voice" as a choice between two kinds, which was never how it worked.
+- You can go back a step without losing what you typed. Closing from the first step throws the card away.
+- Each step's button says what is missing if you press it early (for example "Choose a photo first.").
+
 ### 6.3 Changing posts
-- **Edit** the question, category, focus areas, or the attached voice clip. The new focus areas must belong to the category ("Those focus areas do not belong to this category"). Changing the photo itself is not possible (delete and re-add) [Not built].
-- **Reorder** (`PATCH /me/posts/reorder`): the list sent must contain **every** active post exactly once, and the first one must be a photo ("The featured item must be a photo"). The editor offers drag-and-drop for photos and up/down arrows for voice and written cards. Photos always stay above voice and written cards in the editor.
+- **Edit** the question, category, focus areas, or the attached voice clip, on one screen (editing is not a step-by-step flow — you came to change one thing). Changing the category now also moves the focus areas to ones that belong to it, instead of leaving a combination the server refuses. A photo card's voice note can be played, removed, or added here; a voice card's own clip can be played but not replaced (record a new voice card instead); a written card has no voice note. Changing the photo itself is still not possible (delete and re-add) [Not built].
+- **Reorder** (`PATCH /me/posts/reorder`): the list sent must contain **every** active post exactly once, and the first one must be a photo ("The featured item must be a photo"). In the editor you **hold a photo, then drag it onto another photo to swap them** (the photo lifts with a small vibration and the one it will swap with is outlined; letting go without moving puts it back). Swapping photos never moves a voice or written card: those keep their places between the photos. Each card also has a **⋯ menu** with Move earlier, Move later, Edit the question and Remove. For a photo, Move earlier/later swaps it with the photo before or after it. For a voice or written card, Move earlier/later moves it one card along the profile, which changes its "After photo N". Screen-reader users get Move earlier / Move later as actions on a photo (swaps with the next photo) and on a voice or written row (swaps with the next row). Moving a non-photo into the first slot is refused in the app before anything is sent, with "The top card (slot 1) must be a photo to introduce yourself." Cards of different kinds may otherwise be in any order.
 - **Remove:** a post is marked removed (it is not erased). Rules: you cannot remove your last post, and if you remove the primary photo the **next photo post is promoted** to the top; if there is no other photo you must add one first. Perspectives already received on a removed post stay in your Inbox.
 - Posts cannot be paused or hidden without deleting [Not built].
+- **What the editor looks like:** two parts.
+  - **Photos:** a grid of six places, three across in two rows. Only photos go here. The tiles are portrait-shaped and carry no question text (tap a photo to see and edit its question; its **⋯** menu also shows it). A photo's voice note is a small play button on the photo. The first photo has a small star. The next free place is a **+ Add** button that adds a photo. Places that are taken up by voice or written cards (see below) show as faint empty boxes without a +; tapping one explains "Your voice and written cards use the other places. A profile holds 6 cards in all." One line under the grid: "Tap a photo to edit it. Hold and drag to reorder. Your first photo leads."
+  - **Voice & written:** under the photos, one row per voice or written card, with its question at reading size, its kind (and length for voice), and **where it appears on your profile** ("After photo 1"). A voice card's row has its own play button. **Hold a row and drag it onto another to swap them** (with two or more rows, a line says "Hold and drag to reorder."); this swaps the two cards' places on your profile and never moves a photo. Two buttons, **+ Voice note** and **+ Written**, add one. This part appears once you have a photo, because a voice or written card can never be first.
+  - The count "5 of 6 cards" covers both parts: every kind of card shares the same six places. Removing a card asks first in a sheet.
+- **Voice notes play right on the card.** A photo's voice note is a play button on the photo showing its length (while playing it shows how far in it is, with a thin progress line); a voice card's play button fills the card. You can listen without opening the card, and only one clip plays at a time: starting another stops the first, and opening any screen over the cards stops playback. There is no waveform, because the app does not keep the sound's levels.
+- There is **no on/off switch for the top photo**. The first card is the top card, and the way to change it is to move another photo to the front.
 
 ### 6.4 Categories and focus areas
 There are 11 categories. Each has focus areas (what the owner wants covered), a hint for each (shown to givers), and quick-pick chips.
@@ -734,6 +760,7 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 ## 17. What is fake, missing, or in conflict
 
 **Looks real but is a stand-in [Placeholder]**
+- The **Notifications** and **About** groups in Settings are layout only: every row is greyed out, marked "Soon", and takes no tap. Nothing behind them is built.
 - Selfie verification approves any photo (no liveness, no face match).
 - Text moderation is a tiny phrase list; no photo or voice moderation.
 - Photos and voice are stored on the server's disk; hidden location data is not removed.
@@ -813,6 +840,57 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-26: voice and written cards can be reordered by dragging
+- **Hold a voice or written row and drag it onto another to swap them**, the same way photos work. Swapping two rows trades their places on your profile; photos never move. The ⋯ menu still moves a card past a photo ("After photo 1" → "After photo 2"). (Section 6.3.)
+- **Not changed: the limit of 6 cards in total.** A request to allow 6 photos *plus* voice and written cards on top changes the rule "1 to 6 posts" in `docs/PRODUCT.md`, so it waits for the product owner's decision.
+- No rule, number, server or database change.
+
+### 2026-10-25 (after midnight): photos in the grid, voice and written cards in a list under it
+- **The grid holds only photos now.** A voice or written card has no picture, so as a tile it was a box with a play button or a few squeezed words. They are now listed under the photos, one row each, with the question at reading size. This is how the big dating apps' editors are laid out too (photos grid first, prompts listed below). (Section 6.3.)
+- **Each voice or written row says where it shows on your profile**, for example "After photo 1", and can be played right there (voice). Its ⋯ menu moves it one card earlier or later.
+- **Dragging photos never moves a voice or written card.** Swapping two photos leaves the other cards where they were.
+- **+ Voice note** and **+ Written** buttons under the list add those cards; the **+ Add** in the grid now adds a photo directly. The old "what kind of card?" sheet is gone.
+- All kinds still share the same six places ("5 of 6 cards"). Grid places that the voice and written cards are using show as faint empty boxes with no +.
+- No rule, number, server or database change.
+
+### 2026-10-25 (late night): the six slots are three across, in two rows
+- **The grid is two rows of three**, as asked, the same shape as the other big dating apps' editors, so all six slots fit on the screen at once. The cards are portrait-shaped rather than square, so each photo gets about a third more room than a square of the same width.
+- **No question text on the cards any more.** At a third of the screen wide it could not be read. Tap a card to see and edit its question; the card's ⋯ menu also shows it. A written card still shows the start of its question, since it has nothing else to show. (Section 6.3.)
+- The first card is marked with a small star instead of a "LEADS" label; the next free slot shows a **+ Add** button.
+- Holding and dragging to swap, the ⋯ menu, playing voice notes on the cards, and the first-card-must-be-a-photo rule all work as before.
+- No rule, number, server or database change.
+
+### 2026-10-25 (night): the editor is a six-slot grid again — bigger, readable, and you hold to drag
+- **Back to six slots with "+"**, as asked, but two columns instead of three. Each card is about twice the size of the old grid's (and about twice Hinge's, checked against the screenshots in Hinge's own help centre), and portrait-shaped like the photos people post.
+- **The question is readable on every card.** It sits under the card at normal reading size. The old grid squeezed it to a tiny size inside the photo and then printed it again in a list below; Hinge does not show it in the grid at all. (Section 6.3.)
+- **The next free slot says what it does** ("Add a photo or voice note"); the other empty slots stay quiet, so the six-slot shape is visible without five loud boxes.
+- **Hold, then drag onto another card to swap.** The old grid started a drag as soon as a finger moved, which on a screen this full of cards would make it impossible to scroll; now a card lifts only after a short hold, and the page stops scrolling only while a card is lifted. The card menu (Move earlier / Move later) and screen-reader actions do the same without dragging. The first card still has to be a photo. (Section 6.3.)
+- **Voice notes still play on the cards**, now as a play button on the photo, or the whole face of a voice card. One clip at a time; lifting a card stops playback.
+- No rule, number, server or database change.
+
+### 2026-10-25 (evening): voice notes play on the cards; the edit screen's options work again
+- **Bug fixed: on the edit screen, "Browse questions", "Category" and "What should people focus on?" did nothing when tapped.** The same was true on step 2 of adding a card. Their sheets were placed beside the full-screen window instead of inside it, and the phone will not open a second window from underneath one that is already showing. They now open over it. (Sections 6.2b, 6.3.)
+- **Voice notes now show and play on the cards in Edit.** A photo's voice note sits right under the photo, the way it reaches people viewing the profile; a voice card plays under its question. One clip at a time. (Section 6.3.)
+- **The edit screen no longer offered "Add a voice note" on a voice card**, which already is one; that came from reading the wrong field. It also no longer offers a voice note on a written card. (Section 6.3.)
+- **Categories are back to how they were before the redesign**: a photo card can be filed under Voice (the old screen did this itself when a clip was attached); a written card cannot. The redesign had briefly hidden Voice for photo cards, which was a rule nobody decided.
+- No rule, number, server or database change.
+
+### 2026-10-25 (later): adding a card is three short steps, and voice joins a photo instead of replacing it
+- **The add-a-card screen was one long form**: a photo box, a Written/Voice switch, the question, eleven category chips and a focus-area row, all on one scroll. It is now a full-screen flow with one question per screen and a progress bar — photo, then question, then an optional voice note. Apple's guidance is that a sheet suits one scoped task and that a multi-step job like putting a photo together belongs in a full-screen view. (Section 6.2b.)
+- **"Written" and "Voice" were never two kinds of card.** Every card has a written question; a photo card can also carry a voice note. The old switch made them look mutually exclusive. The voice note is now the last, skippable step, and the screen shows the card being built so it is clear the voice joins it. (Section 6.2b.)
+- **The eleven category chips became one row you open**, and the focus areas another, so the question itself is no longer competing with two walls of chips.
+- **Three bugs went with the old screens.** (1) Changing the category left the old focus areas in place, producing a card the server refused ("Not a focus area of looks: tone"); the focus areas now follow the category. (2) The add screen kept its state between opens, so the question, category and focus areas from one card leaked into the next; every open now starts clean. (3) A custom question written in the question browser was saved with a category and focus areas that did not match, so it was always refused.
+- **Editing a card is now one screen** rather than the same long form, and the removal of a voice note is explicit.
+- No rule, number, server or database change. The question, category, focus areas and limits are exactly as before.
+
+### 2026-10-25: the profile tab is View/Edit, the editor is rebuilt, Settings holds the rest
+- **The You tab is only your profile now.** It opens on **View** (what others see) with a switch to **Edit** beside it. The old route of tapping "Edit Profile & Live Preview" to reach a second screen is gone, along with that screen's Cancel/Done bar. (Section 5.4.)
+- **Everything else moved to a new Settings screen**, behind a gear in the top right: the basics, your goal, your audience, Notices, Perspectives you gave, Blocked people, Sign out and Delete account. They all work exactly as before; only where you find them changed. Settings also shows greyed-out Notifications and About groups marked "Soon" that do nothing [Placeholder]. (Sections 5.4, 17.)
+- **The editor was rebuilt around the photos.** One card per row: a photo now fills the width with its question readable underneath, instead of a 3x2 grid of small tiles where the question was printed twice (once unreadably small on the tile, once again in an "Attached perspectives" list). Voice and written cards stay compact. The five empty dashed boxes are replaced by one "Add a photo or voice note" button that says how many slots are left. Each card has a ⋯ menu with Move up, Move down, Edit the question and Remove. (Section 6.3.)
+- **Two things that never worked are gone or fixed.** The "Top Photo" on/off switch did nothing at all — it was never saved and there is no such setting; it is removed, and the first card is simply the top card. The "Get verified" row could only ever say "Verified", because an unverified profile is not live and never reaches this tab; it now appears only if the selfie is ever not verified, and tapping it opens a working selfie screen (`/me/verify`). The old tap went to a screen that could not open. (Sections 6.3, 17.)
+- **Removing a card now asks in a sheet** like the rest of the app, instead of a blocking pop-up.
+- No rule, number, server or database change. Old links still work: `/me/edit?section=basics|goal|audience` lead to the new screens, and the end of onboarding still lands on its own "Add your first photo" screen. (Section 5.3.)
 
 ### 2026-10-24: Explore now actually shows the shared-interest note
 - The server has always computed the "You both share passion for X & Y" line correctly (section 9.1), but `apps/mobile/app/(tabs)/explore.tsx` never passed it to the screen, so it silently never appeared on a real card. Found by an independent round of browser-driven testing of steps 1 to 5 (direct interaction with the running app, not just the API), separate from Bharath's own test pass. One-line fix; no rule changed, no server change. (Section 9.1.)
