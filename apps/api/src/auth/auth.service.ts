@@ -21,6 +21,10 @@ export class AuthService {
     if (ageFromBirthDate(input.birthDate) < RULES.minAge) {
       throw new AppException('UNDERAGE', 'You must be 18 or older to use Perspective.');
     }
+    // A permanent ban blocks the email from signing up again (decided 2026-10-20).
+    if (await this.prisma.blockedEmail.findUnique({ where: { email: input.email } })) {
+      throw new AppException('EMAIL_BLOCKED', 'This email can’t be used to create an account.');
+    }
     const passwordHash = await hashPassword(input.password);
     try {
       const user = await this.prisma.user.create({
@@ -51,9 +55,7 @@ export class AuthService {
     if (!user || !valid) {
       throw new AppException('INVALID_CREDENTIALS', 'Email or password is incorrect.');
     }
-    if (user.status === 'suspended') {
-      throw new AppException('ACCOUNT_SUSPENDED', 'This account is suspended.');
-    }
+    // Suspended and banned people can still sign in, but only to the ban screen (AuthGuard).
     return this.issueTokens(user.id, randomUUID());
   }
 
@@ -71,7 +73,7 @@ export class AuthService {
       await this.revokeFamily(row.familyId);
       throw new AppException('UNAUTHORIZED', 'Please sign in again.');
     }
-    if (row.expiresAt <= now || row.user.status !== 'active') {
+    if (row.expiresAt <= now) {
       throw new AppException('UNAUTHORIZED', 'Please sign in again.');
     }
     const claimed = await this.prisma.refreshToken.updateMany({

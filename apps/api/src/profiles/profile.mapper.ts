@@ -23,7 +23,10 @@ export const PROFILE_USER_INCLUDE = {
 } as const;
 export type ProfileUserRow = Prisma.UserGetPayload<{ include: typeof PROFILE_USER_INCLUDE }>;
 
-/** Builds allowlisted DTOs. Never returns Prisma entities or private fields. */
+/**
+ * Builds allowlisted DTOs. Never returns Prisma entities or private fields (orientation and the
+ * goal are private, decided 2026-10-20).
+ */
 @Injectable()
 export class ProfileMapper {
   constructor(private readonly signer: MediaUrlSigner) {}
@@ -72,7 +75,7 @@ export class ProfileMapper {
   /** Only live profiles are shown to others, so basics are always present. */
   publicProfile(row: ProfileUserRow): PublicProfile {
     const p = row.profile;
-    if (!p || !p.displayName || !p.gender || !p.heightCm || !p.orientation || !p.city) {
+    if (!p || !p.displayName || !p.gender || !p.heightCm || !p.city) {
       throw new Error('publicProfile called for a profile that is not live');
     }
     return {
@@ -81,10 +84,8 @@ export class ProfileMapper {
       age: ageFromBirthDate(isoDate(row.birthDate)),
       gender: p.gender,
       heightCm: p.heightCm,
-      orientation: p.orientation,
       city: p.city,
       pronouns: p.pronouns ?? null,
-      datingIntention: p.datingIntention ?? null,
       interests: p.interests ?? [],
       lifestylePace: p.lifestylePace ?? null,
       socialPreference: p.socialPreference ?? null,

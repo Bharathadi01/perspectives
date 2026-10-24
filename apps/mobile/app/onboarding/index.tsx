@@ -3,7 +3,8 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StepAboutYou } from '../../src/components/onboarding/StepAboutYou';
-import { StepAudienceIntentions } from '../../src/components/onboarding/StepAudienceIntentions';
+import { StepAudience } from '../../src/components/onboarding/StepAudience';
+import { StepGoal } from '../../src/components/onboarding/StepGoal';
 import { StepInterests } from '../../src/components/onboarding/StepInterests';
 import { StepPersonality } from '../../src/components/onboarding/StepPersonality';
 import { StepReview } from '../../src/components/onboarding/StepReview';
@@ -12,13 +13,16 @@ import { Screen } from '../../src/components/ui/Screen';
 import { ErrorState, LoadingState } from '../../src/components/ui/States';
 import { Label, Muted, Title } from '../../src/components/ui/Text';
 import { useMe } from '../../src/features/hooks';
+import { audienceQuestion } from '../../src/lib/labels';
 import { useOnboardingStore } from '../../src/session/onboardingStore';
 import { useSession } from '../../src/session/sessionStore';
 import { theme } from '../../src/theme';
 
 const ONBOARDING_STEPS = [
   { title: 'About you', subtitle: 'The foundation of your profile and identity' },
-  { title: 'Who would you like to meet?', subtitle: 'Dating preferences, intentions, and dealbreakers' },
+  { title: 'What brings you here?', subtitle: 'Private: only you see your answer' },
+  // The audience title is worded by the goal (see below).
+  { title: 'Your audience', subtitle: 'One setting for your whole profile, used both ways' },
   { title: 'Your interests', subtitle: 'Select at least 3 passions to power matching' },
   { title: 'What matters to you?', subtitle: 'Daily rhythm and social energy harmony' },
   { title: 'A little more personality', subtitle: 'A written perspective prompt to share your voice' },
@@ -33,6 +37,7 @@ export default function Onboarding() {
   const stepIndex = useOnboardingStore((s) => s.stepIndex);
   const setStepIndex = useOnboardingStore((s) => s.setStepIndex);
   const initializeFromProfile = useOnboardingStore((s) => s.initializeFromProfile);
+  const goals = useOnboardingStore((s) => s.goals);
 
   const initializedRef = useRef(false);
 
@@ -40,8 +45,10 @@ export default function Onboarding() {
     if (me.data && !initializedRef.current) {
       initializedRef.current = true;
       initializeFromProfile(me.data);
+      // A profile made before the goal question existed only needs the goal: start there.
+      if (!forceStep && me.data.missing.length === 1 && me.data.missing[0] === 'goal') setStepIndex(1);
     }
-  }, [me.data, initializeFromProfile]);
+  }, [me.data, initializeFromProfile, forceStep, setStepIndex]);
 
   useEffect(() => {
     if (forceStep) {
@@ -63,7 +70,8 @@ export default function Onboarding() {
     return <Redirect href="/(tabs)/explore" />;
   }
 
-  const currentStep = ONBOARDING_STEPS[stepIndex] ?? ONBOARDING_STEPS[0];
+  const step = ONBOARDING_STEPS[stepIndex] ?? ONBOARDING_STEPS[0];
+  const currentStep = stepIndex === 2 ? { ...step, title: audienceQuestion(goals) } : step;
   const progressPercent = ((stepIndex + 1) / ONBOARDING_STEPS.length) * 100;
 
   const handleNext = () => {
@@ -112,11 +120,12 @@ export default function Onboarding() {
 
         {/* Step Views */}
         {stepIndex === 0 && <StepAboutYou onNext={handleNext} />}
-        {stepIndex === 1 && <StepAudienceIntentions onNext={handleNext} />}
-        {stepIndex === 2 && <StepInterests onNext={handleNext} />}
-        {stepIndex === 3 && <StepWhatMatters onNext={handleNext} />}
-        {stepIndex === 4 && <StepPersonality onNext={handleNext} />}
-        {stepIndex === 5 && (
+        {stepIndex === 1 && <StepGoal onNext={handleNext} />}
+        {stepIndex === 2 && <StepAudience onNext={handleNext} />}
+        {stepIndex === 3 && <StepInterests onNext={handleNext} />}
+        {stepIndex === 4 && <StepWhatMatters onNext={handleNext} />}
+        {stepIndex === 5 && <StepPersonality onNext={handleNext} />}
+        {stepIndex === 6 && (
           <StepReview onJumpToStep={(idx) => setStepIndex(idx)} onComplete={handleComplete} />
         )}
       </ScrollView>

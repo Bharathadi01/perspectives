@@ -1,6 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { CandidatesService } from '../../src/daily/candidates.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { SocialService } from '../../src/social/social.service';
 import { Client, LONG_COMMENT, createApp, ensureGave, give, liveUser, resetDb } from './harness';
 
 type Live = Client & { postIds: string[] };
@@ -40,21 +42,22 @@ describe('core loop (e2e)', () => {
     throw new Error('daily set did not complete');
   }
 
-  it('builds a mandatory set of 3 with one boost slot for the least-served profile', async () => {
+  it('builds a small set for a small pool and never labels the boost profile', async () => {
     const w = await world();
-    // Meera already received a perspective this week, so a never-reviewed profile gets the boost.
+    // Meera already received a perspective, so she cannot be the boost; the others can.
     await give(w.kabir, w.meera.postIds[0]).expect(201);
 
+    // Four women are available to Ravi: fewer than 6 people means a set of 1.
     const res = await w.ravi.get('/v1/explore').expect(200);
-    expect(res.body.daily).toMatchObject({ requiredCount: 3, givenCount: 0, unlocked: false });
+    expect(res.body.daily).toMatchObject({ requiredCount: 1, givenCount: 0, unlocked: false });
     const slots = await prisma.dailyAssignment.findMany({ where: { userId: w.ravi.id } });
-    expect(slots).toHaveLength(3);
-    const boost = slots.filter((s) => s.slot === 'boost');
-    expect(boost).toHaveLength(1);
-    expect(boost[0].targetId).not.toBe(w.meera.id);
+    expect(slots).toHaveLength(1);
+    expect(slots[0].slot).toBe('boost');
+    expect(slots[0].targetId).not.toBe(w.meera.id);
     // Nisha is only into women, so Ravi is never assigned her.
     expect(slots.map((s) => s.targetId)).not.toContain(w.nisha.id);
-    expect(res.body.card.slot).toBe('boost');
+    // The card looks like any other card in the set.
+    expect(res.body.card.slot).toBe('mandatory');
   });
 
   it('enforces the giving rules', async () => {
@@ -85,11 +88,14 @@ describe('core loop (e2e)', () => {
     await give(w.ravi, w.asha.postIds[0]).expect(201);
     await give(w.ravi, w.meera.postIds[0]).expect(201);
     await prisma.perspective.updateMany({ where: { giverId: w.ravi.id }, data: { receivedDayKey: '2000-01-01' } });
+    // Giving built yesterday's set; start Ravi's day fresh so today's set is built now.
+    await prisma.dailyAssignment.deleteMany({ where: { userId: w.ravi.id } });
+    await prisma.dailyProgress.deleteMany({ where: { userId: w.ravi.id } });
 
-    await w.ravi.get('/v1/explore').expect(200);
-    const targets = (await prisma.dailyAssignment.findMany({ where: { userId: w.ravi.id } })).map((s) => s.targetId);
-    expect(targets).not.toContain(w.asha.id);
-    expect(targets).toContain(w.meera.id);
+    const viewer = await app.get(SocialService).person(w.ravi.id);
+    const pool = (await app.get(CandidatesService).eligible(viewer!, new Set())).map((c) => c.id);
+    expect(pool).not.toContain(w.asha.id);
+    expect(pool).toContain(w.meera.id);
 
     // Meera's profile still lists both posts and marks the answered one, so Explore can hide it.
     const meera = await w.ravi.get(`/v1/profiles/${w.meera.id}`).expect(200);
@@ -151,6 +157,10 @@ describe('core loop (e2e)', () => {
   it('gates Connect on a perspective in both directions and applies the 14-day cooldown after a decline', async () => {
     const w = await world();
     await give(w.asha, w.ravi.postIds[0]).expect(201);
+    // With only two men available Asha's set is 1, and that give may have finished it. Start her day
+    // fresh so the request below is still locked until she gives her set.
+    await prisma.dailyAssignment.deleteMany({ where: { userId: w.asha.id } });
+    await prisma.dailyProgress.deleteMany({ where: { userId: w.asha.id } });
 
     // Owner-initiated: Ravi must give Asha a perspective before asking.
     const gated = await w.ravi.post('/v1/connect-requests', { receiverId: w.asha.id }).expect(403);
@@ -203,19 +213,20 @@ describe('core loop (e2e)', () => {
 
   it('replaces a skipped slot, and shrinks the requirement when nobody is left', async () => {
     const w = await world();
-    const first = await w.ravi.get('/v1/explore').expect(200);
-    const skipped = first.body.card.profile.id;
-    const afterSkip = await w.ravi.post('/v1/explore/skip', { profileId: skipped }).expect(200);
-    expect(afterSkip.body.daily.requiredCount).toBe(3);
-    expect(afterSkip.body.card.profile.id).not.toBe(skipped);
-
-    // Only four women are eligible; skipping another leaves no replacement.
-    const again = await w.ravi.post('/v1/explore/skip', { profileId: afterSkip.body.card.profile.id }).expect(200);
-    expect(again.body.daily.requiredCount).toBe(2);
-    await completeDailySet(w.ravi);
-    const done = await w.ravi.get('/v1/explore').expect(200);
-    expect(done.body.daily.unlocked).toBe(true);
-    expect(done.body.daily.givenCount).toBe(2);
+    let res = await w.ravi.get('/v1/explore').expect(200);
+    expect(res.body.daily.requiredCount).toBe(1);
+    const seen = new Set<string>();
+    // Four women are eligible: each skip is replaced until nobody is left.
+    for (let i = 0; i < 3; i++) {
+      seen.add(res.body.card.profile.id);
+      res = await w.ravi.post('/v1/explore/skip', { profileId: res.body.card.profile.id }).expect(200);
+      expect(res.body.daily.requiredCount).toBe(1);
+      expect(seen.has(res.body.card.profile.id)).toBe(false);
+    }
+    res = await w.ravi.post('/v1/explore/skip', { profileId: res.body.card.profile.id }).expect(200);
+    expect(res.body.daily).toMatchObject({ requiredCount: 0, unlocked: true });
+    // Everyone was skipped (hidden 2 days), so nothing is left after the set either.
+    expect(res.body.card).toBeNull();
   });
 
   it('deletes an account in-app after re-entering the password', async () => {

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
   ApiErrorEnvelopeSchema,
+  AppealInput,
   AuthTokens,
+  BlockedPersonSchema,
   AuthTokensSchema,
   ConnectionSchema,
   ConnectRequestResultSchema,
@@ -19,10 +21,13 @@ import {
   MediaUploadResultSchema,
   MessageSchema,
   MyProfileSchema,
+  NoticesSchema,
   PerspectiveFeedbackInput,
   PerspectiveFeedbackSchema,
   PostSchema,
   ProfileViewSchema,
+  RegisterPushTokenInput,
+  RestrictionSchema,
   SignUpInput,
   UpdatePostInput,
   UpdateProfileInput,
@@ -243,11 +248,33 @@ export function createApiClient(options: ApiClientOptions) {
         call({ method: 'POST', path: '/v1/connections/seen', body: { connectionIds }, schema: NoContent, idempotencyKey }),
     },
 
+    /** For a suspended or banned person: the ban screen and their one appeal per ban. */
+    account: {
+      restriction: () => call({ method: 'GET', path: '/v1/account/restriction', schema: RestrictionSchema }),
+      appeal: (input: AppealInput, idempotencyKey?: string) =>
+        call({ method: 'POST', path: '/v1/account/appeal', body: input, schema: RestrictionSchema, idempotencyKey }),
+    },
+
+    /** This device's push token: registered after sign-in, removed on sign-out. */
+    push: {
+      register: (input: RegisterPushTokenInput, idempotencyKey?: string) =>
+        call({ method: 'POST', path: '/v1/me/push-tokens', body: input, schema: NoContent, idempotencyKey }),
+      remove: (token: string, idempotencyKey?: string) =>
+        call({ method: 'DELETE', path: '/v1/me/push-tokens', body: { token }, schema: NoContent, idempotencyKey }),
+    },
+
+    notices: {
+      list: () => call({ method: 'GET', path: '/v1/notices', schema: NoticesSchema }),
+      markAllRead: (idempotencyKey?: string) =>
+        call({ method: 'POST', path: '/v1/notices/read', schema: NoContent, idempotencyKey }),
+    },
+
     safety: {
       report: (input: CreateReportInput, idempotencyKey?: string) =>
         call({ method: 'POST', path: '/v1/reports', body: input, schema: z.object({ reportId: z.string() }), idempotencyKey }),
       block: (userId: string, idempotencyKey?: string) =>
         call({ method: 'POST', path: `/v1/blocks/${userId}`, schema: NoContent, idempotencyKey }),
+      blocked: () => call({ method: 'GET', path: '/v1/blocks', schema: z.array(BlockedPersonSchema) }),
       unblock: (userId: string, idempotencyKey?: string) =>
         call({ method: 'DELETE', path: `/v1/blocks/${userId}`, schema: NoContent, idempotencyKey }),
       deleteAccount: async (input: DeleteAccountInput) => {

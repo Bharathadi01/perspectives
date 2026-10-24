@@ -4,6 +4,7 @@ import React from 'react';
 import { ConnectedMomentWatcher } from '../../src/components/connect/ConnectedMomentWatcher';
 import { LoadingState } from '../../src/components/ui/States';
 import { useConnections, useInbox, useMe } from '../../src/features/hooks';
+import { usePushRegistration } from '../../src/push/push';
 import { useSession } from '../../src/session/sessionStore';
 import { theme } from '../../src/theme';
 
@@ -23,6 +24,8 @@ export default function TabsLayout() {
   const live = !!me.data?.isLive;
   const inbox = useInbox();
   const connections = useConnections(live);
+  // Ask for push permission once the person is in the app (not during sign-up or onboarding).
+  usePushRegistration(live);
 
   if (status === 'signedOut') return <Redirect href="/(auth)/welcome" />;
   if (status === 'loading' || me.isLoading) return <LoadingState />;

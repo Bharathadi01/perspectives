@@ -16,11 +16,28 @@ Planned (Cloudinary, ADR-003): API issues short-lived signed Cloudinary upload i
 Selfie verification is required at profile creation. Only verified, 18+ users have an active profile. Verification media is private: never shown to other users, never in public DTOs, and kept only as long as the retention policy defined during implementation allows.
 
 ## UGC controls
-Terms acceptance before creation; age gate; selfie verification; machine and human moderation before delivery for text, photos, and audio; report profile/post/perspective/message/user; immediate local hide; block from every person/UGC surface; enforcement ladder; appeals; published safety contact; audited moderator actions.
+Terms acceptance before creation; age gate; selfie verification; machine and human moderation before delivery for text, photos, and audio; report profile/post/perspective/message/user; immediate local hide; block from every person/UGC surface; enforcement ladder; appeals; published safety contact; audited moderator actions. The enforcement ladder is: keep out of daily sets (2 reporters), hold (3 reporters, or one serious report), then an admin decision (see Admin access and enforcement).
 
 Perspectives are honest and unfiltered, so criticism is allowed. Moderation targets abuse, not disagreement. Because the daily give-to-get rule assigns profiles that users did not pick themselves (always within their own filters, blocks, and mutes), report and block must be one tap away on every profile and every perspective.
 
 Connect requests carry a perspective, and the receiver sees it before deciding. A hostile perspective attached to a connect request can be declined and reported.
+
+## Admin access and enforcement (decided 2026-10-20; built 2026-10-21)
+**Why separate:** an admin power attached to a normal user account is the easiest thing to abuse. A stolen phone, a leaked password or one missed role check would give ban powers to whoever has it, and admin screens inside the mobile app would ship to every user's phone. So admin is a separate identity used from a separate web page.
+- **Separate admin identities:** admin logins are not Perspective user accounts. They live in their own table with their own password hash. There is no sign-up and no way to create an admin from any app; admins are created by a command run on the server. Each admin has a role (`admin`); more roles later if needed.
+- **Second factor:** a 6-digit code from an authenticator app at every admin sign-in. *Temporarily off (product owner, 2026-10-21):* built, but `ADMIN_REQUIRE_CODE` defaults to false so admins sign in with a password only during development. It must be switched on before the beta.
+- **Separate web page:** `apps/admin`, a web-only Expo Router project reusing `@perspective/contracts` and `@perspective/api-client`. It is never part of the mobile bundle.
+- **Separate API surface:** all admin endpoints live under `/v1/admin/*`, behind an admin guard that accepts only an admin token (its own audience claim). User tokens never work there, and admin tokens never work on user routes. Admin sessions are short (about 8 hours, no long-lived refresh). Every admin endpoint is default-deny like the rest of the API.
+- **Audit log:** every admin action (view of reported content, dismiss, ban, extend, restore, appeal decision) is recorded with the admin, time, target, action and reason. The log cannot be edited from the dashboard.
+- **Before public launch:** rate limits on admin sign-in, allow-listing or a VPN for the admin page, and a named grievance contact.
+- **How it is built (2026-10-21):** admins are made with `pnpm admin:create -- --email ...` (prints a generated password and the authenticator secret once; `--reset` gives new ones). The 6-digit codes are RFC 6238 (SHA-1, 30-second steps, one step of drift), written on `node:crypto` and checked against the RFC test vectors, and a code's time step can be used only once. Admin tokens carry `typ: admin` and are signed with `ADMIN_JWT_SECRET`, or a secret derived from the user token secret when it is not set, so user and admin tokens never verify on each other's routes. The admin client is a separate entry point (`@perspective/api-client/admin`) and is not in the mobile bundle; only the shared data shapes in `@perspective/contracts` are.
+
+**What the dashboard shows:**
+- **Review queue:** everyone on hold or flagged, newest serious reports first, then appeals, then the rest. Each row shows the reason (serious report, 3 reporters, weak giver), the reports and marks with the reported content, and the person's history.
+- **Actions:** dismiss (the hold is lifted), ban for 3 days, ban permanently, extend a ban, restore after an appeal. A reason is required and is shown to the person.
+- **Appeals:** temporary and permanent bans can be appealed; open appeals are highlighted at the top.
+
+**Holds and bans (rules in `PRODUCT.md` → Reports, holds and bans):** automatic steps only hold (keep out of daily sets, or hide while waiting for review). A ban is always an admin action. A suspended account has an end date and returns to active by itself when it passes. Banned and suspended people can sign in only to a screen showing the reason, end date and appeal form (every other route answers `ACCOUNT_SUSPENDED` or `ACCOUNT_BANNED`); their profile is hidden and chats are paused. Account deletion stays available to them. A permanent ban blocks the email from signing up again; only records needed for safety are kept.
 
 ## Prohibited v1 content
 Nudity and sexual content, minors in evaluation contexts, body shaming, degrading or abusive comments, threats, hate, harassment, doxxing, scams, impersonation, deceptive synthetic likeness, self-harm encouragement, eating-disorder encouragement, public attractiveness ranking, and non-consensual private media.

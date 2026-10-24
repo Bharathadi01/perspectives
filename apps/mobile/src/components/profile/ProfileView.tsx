@@ -1,7 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { MatchReason, Post, PublicProfile } from '@perspective/contracts';
 import {
-  DATING_INTENTION_CONFIG,
   getInterestById,
   LIFESTYLE_PACE_LABELS,
   SOCIAL_PREFERENCE_LABELS,
@@ -51,8 +50,6 @@ export function ProfileView({
     />
   );
 
-  const intentionConfig = profile.datingIntention ? DATING_INTENTION_CONFIG[profile.datingIntention] : null;
-
   return (
     <View style={s.stack}>
       {/* Explainable Match Reasons Banner (in Explore Feed) */}
@@ -87,15 +84,9 @@ export function ProfileView({
       {/* Basics Strip */}
       <BasicsRow profile={profile} />
 
-      {/* Dating Intention & Lifestyle Pill Strip */}
-      {(intentionConfig || profile.lifestylePace || profile.socialPreference) && (
-        <View style={s.intentionStrip}>
-          {intentionConfig && (
-            <View style={s.intentionPill}>
-              <Ionicons name={intentionConfig.icon as any} size={14} color={theme.colors.brand} />
-              <Text style={s.intentionPillText}>{intentionConfig.label}</Text>
-            </View>
-          )}
+      {/* Lifestyle Pill Strip */}
+      {(profile.lifestylePace || profile.socialPreference) && (
+        <View style={s.pillStrip}>
           {profile.lifestylePace && (
             <View style={s.lifestylePill}>
               <Text style={s.lifestylePillText}>
@@ -187,24 +178,10 @@ const s = StyleSheet.create({
     fontWeight: theme.typography.fontWeight.regular,
     color: theme.colors.muted,
   },
-  intentionStrip: {
+  pillStrip: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.spacing.xs,
-  },
-  intentionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.brandSoft,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 6,
-    borderRadius: theme.radius.pill,
-  },
-  intentionPillText: {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.brand,
   },
   lifestylePill: {
     backgroundColor: theme.colors.surface,

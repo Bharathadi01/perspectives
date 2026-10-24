@@ -1,24 +1,68 @@
-import type { DatingIntention, LifestylePace, MatchReason, SocialPreference } from '@perspective/contracts';
-import { DATING_INTENTION_CONFIG, getInterestById } from '@perspective/contracts';
-import type { Person } from '../social/social.service';
+import type { MatchReason } from '@perspective/contracts';
+import { getInterestById } from '@perspective/contracts';
 
 /**
- * Stage 2: Multidimensional Compatibility Scoring and Explainability
- * As specified in docs/ONBOARDING_AND_MATCHING_RESEARCH.md:
- * - 40% Shared Interests (Jaccard Similarity)
- * - 25% Dating Intentions Compatibility (Matrix)
- * - 20% Category & Preference Affinity
- * - 15% Lifestyle & Social Rhythm Compatibility
- * Missing data is renormalized dynamically so omissions are never penalized as zero.
+ * Feed ranking for the beta (docs/PRODUCT.md → Algorithms, decided 2026-10-20). Rule-based, every
+ * weight tunable in config:
+ *
+ *   score = 0.45 × shared interests + 0.20 × need + 0.15 × recently active
+ *         + 0.10 × new member + 0.10 × giving quality + 0.10 × fresh − report penalty
+ *
+ * "Fresh" (decided 2026-10-20) means the viewer never gave this person a perspective. It is a small
+ * head start on top of the other weights, so a very good older match can still come first.
+ *
+ * Not used: daily rhythm, social energy, relationship goals, orientation, post-category overlap,
+ * and any attractiveness or popularity score.
  */
 
-export interface CompatibilityResult {
-  score: number;
-  coverage: number;
-  reasons: MatchReason[];
+export interface RankingWeights {
+  sharedInterests: number;
+  need: number;
+  recentlyActive: number;
+  newMember: number;
+  givingQuality: number;
+  fresh: number;
 }
 
-/** Jaccard similarity for explicit interests: |A ∩ B| / |A ∪ B| */
+export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
+  sharedInterests: 0.45,
+  need: 0.2,
+  recentlyActive: 0.15,
+  newMember: 0.1,
+  givingQuality: 0.1,
+  fresh: 0.1,
+};
+
+export interface RankingFactors {
+  /** 0..1 interest overlap (0.5 when either side has no interests). */
+  sharedInterests: number;
+  /** 0..1, higher when the profile received fewer perspectives recently (counting today's sets). */
+  need: number;
+  /** 0..1, higher when the owner opened the app recently. */
+  recentlyActive: number;
+  /** 1 during the profile's first week, else 0. */
+  newMember: number;
+  /** 0..1, how often their own perspectives were marked helpful, neutral (0.5) until there are enough marks. */
+  givingQuality: number;
+  /** 1 when the viewer never gave this person a perspective, else 0. */
+  fresh: number;
+  /** Subtracted: distinct people who reported them. */
+  penalties: number;
+}
+
+export function rankingScore(f: RankingFactors, w: RankingWeights = DEFAULT_RANKING_WEIGHTS): number {
+  return (
+    w.sharedInterests * f.sharedInterests +
+    w.need * f.need +
+    w.recentlyActive * f.recentlyActive +
+    w.newMember * f.newMember +
+    w.givingQuality * f.givingQuality +
+    w.fresh * f.fresh -
+    f.penalties
+  );
+}
+
+/** Jaccard similarity for explicit interests: |A ∩ B| / |A ∪ B|. Unknown (0.5) when either side has none. */
 export function interestSimilarity(
   viewerInterests: readonly string[],
   candidateInterests: readonly string[],
@@ -26,240 +70,74 @@ export function interestSimilarity(
   if (viewerInterests.length === 0 || candidateInterests.length === 0) {
     return { score: 0.5, sharedIds: [], isKnown: false };
   }
-  const setA = new Set(viewerInterests);
   const setB = new Set(candidateInterests);
   const shared = viewerInterests.filter((id) => setB.has(id));
   const union = new Set([...viewerInterests, ...candidateInterests]);
-  const score = union.size === 0 ? 0.5 : shared.length / union.size;
-  return { score, sharedIds: shared, isKnown: true };
+  return { score: shared.length / union.size, sharedIds: shared, isKnown: true };
 }
 
-/** Dating intentions alignment matrix */
-export function datingIntentionCompatibility(
-  viewer: DatingIntention | null,
-  candidate: DatingIntention | null,
-): { score: number; isKnown: boolean; compatible: boolean } {
-  if (!viewer || !candidate) {
-    return { score: 0.5, isKnown: false, compatible: true };
-  }
-  if (viewer === candidate) {
-    return { score: 1.0, isKnown: true, compatible: true };
-  }
-
-  // Compatible adjacent
-  if (
-    (viewer === 'long_term' && candidate === 'long_term_open') ||
-    (viewer === 'long_term_open' && candidate === 'long_term')
-  ) {
-    return { score: 0.85, isKnown: true, compatible: true };
-  }
-  if (
-    (viewer === 'long_term_open' && candidate === 'short_term_open') ||
-    (viewer === 'short_term_open' && candidate === 'long_term_open')
-  ) {
-    return { score: 0.7, isKnown: true, compatible: true };
-  }
-  if (
-    (viewer === 'short_term_open' && candidate === 'casual') ||
-    (viewer === 'casual' && candidate === 'short_term_open')
-  ) {
-    return { score: 0.85, isKnown: true, compatible: true };
-  }
-
-  // Exploratory
-  if (viewer === 'figuring_out' || candidate === 'figuring_out') {
-    return { score: 0.6, isKnown: true, compatible: true };
-  }
-
-  // Friendship
-  if (viewer === 'friendship' || candidate === 'friendship') {
-    return { score: 0.35, isKnown: true, compatible: true };
-  }
-
-  // Opposing (e.g. long_term vs casual)
-  return { score: 0.15, isKnown: true, compatible: false };
+export interface CompatibilityResult {
+  /** 0..1, shared interests only. */
+  score: number;
+  reasons: MatchReason[];
 }
 
-/** Lifestyle pace and social energy harmony */
-export function lifestyleCompatibility(
-  viewerPace: LifestylePace | null,
-  candidatePace: LifestylePace | null,
-  viewerSocial: SocialPreference | null,
-  candidateSocial: SocialPreference | null,
-): { score: number; isKnown: boolean } {
-  let matchedComponents = 0;
-  let totalScore = 0;
-
-  if (viewerPace && candidatePace) {
-    matchedComponents++;
-    if (viewerPace === candidatePace) totalScore += 1.0;
-    else if (viewerPace === 'balanced' || candidatePace === 'balanced') totalScore += 0.75;
-    else if (
-      (viewerPace === 'early_bird' && candidatePace === 'night_owl') ||
-      (viewerPace === 'night_owl' && candidatePace === 'early_bird')
-    ) {
-      totalScore += 0.3;
-    } else totalScore += 0.6;
-  }
-
-  if (viewerSocial && candidateSocial) {
-    matchedComponents++;
-    if (viewerSocial === candidateSocial) totalScore += 1.0;
-    else if (viewerSocial === 'ambivert' || candidateSocial === 'ambivert') totalScore += 0.8;
-    else if (
-      (viewerSocial === 'introvert' && candidateSocial === 'social_butterfly') ||
-      (viewerSocial === 'social_butterfly' && candidateSocial === 'introvert')
-    ) {
-      totalScore += 0.35;
-    } else totalScore += 0.65;
-  }
-
-  if (matchedComponents === 0) {
-    return { score: 0.5, isKnown: false };
-  }
-  return { score: totalScore / matchedComponents, isKnown: true };
-}
-
-/** Overlap between viewer and candidate post categories */
-export function categoryAffinity(viewer: readonly string[], candidate: readonly string[]): number {
-  if (viewer.length === 0 || candidate.length === 0) return 0;
-  const set = new Set(viewer);
-  const shared = new Set(candidate.filter((c) => set.has(c)));
-  return shared.size / new Set(candidate).size;
-}
-
-/** Compute overall pairwise compatibility score with explainable reasons */
-export function computeCompatibility(viewer: Person, candidate: Person): CompatibilityResult {
+/** How well two people fit, from shared interests only, with a plain-words reason when they share some. */
+export function computeCompatibility(
+  viewer: { interests: readonly string[] },
+  candidate: { interests: readonly string[] },
+): CompatibilityResult {
+  const res = interestSimilarity(viewer.interests, candidate.interests);
   const reasons: MatchReason[] = [];
-
-  // 1. Shared Interests
-  const intRes = interestSimilarity(viewer.interests, candidate.interests);
-  if (intRes.sharedIds.length > 0) {
-    const labels = intRes.sharedIds
+  if (res.sharedIds.length > 0) {
+    const labels = res.sharedIds
       .slice(0, 2)
       .map((id) => getInterestById(id)?.label ?? id)
       .join(' & ');
-    reasons.push({
-      kind: 'shared_interest',
-      text: `You both share passion for ${labels}`,
-    });
+    reasons.push({ kind: 'shared_interest', text: `You both share passion for ${labels}` });
   }
-
-  // 2. Dating Intentions
-  const intentRes = datingIntentionCompatibility(viewer.datingIntention, candidate.datingIntention);
-  if (intentRes.isKnown && intentRes.score >= 0.7) {
-    if (viewer.datingIntention === candidate.datingIntention && viewer.datingIntention) {
-      const cfg = DATING_INTENTION_CONFIG[viewer.datingIntention];
-      reasons.push({
-        kind: 'dating_intention',
-        text: `Both looking for ${cfg?.label ?? 'the same thing'}`,
-      });
-    } else {
-      reasons.push({
-        kind: 'dating_intention',
-        text: 'Compatible dating intentions',
-      });
-    }
-  }
-
-  // 3. Category Affinity
-  const catScore = categoryAffinity(viewer.postCategories, candidate.postCategories);
-  if (catScore >= 0.5 && viewer.postCategories.length > 0) {
-    reasons.push({
-      kind: 'category_resonance',
-      text: 'Similar perspective topics and aesthetic interests',
-    });
-  }
-
-  // 4. Lifestyle
-  const lifeRes = lifestyleCompatibility(
-    viewer.lifestylePace,
-    candidate.lifestylePace,
-    viewerSocial(viewer),
-    viewerSocial(candidate),
-  );
-
-  // Dynamic Weight Normalization
-  let totalWeight = 0;
-  let weightedSum = 0;
-  let coverageComponents = 0;
-
-  if (intRes.isKnown) {
-    weightedSum += 0.4 * intRes.score;
-    totalWeight += 0.4;
-    coverageComponents++;
-  }
-  if (intentRes.isKnown) {
-    weightedSum += 0.25 * intentRes.score;
-    totalWeight += 0.25;
-    coverageComponents++;
-  }
-  if (viewer.postCategories.length > 0 && candidate.postCategories.length > 0) {
-    weightedSum += 0.2 * catScore;
-    totalWeight += 0.2;
-    coverageComponents++;
-  }
-  if (lifeRes.isKnown) {
-    weightedSum += 0.15 * lifeRes.score;
-    totalWeight += 0.15;
-    coverageComponents++;
-  }
-
-  const score = totalWeight > 0 ? weightedSum / totalWeight : 0.5;
-  const coverage = coverageComponents / 4;
-
-  return {
-    score: Math.min(1.0, Math.max(0.0, score)),
-    coverage,
-    reasons,
-  };
+  return { score: res.score, reasons };
 }
 
-function viewerSocial(p: Person): SocialPreference | null {
-  return p.socialPreference;
+/** Need: 1 / (1 + perspectives received recently + mandatory sets already holding the profile today). */
+export function reciprocityNeed(served: number): number {
+  return 1 / (1 + Math.max(0, served));
 }
 
-/** Feed ranking v2 combining compatibility with reciprocity, freshness, quality, and safety */
-export interface RankingFactors {
-  compatibility?: number;
-  categoryAffinity?: number;
-  reciprocityNeed: number;
-  freshness: number;
-  qualityPrior: number;
-  penalties: number;
+/**
+ * Recently active, from whole days since the owner last opened the app (0 = today):
+ * today or yesterday 1.0, 2 to 3 days 0.5, 4 to 7 days 0.2, older or never 0.
+ */
+export function recentlyActiveScore(daysSinceActive: number | null): number {
+  if (daysSinceActive === null || daysSinceActive < 0) return 0;
+  if (daysSinceActive <= 1) return 1;
+  if (daysSinceActive <= 3) return 0.5;
+  if (daysSinceActive <= 7) return 0.2;
+  return 0;
 }
 
-export const RANKING_WEIGHTS = {
-  compatibility: 0.45,
-  reciprocityNeed: 0.25,
-  freshness: 0.15,
-  qualityPrior: 0.15,
-} as const;
+/** Days a profile counts as a new member. */
+export const NEW_MEMBER_DAYS = 7;
 
-export function rankingScore(f: RankingFactors): number {
-  const comp = f.compatibility ?? f.categoryAffinity ?? 0.5;
-  return (
-    RANKING_WEIGHTS.compatibility * comp +
-    RANKING_WEIGHTS.reciprocityNeed * f.reciprocityNeed +
-    RANKING_WEIGHTS.freshness * f.freshness +
-    RANKING_WEIGHTS.qualityPrior * f.qualityPrior -
-    f.penalties
-  );
+/** New member: 1.0 during the profile's first week, then 0. */
+export function newMemberScore(profileAgeDays: number): number {
+  return profileAgeDays >= 0 && profileAgeDays < NEW_MEMBER_DAYS ? 1 : 0;
 }
 
-export function reciprocityNeed(recentReceived: number): number {
-  return 1 / (1 + Math.max(0, recentReceived));
+/** Marks needed before a giver's own record outweighs the neutral starting point. */
+export const QUALITY_PRIOR_MARKS = 5;
+
+/**
+ * Giving quality: the share of a person's own perspectives that owners marked helpful, pulled toward
+ * a neutral 0.5 until there are enough marks: (helpful + 0.5 × prior) / (marked + prior).
+ */
+export function givingQuality(helpful: number, notHelpful: number, prior = QUALITY_PRIOR_MARKS): number {
+  const h = Math.max(0, helpful);
+  const marked = h + Math.max(0, notHelpful);
+  return (h + 0.5 * prior) / (marked + prior);
 }
 
-export function freshness(profileAgeDays: number): number {
-  return Math.exp(-Math.max(0, profileAgeDays) / 30);
-}
-
-export function qualityPrior(helpful: number, notHelpful: number): number {
-  const total = helpful + notHelpful;
-  return total === 0 ? 0.5 : helpful / total;
-}
-
-export function reportPenalty(reportCount: number): number {
-  return 0.1 * Math.min(reportCount, 5);
+/** 0.1 for each different person who reported the profile in the window, up to 5. */
+export function reportPenalty(distinctReporters: number): number {
+  return 0.1 * Math.min(Math.max(0, distinctReporters), 5);
 }

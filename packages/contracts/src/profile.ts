@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { DayKeySchema, IdSchema, RULES } from './common';
-import { DatingIntention, LifestylePace, PersonalityPromptAnswerSchema, SocialPreference } from './personality';
+import { LifestylePace, PersonalityPromptAnswerSchema, SocialPreference } from './personality';
 import { PostSchema } from './post';
 
 /** assumption: gender options (not enumerated by the product owner) */
 export const Gender = z.enum(['woman', 'man', 'non_binary']);
 export type Gender = z.infer<typeof Gender>;
 
-/** assumption: orientation/preference options (not enumerated by the product owner) */
+/** Optional and private (decided 2026-10-20): never shown, not used for matching in the beta, never in analytics. */
 export const Orientation = z.enum([
   'straight',
   'gay',
@@ -20,11 +20,25 @@ export const Orientation = z.enum([
 ]);
 export type Orientation = z.infer<typeof Orientation>;
 
+/**
+ * The private onboarding goal (decided 2026-10-20): Get perspectives, Meet new people, or both.
+ * Never shown to anyone and never labels a connection. It words the audience question; in the
+ * beta it does not change matching.
+ */
+export const Goal = z.enum(['get_perspectives', 'meet_people']);
+export type Goal = z.infer<typeof Goal>;
+
+export const GoalsSchema = z
+  .array(Goal)
+  .min(1)
+  .max(2)
+  .refine((g) => new Set(g).size === g.length, { message: 'Goals must be unique' });
+
 export const SelfieStatus = z.enum(['unverified', 'verified', 'rejected']);
 export type SelfieStatus = z.infer<typeof SelfieStatus>;
 
 /** What is still missing before a profile goes live. */
-export const ProfileRequirement = z.enum(['basics', 'audience', 'selfie', 'primary_photo_post']);
+export const ProfileRequirement = z.enum(['basics', 'goal', 'audience', 'selfie', 'primary_photo_post']);
 export type ProfileRequirement = z.infer<typeof ProfileRequirement>;
 
 /** Who may see this profile. Set once at profile level, always 18+. */
@@ -58,10 +72,8 @@ export const PublicProfileSchema = z.object({
   age: z.number().int(),
   gender: Gender,
   heightCm: z.number().int(),
-  orientation: Orientation,
   city: z.string(),
   pronouns: z.string().nullable().optional(),
-  datingIntention: DatingIntention.nullable().optional(),
   interests: z.array(z.string()).default([]),
   lifestylePace: LifestylePace.nullable().optional(),
   socialPreference: SocialPreference.nullable().optional(),
@@ -83,9 +95,9 @@ export const MyProfileSchema = z.object({
   heightCm: z.number().int().nullable(),
   orientation: Orientation.nullable(),
   city: z.string().nullable(),
+  goals: z.array(Goal).default([]),
+  /** The age range in use, which may have been widened automatically (see notices). */
   audience: AudienceSchema.nullable(),
-  datingIntention: DatingIntention.nullable().optional(),
-  intentionDealbreaker: z.boolean().default(false),
   interests: z.array(z.string()).default([]),
   lifestylePace: LifestylePace.nullable().optional(),
   socialPreference: SocialPreference.nullable().optional(),
@@ -103,11 +115,10 @@ export const UpdateProfileInputSchema = z
     gender: Gender,
     pronouns: z.string().trim().max(30).nullable(),
     heightCm: z.number().int().min(RULES.heightCmMin).max(RULES.heightCmMax),
-    orientation: Orientation,
+    orientation: Orientation.nullable(),
     city: z.string().trim().min(2).max(80),
+    goals: GoalsSchema,
     audience: AudienceSchema,
-    datingIntention: DatingIntention.nullable(),
-    intentionDealbreaker: z.boolean(),
     interests: z.array(z.string()).max(10),
     lifestylePace: LifestylePace.nullable(),
     socialPreference: SocialPreference.nullable(),

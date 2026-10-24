@@ -14,6 +14,7 @@ import { ConnectState, evaluateAccept, evaluateConnect, requestAvailableAt } fro
 import { ExpiryConfig, ExpiryDecision, ExpiryFacts, evaluateExpiry, expiryForViewer } from '../domain/connection-expiry';
 import { isRevealed } from '../domain/daily';
 import { TextModerator } from '../moderation/moderation';
+import { PushService } from '../push/push.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PROFILE_USER_INCLUDE, ProfileMapper } from '../profiles/profile.mapper';
 import { SocialService } from '../social/social.service';
@@ -35,6 +36,7 @@ export class ConnectService {
     private readonly daily: DailyService,
     private readonly mapper: ProfileMapper,
     private readonly moderator: TextModerator,
+    private readonly push: PushService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -95,6 +97,8 @@ export class ConnectService {
       },
       select: { id: true, status: true },
     });
+    // Push A (placeholder): no name, because requests stay locked until the receiver's daily set is done.
+    this.push.notify(receiverId, { title: 'Perspective', body: 'Someone wants to connect with you.', data: { screen: 'inbox' } });
     return created;
   }
 
@@ -167,6 +171,12 @@ export class ConnectService {
         update: { status: 'active', originRequestId: req.id, ...fresh },
         select: { id: true },
       });
+    });
+    // Push B: the person who asked learns they are connected (the one accepting sees it on screen).
+    this.push.notify(req.senderId, {
+      title: 'You’re connected',
+      body: `You and ${await this.push.nameOf(viewerId)} are connected. Say hi!`,
+      data: { screen: 'chat', connectionId: connection.id },
     });
     return this.connectionFor(viewerId, connection.id);
   }
@@ -246,12 +256,23 @@ export class ConnectService {
     if (blocks.viewerBlocked || blocks.blockedByOther) {
       throw new AppException('BLOCKED_PAIR', 'This conversation is closed.');
     }
+    // A banned person's chats are paused, not deleted (decided 2026-10-20).
+    const partner = await this.prisma.user.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (partner?.status !== 'active') {
+      throw new AppException('CONNECTION_PAUSED', 'This conversation is paused. The other person can’t use Perspective right now.');
+    }
     const verdict = await this.moderator.check(text);
     if (!verdict.allowed) {
       throw new AppException('MODERATION_FAILED', 'That message breaks the community guidelines.');
     }
     const m = await this.prisma.message.create({ data: { connectionId, senderId: viewerId, text } });
     await this.prisma.connection.update({ where: { id: connectionId }, data: { updatedAt: new Date() } });
+    // Push C: never the message text.
+    this.push.notify(partnerId, {
+      title: await this.push.nameOf(viewerId),
+      body: `${await this.push.nameOf(viewerId)} sent you a message.`,
+      data: { screen: 'chat', connectionId },
+    });
     return { id: m.id, connectionId, senderId: viewerId, text: m.text, createdAt: m.createdAt.toISOString() };
   }
 
@@ -353,7 +374,10 @@ export class ConnectService {
     }
     const partnerOf = (id: string) => (id === c.userAId ? c.userBId : c.userAId);
     const decision = evaluateExpiry(await this.expiryFacts(c, now), partnerOf, this.expiryConfig());
-    if (!decision.close) return { connection: c, decision };
+    if (!decision.close) {
+      if (decision.warn) await this.pushQuietWarning(c, decision);
+      return { connection: c, decision };
+    }
     const closed = await this.prisma.connection.updateMany({
       where: { id: c.id, status: 'active' },
       data: { status: 'unmatched', closedReason: decision.close, closedAt: now },
@@ -362,6 +386,32 @@ export class ConnectService {
       ? { ...c, status: 'unmatched' as const, closedReason: decision.close, closedAt: now }
       : await this.prisma.connection.findUniqueOrThrow({ where: { id: c.id } });
     return { connection, decision };
+  }
+
+  /**
+   * Push F (placeholder), once per connection and phase: the quiet person is told someone is waiting;
+   * when nobody has written, both get a nudge.
+   */
+  private async pushQuietWarning(c: ConnectionRow, decision: ExpiryDecision): Promise<void> {
+    const since = c.connectedAt.toISOString();
+    if (decision.quietUserId) {
+      const waitingId = decision.quietUserId === c.userAId ? c.userBId : c.userAId;
+      this.push.notify(decision.quietUserId, {
+        title: 'Perspective',
+        body: `${await this.push.nameOf(waitingId)} is waiting. This connection closes in about a day if you don’t reply.`,
+        data: { screen: 'chat', connectionId: c.id },
+        dedupeKey: `quiet_reply:${c.id}:${since}`,
+      });
+      return;
+    }
+    for (const [me, other] of [[c.userAId, c.userBId], [c.userBId, c.userAId]]) {
+      this.push.notify(me, {
+        title: 'Perspective',
+        body: `Say hi to ${await this.push.nameOf(other)}. This connection closes soon if nobody writes.`,
+        data: { screen: 'chat', connectionId: c.id },
+        dedupeKey: `quiet_hello:${c.id}:${since}`,
+      });
+    }
   }
 
   private async activeRowsFor(viewerId: string, now: Date): Promise<ConnectionRow[]> {

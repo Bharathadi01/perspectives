@@ -85,10 +85,11 @@ export interface LiveUserOptions {
   gender: Gender;
   age?: number;
   audience: { genders: Gender[]; minAge: number; maxAge: number };
+  goals?: ('get_perspectives' | 'meet_people')[];
   extraPosts?: number;
 }
 
-/** Signs up and completes the profile: basics, audience, selfie, primary photo post. */
+/** Signs up and completes the profile: basics (orientation left out: it is optional), goal, audience, selfie, primary photo post. */
 export async function liveUser(app: INestApplication, o: LiveUserOptions): Promise<Client & { postIds: string[] }> {
   const c = await signUp(app, `${o.name.toLowerCase()}-${randomUUID().slice(0, 8)}@test.local`, o.age ?? 25);
   await c
@@ -96,8 +97,8 @@ export async function liveUser(app: INestApplication, o: LiveUserOptions): Promi
       displayName: o.name,
       gender: o.gender,
       heightCm: 172,
-      orientation: 'straight',
       city: 'Bengaluru',
+      goals: o.goals ?? ['get_perspectives', 'meet_people'],
       audience: o.audience,
     })
     .expect(200);

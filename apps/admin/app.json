@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Perspective Admin",
+    "slug": "perspective-admin",
+    "version": "1.0.0",
+    "platforms": ["web"],
+    "userInterfaceStyle": "light",
+    "scheme": "perspective-admin",
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"]
+  }
+}

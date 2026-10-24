@@ -22,11 +22,16 @@ export function errorMessage(err: unknown): string {
       case 'DAILY_UNLOCK_INCOMPLETE':
       case 'CAP_REACHED':
       case 'UNDERAGE':
+      case 'EMAIL_BLOCKED':
+      case 'APPEAL_NOT_ALLOWED':
+      case 'CONNECTION_PAUSED':
         return err.message;
       case 'UNAUTHORIZED':
         return 'Please sign in again.';
       case 'ACCOUNT_SUSPENDED':
         return 'This account is suspended.';
+      case 'ACCOUNT_BANNED':
+        return 'This account is banned.';
       case 'NOT_FOUND':
       case 'POST_NOT_ELIGIBLE':
       case 'PROFILE_NOT_ELIGIBLE':

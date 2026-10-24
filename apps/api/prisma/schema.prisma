@@ -9,9 +9,39 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/// active, suspended (a ban with an end date, `suspendedUntil`) or banned (permanent). Decided 2026-10-20.
 enum UserStatus {
   active
   suspended
+  banned
+}
+
+/// Why someone is in the admin's review list (docs/PRODUCT.md → Reports, holds and bans).
+enum ReviewReason {
+  reporters
+  serious_report
+  weak_giver
+}
+
+enum ReviewOutcome {
+  dismissed
+  banned_temporary
+  banned_permanent
+}
+
+enum BanKind {
+  temporary
+  permanent
+}
+
+enum AppealStatus {
+  open
+  upheld
+  restored
+}
+
+enum AdminRole {
+  admin
 }
 
 enum Gender {
@@ -31,6 +61,20 @@ enum Orientation {
   prefer_not_to_say
 }
 
+/// The private onboarding goal (decided 2026-10-20). A person picks one or both; never shown to anyone.
+enum ProfileGoal {
+  get_perspectives
+  meet_people
+}
+
+/// Kinds of in-app notice. Step 2 of the beta adds the automatic age widening only.
+enum NoticeKind {
+  audience_widened
+  weak_giver_tip
+  account_restored
+}
+
+/// Unused since 2026-10-20 (replaced by ProfileGoal). Kept because migrations are additive only.
 enum DatingIntention {
   long_term
   long_term_open
@@ -194,6 +238,8 @@ model User {
   passwordHash    String
   birthDate       DateTime   @db.Date
   status          UserStatus @default(active)
+  /// End of a temporary ban (status suspended). The account returns to active by itself afterwards.
+  suspendedUntil  DateTime?
   termsAcceptedAt DateTime
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
@@ -218,6 +264,12 @@ model User {
   blocksReceived    Block[]             @relation("Blocked")
   reportsFiled      Report[]
   idempotency       IdempotencyRecord[]
+  notices           Notice[]
+  reviewCases       ReviewCase[]
+  bans              Ban[]
+  appeals           Appeal[]
+  giverQuality      GiverQuality?
+  pushTokens        PushToken[]
 
   @@map("users")
 }
@@ -247,9 +299,15 @@ model Profile {
   orientation          Orientation?
   city                 String?
   pronouns             String?
+  goals                ProfileGoal[]     @default([])
   audienceGenders      Gender[]          @default([])
+  /// The age range in use for matching. Equal to the chosen range unless it was widened automatically.
   audienceMinAge       Int?
   audienceMaxAge       Int?
+  /// The age range the person last chose themselves; automatic widening is measured from it.
+  audienceChosenMinAge Int?
+  audienceChosenMaxAge Int?
+  /// Unused since 2026-10-20: the dating intention and its dealbreaker were removed (ADR-018).
   datingIntention      DatingIntention?
   intentionDealbreaker Boolean           @default(false)
   interests            String[]          @default([])
@@ -266,6 +324,22 @@ model Profile {
 
   @@index([isLive, gender])
   @@map("profiles")
+}
+
+/// The in-app notices list (You → Notices). `dedupeKey` stops the same notice being written twice.
+model Notice {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NoticeKind
+  data      Json
+  dedupeKey String
+  readAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@map("notices")
 }
 
 model Media {
@@ -325,6 +399,8 @@ model Perspective {
   verdict          FeedbackVerdict?
   notHelpfulReason NotHelpfulReason?
   thankedAt        DateTime?
+  /// When the owner last marked it helpful or not helpful (marks fade after 45 days).
+  feedbackAt       DateTime?
   /// Day (app timezone) the perspective was received; drives the daily unlock.
   receivedDayKey   String
   createdAt        DateTime          @default(now())
@@ -364,6 +440,8 @@ model DailyAssignment {
 
   @@unique([userId, dayKey, targetId])
   @@index([userId, dayKey, status])
+  /// Counts how many sets already hold a profile today (over-exposure cap).
+  @@index([targetId, dayKey])
   @@map("daily_assignments")
 }
 
@@ -458,20 +536,169 @@ model Block {
 }
 
 model Report {
-  id         String           @id @default(uuid()) @db.Uuid
+  id           String           @id @default(uuid()) @db.Uuid
   /// Kept (as null) after the reporter deletes their account, for safety records.
-  reporterId String?          @db.Uuid
-  reporter   User?            @relation(fields: [reporterId], references: [id], onDelete: SetNull)
-  targetType ReportTargetType
-  targetId   String           @db.Uuid
-  reason     ReportReason
-  note       String?
-  status     ReportStatus     @default(unreviewed)
-  createdAt  DateTime         @default(now())
+  reporterId   String?          @db.Uuid
+  reporter     User?            @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+  targetType   ReportTargetType
+  targetId     String           @db.Uuid
+  reason       ReportReason
+  note         String?
+  status       ReportStatus     @default(unreviewed)
+  /// The person the report is about (profile owner, post owner, perspective giver or message sender).
+  subjectId    String?          @db.Uuid
+  /// True when it came from a "not helpful" mark (insulting, sexual or unsafe) instead of the Report button.
+  fromFeedback Boolean          @default(false)
+  createdAt    DateTime         @default(now())
 
   @@index([status, createdAt])
   @@index([targetType, targetId])
+  @@index([subjectId, createdAt])
   @@map("reports")
+}
+
+/// An entry in the admin's review list. Holds (reporters, serious_report) hide the person from anyone
+/// new while open; a weak_giver case only flags them. Closed by an admin (or when they ban).
+model ReviewCase {
+  id       String         @id @default(uuid()) @db.Uuid
+  userId   String         @db.Uuid
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason   ReviewReason
+  hides    Boolean
+  openedAt DateTime       @default(now())
+  closedAt DateTime?
+  closedBy String?        @db.Uuid
+  outcome  ReviewOutcome?
+
+  @@index([userId, closedAt])
+  @@index([closedAt, openedAt])
+  @@map("review_cases")
+}
+
+/// Every ban an admin gave. The current one is the latest that is not lifted. Extending creates a new
+/// ban (so it can be appealed once again) and marks the old one lifted.
+model Ban {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      BanKind
+  /// Shown to the person on the ban screen.
+  reason    String
+  endsAt    DateTime?
+  createdBy String    @db.Uuid
+  createdAt DateTime  @default(now())
+  liftedAt  DateTime?
+  appeal    Appeal?
+
+  @@index([userId, createdAt])
+  @@map("bans")
+}
+
+/// One appeal per ban (decided 2026-10-21).
+model Appeal {
+  id             String       @id @default(uuid()) @db.Uuid
+  banId          String       @unique @db.Uuid
+  ban            Ban          @relation(fields: [banId], references: [id], onDelete: Cascade)
+  userId         String       @db.Uuid
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message        String
+  status         AppealStatus @default(open)
+  createdAt      DateTime     @default(now())
+  decidedAt      DateTime?
+  decidedBy      String?      @db.Uuid
+  /// Shown to the person when the ban is kept.
+  decisionReason String?
+
+  @@index([status, createdAt])
+  @@map("appeals")
+}
+
+/// Weak-giver state (the quality loop), recomputed after every mark on their perspectives and on their
+/// first visit of the day (so faded marks clear it).
+model GiverQuality {
+  userId         String    @id @db.Uuid
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weak           Boolean   @default(false)
+  /// When they last went over the line (the private tip was sent then).
+  weakSince      DateTime?
+  /// When they were put on the admin's list in this episode.
+  flaggedAt      DateTime?
+  lowEffortMarks Int       @default(0)
+  helpfulMarks   Int       @default(0)
+  updatedAt      DateTime  @updatedAt
+
+  @@index([weak])
+  @@map("giver_quality")
+}
+
+/// Admin sign-ins are not Perspective accounts (docs/SECURITY.md). Created only by a server command.
+model AdminUser {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  /// Base32 secret for the authenticator app (6-digit code at every sign-in).
+  totpSecret   String
+  /// Last accepted 30-second step, so a code cannot be used twice.
+  lastTotpStep Int?
+  role         AdminRole @default(admin)
+  createdAt    DateTime  @default(now())
+  lastSignInAt DateTime?
+  disabledAt   DateTime?
+
+  audit AdminAuditEntry[]
+
+  @@map("admin_users")
+}
+
+/// Every admin action and every view of reported content. Never edited from the dashboard.
+model AdminAuditEntry {
+  id           String    @id @default(uuid()) @db.Uuid
+  adminId      String    @db.Uuid
+  admin        AdminUser @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  action       String
+  targetUserId String?   @db.Uuid
+  targetId     String?   @db.Uuid
+  reason       String?
+  createdAt    DateTime  @default(now())
+
+  @@index([targetUserId, createdAt])
+  @@index([createdAt])
+  @@map("admin_audit_log")
+}
+
+/// An Expo push token for one of the person's devices (beta step 5). Disabled when Expo says the
+/// device is no longer registered; removed when they sign out on that device.
+model PushToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  platform   String
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  disabledAt DateTime?
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
+/// Pushes that must go out at most once (the daily reminder, chat warnings). No message content.
+model PushLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  dedupeKey String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@map("push_log")
+}
+
+/// Emails that cannot sign up again after a permanent ban.
+model BlockedEmail {
+  email     String   @id
+  createdAt DateTime @default(now())
+
+  @@map("blocked_emails")
 }
 
 model IdempotencyRecord {

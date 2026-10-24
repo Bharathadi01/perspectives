@@ -1,16 +1,28 @@
-import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { ApiError } from '@perspective/api-client';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '../src/components/ui/Toast';
+import { configurePushDisplay, usePushNavigation } from '../src/push/push';
 import { tokenStore } from '../src/session/tokenStore';
 import { useSession } from '../src/session/sessionStore';
 import { theme } from '../src/theme';
 
+/** A suspended or banned person can only see the ban screen (decided 2026-10-20). */
+const isRestricted = (err: unknown) => err instanceof ApiError && (err.code === 'ACCOUNT_SUSPENDED' || err.code === 'ACCOUNT_BANNED');
+const toBanScreen = (err: unknown) => {
+  if (isRestricted(err)) router.replace('/restricted');
+};
+
+configurePushDisplay();
+
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  queryCache: new QueryCache({ onError: toBanScreen }),
+  mutationCache: new MutationCache({ onError: toBanScreen }),
+  defaultOptions: { queries: { retry: (count, err) => !isRestricted(err) && count < 1, staleTime: 30_000 } },
 });
 
 /** Tell react-query when the app returns to the foreground, so open queries (like new connections) refresh. */
@@ -38,6 +50,7 @@ function useBootstrapSession() {
 export default function RootLayout() {
   useBootstrapSession();
   useAppFocus();
+  usePushNavigation();
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>

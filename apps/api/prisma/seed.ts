@@ -5,11 +5,12 @@
  *
  * Every seed user's password is `perspective123`.
  */
-import { PrismaClient, Gender, Orientation, PostCategory } from '@prisma/client';
+import { PrismaClient, Gender, Orientation, PostCategory, ProfileGoal } from '@prisma/client';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { generateTotpSecret } from '../src/admin/totp';
 import { hashPassword } from '../src/auth/passwords';
 import { dayKeyFor } from '../src/common/day';
 import { gradientPng, toneWav } from './media-fixtures';
@@ -37,6 +38,7 @@ interface SeedUser {
   age: number;
   gender: Gender;
   orientation: Orientation;
+  goals: ProfileGoal[];
   heightCm: number;
   city: string;
   audience: { genders: Gender[]; minAge: number; maxAge: number };
@@ -45,7 +47,7 @@ interface SeedUser {
 
 const USERS: SeedUser[] = [
   {
-    n: 1, email: 'ravi@perspective.test', name: 'Ravi', age: 24, gender: 'man', orientation: 'straight', heightCm: 178, city: 'Bengaluru',
+    n: 1, email: 'ravi@perspective.test', name: 'Ravi', age: 24, gender: 'man', orientation: 'straight', goals: ['meet_people'], heightCm: 178, city: 'Bengaluru',
     audience: { genders: ['woman'], minAge: 18, maxAge: 30 },
     posts: [
       { kind: 'photo', prompt: 'Does this outfit work for a first date?', category: 'style', focusAreas: ['outfit', 'fit'], colors: [[94, 75, 219], [247, 196, 160]] },
@@ -54,7 +56,7 @@ const USERS: SeedUser[] = [
     ],
   },
   {
-    n: 2, email: 'meera@perspective.test', name: 'Meera', age: 23, gender: 'woman', orientation: 'straight', heightCm: 165, city: 'Bengaluru',
+    n: 2, email: 'meera@perspective.test', name: 'Meera', age: 23, gender: 'woman', orientation: 'straight', goals: ['get_perspectives', 'meet_people'], heightCm: 165, city: 'Bengaluru',
     audience: { genders: ['man'], minAge: 21, maxAge: 32 },
     posts: [
       { kind: 'photo', prompt: 'First impression from this photo?', category: 'looks', focusAreas: ['first_look', 'expression'], colors: [[184, 107, 32], [250, 225, 190]] },
@@ -62,7 +64,7 @@ const USERS: SeedUser[] = [
     ],
   },
   {
-    n: 3, email: 'asha@perspective.test', name: 'Asha', age: 26, gender: 'woman', orientation: 'bisexual', heightCm: 168, city: 'Mumbai',
+    n: 3, email: 'asha@perspective.test', name: 'Asha', age: 26, gender: 'woman', orientation: 'bisexual', goals: ['get_perspectives'], heightCm: 168, city: 'Mumbai',
     audience: { genders: ['man', 'woman'], minAge: 22, maxAge: 35 },
     posts: [
       { kind: 'photo', prompt: 'What vibe do I give off here?', category: 'vibe', focusAreas: ['energy', 'approachable'], colors: [[23, 23, 27], [91, 75, 219]] },
@@ -70,28 +72,28 @@ const USERS: SeedUser[] = [
     ],
   },
   {
-    n: 4, email: 'kabir@perspective.test', name: 'Kabir', age: 28, gender: 'man', orientation: 'straight', heightCm: 182, city: 'Bengaluru',
+    n: 4, email: 'kabir@perspective.test', name: 'Kabir', age: 28, gender: 'man', orientation: 'straight', goals: ['meet_people'], heightCm: 182, city: 'Bengaluru',
     audience: { genders: ['woman'], minAge: 21, maxAge: 35 },
     posts: [
       { kind: 'photo', prompt: 'Does my posture look confident?', category: 'fitness', focusAreas: ['posture'], colors: [[30, 90, 140], [200, 225, 240]] },
     ],
   },
   {
-    n: 5, email: 'nisha@perspective.test', name: 'Nisha', age: 22, gender: 'woman', orientation: 'straight', heightCm: 160, city: 'Delhi',
+    n: 5, email: 'nisha@perspective.test', name: 'Nisha', age: 22, gender: 'woman', orientation: 'straight', goals: ['get_perspectives', 'meet_people'], heightCm: 160, city: 'Delhi',
     audience: { genders: ['man'], minAge: 18, maxAge: 28 },
     posts: [
       { kind: 'photo', prompt: 'New haircut. Yay or nay?', category: 'style', focusAreas: ['grooming'], colors: [[200, 120, 160], [250, 235, 240]] },
     ],
   },
   {
-    n: 6, email: 'priya@perspective.test', name: 'Priya', age: 25, gender: 'woman', orientation: 'straight', heightCm: 170, city: 'Bengaluru',
+    n: 6, email: 'priya@perspective.test', name: 'Priya', age: 25, gender: 'woman', orientation: 'straight', goals: ['get_perspectives'], heightCm: 170, city: 'Bengaluru',
     audience: { genders: ['man'], minAge: 21, maxAge: 35 },
     posts: [
       { kind: 'photo', prompt: 'Does this say approachable or intimidating?', category: 'vibe', focusAreas: ['impression', 'approachable'], colors: [[60, 60, 90], [220, 200, 240]] },
     ],
   },
   {
-    n: 7, email: 'arjun@perspective.test', name: 'Arjun', age: 30, gender: 'man', orientation: 'gay', heightCm: 175, city: 'Bengaluru',
+    n: 7, email: 'arjun@perspective.test', name: 'Arjun', age: 30, gender: 'man', orientation: 'gay', goals: ['meet_people'], heightCm: 175, city: 'Bengaluru',
     audience: { genders: ['man'], minAge: 24, maxAge: 40 },
     posts: [
       { kind: 'photo', prompt: 'Gym or office look — which works better?', category: 'style', focusAreas: ['outfit'], colors: [[20, 110, 110], [220, 240, 235]] },
@@ -126,9 +128,12 @@ async function main(): Promise<void> {
             heightCm: u.heightCm,
             orientation: u.orientation,
             city: u.city,
+            goals: u.goals,
             audienceGenders: u.audience.genders,
             audienceMinAge: u.audience.minAge,
             audienceMaxAge: u.audience.maxAge,
+            audienceChosenMinAge: u.audience.minAge,
+            audienceChosenMaxAge: u.audience.maxAge,
             selfieStatus: 'verified',
             selfieCheckedAt: now,
             isLive: true,
@@ -164,6 +169,11 @@ async function main(): Promise<void> {
 
   // Yesterday: Meera and Asha gave Ravi perspectives, and Ravi finished yesterday's set (revealed).
   await prisma.dailyProgress.create({ data: { userId: ravi, dayKey: yesterday, requiredCount: 0, unlockedAt: giveAt(yesterday) } });
+  // Everyone else "opened the app" yesterday too, so they count as active people for the daily set
+  // (people who have not opened the app in 7 days are never put into a set).
+  await prisma.dailyProgress.createMany({
+    data: ids.filter((u) => u !== ravi).map((userId) => ({ userId, dayKey: yesterday, requiredCount: 0, unlockedAt: giveAt(yesterday) })),
+  });
   await prisma.perspective.create({
     data: {
       postId: postIds.get(ravi)![0], giverId: meera, ownerId: ravi, receivedDayKey: yesterday, createdAt: giveAt(yesterday),
@@ -220,8 +230,17 @@ async function main(): Promise<void> {
     ],
   });
 
+  // A development admin for the admin page (decided 2026-10-21: password only for now). Never used
+  // on a real server: there, admins are made with `pnpm admin:create`.
+  await prisma.adminUser.upsert({
+    where: { email: 'admin@perspective.test' },
+    create: { email: 'admin@perspective.test', passwordHash, totpSecret: generateTotpSecret() },
+    update: { passwordHash, disabledAt: null },
+  });
+
   console.log(`Seeded ${USERS.length} verified users. Password for all: perspective123`);
   for (const u of USERS) console.log(`  ${u.name.padEnd(6)} ${u.email}`);
+  console.log('Admin page (http://localhost:8082): admin@perspective.test / perspective123');
 }
 
 main()

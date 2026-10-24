@@ -1,6 +1,28 @@
-import type { Gender, NotHelpfulReason, Orientation, ReportReason } from '@perspective/contracts';
+import type { Gender, Goal, NotHelpfulReason, Orientation, ReportReason } from '@perspective/contracts';
 
 export const GENDER_LABEL: Record<Gender, string> = { woman: 'Woman', man: 'Man', non_binary: 'Non-binary' };
+
+/** The private onboarding goal (decided 2026-10-20). Never shown to anyone else. */
+export const GOAL_LABEL: Record<Goal, { title: string; description: string }> = {
+  get_perspectives: { title: 'Get perspectives', description: 'Hear honestly how you look, dress, sound and come across.' },
+  meet_people: { title: 'Meet new people', description: 'Connect with people you get along with.' },
+};
+
+/** The audience question is worded by the goal (docs/PRODUCT.md → Audience). */
+export function audienceQuestion(goals: readonly Goal[]): string {
+  const perspectives = goals.includes('get_perspectives');
+  const meet = goals.includes('meet_people');
+  if (perspectives && !meet) return 'Whose perspectives do you want?';
+  if (meet && !perspectives) return 'Who would you like to meet?';
+  return 'Who do you want in your feed?';
+}
+
+/** True when the person only wants perspectives: their audience starts with every gender selected. */
+export function perspectivesOnly(goals: readonly Goal[]): boolean {
+  return goals.length === 1 && goals[0] === 'get_perspectives';
+}
+
+export const PERSPECTIVES_ONLY_HINT = 'Including more people brings you more perspectives, faster.';
 
 export const ORIENTATION_LABEL: Record<Orientation, string> = {
   straight: 'Straight',

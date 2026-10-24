@@ -1,14 +1,17 @@
 import { create } from 'zustand';
 import type {
-  DatingIntention,
   Gender,
+  Goal,
   LifestylePace,
   MyProfile,
   Orientation,
   PersonalityPromptAnswer,
   SocialPreference,
 } from '@perspective/contracts';
-import { RULES } from '@perspective/contracts';
+import { Gender as GenderEnum, RULES } from '@perspective/contracts';
+
+/** Onboarding steps: about you, goal, audience, interests, what matters, personality, review. */
+export const ONBOARDING_STEP_COUNT = 7;
 
 export interface OnboardingDraftState {
   // Step 1: About You
@@ -16,25 +19,29 @@ export interface OnboardingDraftState {
   gender: Gender | null;
   pronouns: string;
   heightCm: string;
+  /** Optional and private (decided 2026-10-20). */
   orientation: Orientation | null;
   city: string;
   selfieVerified: boolean;
 
-  // Step 2: Who would you like to meet?
+  // Step 2: Goal (private)
+  goals: Goal[];
+
+  // Step 3: Audience, worded by the goal
   audienceGenders: Gender[];
   audienceMinAge: number;
   audienceMaxAge: number;
-  datingIntention: DatingIntention | null;
-  intentionDealbreaker: boolean;
+  /** True once the person (or their saved profile) chose genders, so the goal no longer pre-fills them. */
+  audienceTouched: boolean;
 
-  // Step 3: Interests
+  // Step 4: Interests
   selectedInterests: string[];
 
-  // Step 4: What matters to you? (Lifestyle & Social Pace)
+  // Step 5: What matters to you? (Lifestyle & Social Pace)
   lifestylePace: LifestylePace | null;
   socialPreference: SocialPreference | null;
 
-  // Step 5: Personality Prompts
+  // Step 6: Personality Prompts
   personalityPrompts: PersonalityPromptAnswer[];
 
   // Step index
@@ -43,6 +50,8 @@ export interface OnboardingDraftState {
   // Actions
   setField: <K extends keyof OnboardingDraftState>(key: K, val: OnboardingDraftState[K]) => void;
   setStepIndex: (idx: number) => void;
+  /** Saves the goal; "Get perspectives" alone starts the audience with every gender selected. */
+  setGoals: (goals: Goal[]) => void;
   initializeFromProfile: (me: MyProfile) => void;
   reset: () => void;
 }
@@ -52,15 +61,16 @@ const DEFAULT_STATE = {
   gender: null as Gender | null,
   pronouns: '',
   heightCm: '',
-  orientation: 'straight' as Orientation | null,
+  orientation: null as Orientation | null,
   city: '',
   selfieVerified: false,
+
+  goals: [] as Goal[],
 
   audienceGenders: ['woman'] as Gender[],
   audienceMinAge: RULES.minAge,
   audienceMaxAge: 35,
-  datingIntention: 'long_term_open' as DatingIntention | null,
-  intentionDealbreaker: false,
+  audienceTouched: false,
 
   selectedInterests: [] as string[],
 
@@ -77,7 +87,17 @@ export const useOnboardingStore = create<OnboardingDraftState>((set) => ({
 
   setField: (key, val) => set((s) => ({ ...s, [key]: val })),
 
-  setStepIndex: (idx) => set({ stepIndex: Math.max(0, Math.min(5, idx)) }),
+  setStepIndex: (idx) => set({ stepIndex: Math.max(0, Math.min(ONBOARDING_STEP_COUNT - 1, idx)) }),
+
+  setGoals: (goals) =>
+    set((s) => {
+      const onlyPerspectives = goals.length === 1 && goals[0] === 'get_perspectives';
+      return {
+        ...s,
+        goals,
+        ...(onlyPerspectives && !s.audienceTouched ? { audienceGenders: [...GenderEnum.options] } : {}),
+      };
+    }),
 
   initializeFromProfile: (me) =>
     set((s) => ({
@@ -89,11 +109,11 @@ export const useOnboardingStore = create<OnboardingDraftState>((set) => ({
       orientation: me.orientation ?? s.orientation,
       city: me.city ?? s.city,
       selfieVerified: me.selfieStatus === 'verified',
+      goals: me.goals?.length ? me.goals : s.goals,
       audienceGenders: me.audience?.genders?.length ? me.audience.genders : s.audienceGenders,
       audienceMinAge: me.audience?.minAge ?? s.audienceMinAge,
       audienceMaxAge: me.audience?.maxAge ?? s.audienceMaxAge,
-      datingIntention: me.datingIntention ?? s.datingIntention,
-      intentionDealbreaker: me.intentionDealbreaker ?? s.intentionDealbreaker,
+      audienceTouched: s.audienceTouched || Boolean(me.audience?.genders?.length),
       selectedInterests: me.interests?.length ? me.interests : s.selectedInterests,
       lifestylePace: me.lifestylePace ?? s.lifestylePace,
       socialPreference: me.socialPreference ?? s.socialPreference,

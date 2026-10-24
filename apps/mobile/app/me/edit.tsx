@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { api } from '../../src/api/client';
 import { AudienceForm } from '../../src/components/forms/AudienceForm';
+import { GoalForm } from '../../src/components/forms/GoalForm';
 import { BasicsForm } from '../../src/components/forms/BasicsForm';
 import { AudioRecordingModal } from '../../src/components/profile/AudioRecordingModal';
 import { EditPostPromptModal } from '../../src/components/profile/EditPostPromptModal';
@@ -37,7 +38,7 @@ import { Label, Muted, Title } from '../../src/components/ui/Text';
 import { useToast } from '../../src/components/ui/Toast';
 import { useMe, useRemovePost, useReorderPosts, useUpdatePost } from '../../src/features/hooks';
 import { errorMessage } from '../../src/lib/errors';
-import { formatDuration } from '../../src/lib/labels';
+import { GOAL_LABEL, audienceQuestion, formatDuration } from '../../src/lib/labels';
 import { theme } from '../../src/theme';
 
 function AttachedPerspectiveCard({
@@ -156,17 +157,15 @@ function AttachedPerspectiveCard({
 }
 
 function asPublicProfile(me: MyProfile, customPosts?: Post[]): PublicProfile | null {
-  if (!me.displayName || !me.gender || !me.heightCm || !me.orientation || !me.city) return null;
+  if (!me.displayName || !me.gender || !me.heightCm || !me.city) return null;
   return {
     id: me.id,
     displayName: me.displayName,
     age: me.age,
     gender: me.gender,
     heightCm: me.heightCm,
-    orientation: me.orientation,
     city: me.city,
     pronouns: me.pronouns ?? null,
-    datingIntention: me.datingIntention ?? null,
     interests: me.interests ?? [],
     lifestylePace: me.lifestylePace ?? null,
     socialPreference: me.socialPreference ?? null,
@@ -178,7 +177,7 @@ function asPublicProfile(me: MyProfile, customPosts?: Post[]): PublicProfile | n
 
 export default function EditProfile() {
   const { section, from, initialMode } = useLocalSearchParams<{
-    section?: 'basics' | 'audience' | 'all';
+    section?: 'basics' | 'goal' | 'audience' | 'all';
     from?: 'onboarding';
     initialMode?: 'preview' | 'edit';
   }>();
@@ -190,8 +189,8 @@ export default function EditProfile() {
   const toast = useToast();
 
   const [mode, setMode] = useState<'edit' | 'view'>('edit');
-  const [subSection, setSubSection] = useState<'posts' | 'basics' | 'audience'>(
-    section === 'audience' ? 'audience' : section === 'basics' ? 'basics' : 'posts',
+  const [subSection, setSubSection] = useState<'posts' | 'basics' | 'goal' | 'audience'>(
+    section === 'audience' || section === 'basics' || section === 'goal' ? section : 'posts',
   );
 
   // Modals state
@@ -348,6 +347,29 @@ export default function EditProfile() {
     );
   }
 
+  if (subSection === 'goal') {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        <View style={s.header}>
+          <Pressable onPress={() => setSubSection('posts')} accessibilityRole="button" accessibilityLabel="Back to profile editor" style={s.headerBtn}>
+            <Text style={s.headerBtnText}>Back</Text>
+          </Pressable>
+          <Text style={s.headerTitleText}>Your Goal</Text>
+          <View style={s.headerBtn} />
+        </View>
+        <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+          <GoalForm
+            me={me.data}
+            onSaved={() => {
+              toast('Goal updated.', 'success');
+              setSubSection('posts');
+            }}
+          />
+        </ScrollView>
+      </Screen>
+    );
+  }
+
   if (subSection === 'audience') {
     return (
       <Screen edges={['top', 'bottom']}>
@@ -355,7 +377,7 @@ export default function EditProfile() {
           <Pressable onPress={() => setSubSection('posts')} accessibilityRole="button" accessibilityLabel="Back to profile editor" style={s.headerBtn}>
             <Text style={s.headerBtnText}>Back</Text>
           </Pressable>
-          <Text style={s.headerTitleText}>Who Sees You</Text>
+          <Text style={s.headerTitleText}>Your Audience</Text>
           <View style={s.headerBtn} />
         </View>
         <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
@@ -556,9 +578,19 @@ export default function EditProfile() {
             <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
           </Pressable>
 
+          <Pressable style={s.cardRow} onPress={() => setSubSection('goal')}>
+            <View style={s.cardRowLeft}>
+              <Text style={s.cardRowTitle}>Your Goal (private)</Text>
+              <Text style={s.cardRowSubtitle}>
+                {me.data.goals.length > 0 ? me.data.goals.map((g) => GOAL_LABEL[g].title).join(' and ') : 'Choose your goal'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
+          </Pressable>
+
           <Pressable style={s.cardRow} onPress={() => setSubSection('audience')}>
             <View style={s.cardRowLeft}>
-              <Text style={s.cardRowTitle}>Who Sees You</Text>
+              <Text style={s.cardRowTitle}>{audienceQuestion(me.data.goals)}</Text>
               <Text style={s.cardRowSubtitle}>
                 {me.data.audience
                   ? `Ages ${me.data.audience.minAge}–${me.data.audience.maxAge} • ${me.data.audience.genders.join(', ')}`

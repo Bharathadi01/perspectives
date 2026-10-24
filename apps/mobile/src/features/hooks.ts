@@ -13,6 +13,7 @@ import type {
 import { api } from '../api/client';
 import { queryKeys } from '../api/queryKeys';
 import { useIdempotentMutation } from '../lib/useIdempotentMutation';
+import { unregisterPush } from '../push/push';
 import { useSession } from '../session/sessionStore';
 
 // ---------- session ----------
@@ -41,7 +42,10 @@ export function useLogIn() {
 export function useLogOut() {
   const setStatus = useSession((s) => s.setStatus);
   const qc = useQueryClient();
-  return useIdempotentMutation(() => api.auth.logOut(), {
+  return useIdempotentMutation(async () => {
+    await unregisterPush();
+    await api.auth.logOut();
+  }, {
     onSettled: () => {
       qc.clear();
       setStatus('signedOut');
@@ -57,7 +61,11 @@ export function useMe(enabled = true) {
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useIdempotentMutation((input: UpdateProfileInput, key: string) => api.me.update(input, key), {
-    onSuccess: (me) => qc.setQueryData(queryKeys.me, me),
+    onSuccess: (me) => {
+      qc.setQueryData(queryKeys.me, me);
+      // A changed audience changes who Explore may show, so the card on screen can be out of date.
+      void qc.invalidateQueries({ queryKey: queryKeys.explore });
+    },
   });
 }
 
@@ -239,6 +247,32 @@ export function useMarkConnectionsSeen() {
   });
 }
 
+// ---------- ban screen ----------
+/** For a suspended or banned person: the reason, the end date and their appeal. */
+export function useRestriction() {
+  return useQuery({ queryKey: queryKeys.restriction, queryFn: () => api.account.restriction(), retry: false });
+}
+
+export function useAppeal() {
+  const qc = useQueryClient();
+  return useIdempotentMutation((message: string, key: string) => api.account.appeal({ message }, key), {
+    onSuccess: (r) => qc.setQueryData(queryKeys.restriction, r),
+  });
+}
+
+// ---------- notices ----------
+/** The in-app notices list (You → Notices), refetched when the app comes back to the foreground. */
+export function useNotices(enabled = true) {
+  return useQuery({ queryKey: queryKeys.notices, queryFn: () => api.notices.list(), enabled });
+}
+
+export function useMarkNoticesRead() {
+  const qc = useQueryClient();
+  return useIdempotentMutation((_: void, key: string) => api.notices.markAllRead(key), {
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.notices }),
+  });
+}
+
 // ---------- safety ----------
 export function useReport() {
   return useIdempotentMutation((input: CreateReportInput, key: string) => api.safety.report(input, key));
@@ -247,6 +281,19 @@ export function useReport() {
 export function useBlock() {
   const qc = useQueryClient();
   return useIdempotentMutation((userId: string, key: string) => api.safety.block(userId, key), {
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
+/** You → Blocked people. */
+export function useBlocked() {
+  return useQuery({ queryKey: queryKeys.blocked, queryFn: () => api.safety.blocked() });
+}
+
+/** Unblocking can bring the person back into Explore and profiles, so everything refreshes. */
+export function useUnblock() {
+  const qc = useQueryClient();
+  return useIdempotentMutation((userId: string, key: string) => api.safety.unblock(userId, key), {
     onSuccess: () => void qc.invalidateQueries(),
   });
 }

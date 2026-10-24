@@ -7,11 +7,11 @@ import { GENDER_LABEL, ORIENTATION_LABEL, normalizeDigits } from '../../lib/labe
 import { theme } from '../../theme';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
-import { Label } from '../ui/Text';
+import { Label, Muted } from '../ui/Text';
 import { TextField } from '../ui/TextField';
 import { useToast } from '../ui/Toast';
 
-/** Name, gender, height, orientation and city: the basics givers see. */
+/** Name, gender, height and city: the basics givers see. Orientation is optional and private (decided 2026-10-20). */
 export function BasicsForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProfile; onSaved: () => void; submitTitle?: string }) {
   const update = useUpdateProfile();
   const toast = useToast();
@@ -23,10 +23,10 @@ export function BasicsForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProfil
 
   const heightNum = Number(height);
   const heightValid = Number.isInteger(heightNum) && heightNum >= RULES.heightCmMin && heightNum <= RULES.heightCmMax;
-  const valid = displayName.trim().length > 0 && gender && orientation && city.trim().length >= 2 && heightValid;
+  const valid = displayName.trim().length > 0 && gender && city.trim().length >= 2 && heightValid;
 
   const save = async () => {
-    if (!valid || !gender || !orientation) return;
+    if (!valid || !gender) return;
     try {
       await update.run({ displayName: displayName.trim(), gender, heightCm: heightNum, orientation, city: city.trim() });
       onSaved();
@@ -73,10 +73,16 @@ export function BasicsForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProfil
         </View>
       </View>
       <View style={s.group}>
-        <Label>Orientation</Label>
+        <Label>Orientation (optional, private)</Label>
+        <Muted>Only you see this. It is not shown on your profile and does not change who you see.</Muted>
         <View style={s.chips}>
           {Orientation.options.map((o) => (
-            <Chip key={o} label={ORIENTATION_LABEL[o]} selected={orientation === o} onPress={() => setOrientation(o)} />
+            <Chip
+              key={o}
+              label={ORIENTATION_LABEL[o]}
+              selected={orientation === o}
+              onPress={() => setOrientation(orientation === o ? null : o)}
+            />
           ))}
         </View>
       </View>

@@ -28,7 +28,7 @@ export function StepAboutYou({ onNext }: { onNext: () => void }) {
   const heightValid = Number.isInteger(heightNum) && heightNum >= RULES.heightCmMin && heightNum <= RULES.heightCmMax;
   const nameValid = displayName.trim().length >= 1;
   const cityValid = city.trim().length >= 2;
-  const isValid = nameValid && gender !== null && orientation !== null && cityValid && heightValid;
+  const isValid = nameValid && gender !== null && cityValid && heightValid;
 
   return (
     <View style={s.container}>
@@ -102,16 +102,20 @@ export function StepAboutYou({ onNext }: { onNext: () => void }) {
         </View>
       </View>
 
-      {/* Orientation */}
+      {/* Orientation: optional and private (decided 2026-10-20) */}
       <View style={s.group}>
-        <Label>Orientation</Label>
+        <View style={s.labelWithHint}>
+          <Label>Orientation</Label>
+          <Muted style={s.optionalTag}>Optional · Private</Muted>
+        </View>
+        <Muted>Only you see this. It is not shown on your profile and does not change who you see.</Muted>
         <View style={s.chipsRow}>
           {Orientation.options.map((o) => (
             <Chip
               key={o}
               label={ORIENTATION_LABEL[o]}
               selected={orientation === o}
-              onPress={() => setField('orientation', o)}
+              onPress={() => setField('orientation', orientation === o ? null : o)}
             />
           ))}
         </View>
@@ -147,7 +151,7 @@ export function StepAboutYou({ onNext }: { onNext: () => void }) {
       </View>
 
       <Button
-        title="Continue to Preferences"
+        title="Continue"
         onPress={onNext}
         disabled={!isValid || !selfieVerified}
       />

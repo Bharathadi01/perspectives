@@ -217,19 +217,6 @@ describe('onboarding and matching contracts', () => {
     expect(SelectedInterestsSchema.safeParse(['cinema_film', 'specialty_coffee', 'invalid_hobby']).success).toBe(false);
   });
 
-  it('validates dating intentions and config completeness', async () => {
-    const { DatingIntention, DATING_INTENTION_CONFIG } = await import('../src/personality');
-    expect(DatingIntention.safeParse('long_term').success).toBe(true);
-    expect(DatingIntention.safeParse('casual').success).toBe(true);
-    expect(DatingIntention.safeParse('invalid_intention').success).toBe(false);
-
-    // Every enum value must have human-readable config
-    for (const key of Object.keys(DATING_INTENTION_CONFIG) as (keyof typeof DATING_INTENTION_CONFIG)[]) {
-      expect(DATING_INTENTION_CONFIG[key].label).toBeDefined();
-      expect(DATING_INTENTION_CONFIG[key].badge).toBeDefined();
-    }
-  });
-
   it('validates personality prompt answers within bounds', async () => {
     const { PersonalityPromptAnswerSchema } = await import('../src/personality');
     expect(
@@ -262,8 +249,8 @@ describe('onboarding and matching contracts', () => {
     const parsed = UpdateProfileInputSchema.safeParse({
       displayName: 'Maya',
       pronouns: 'she/they',
-      datingIntention: 'long_term',
-      intentionDealbreaker: true,
+      goals: ['get_perspectives', 'meet_people'],
+      orientation: null,
       interests: ['cinema_film', 'specialty_coffee', 'books_reading'],
       lifestylePace: 'balanced',
       socialPreference: 'ambivert',
@@ -276,5 +263,22 @@ describe('onboarding and matching contracts', () => {
       ],
     });
     expect(parsed.success).toBe(true);
+  });
+
+  it('requires one or both goals, each once', async () => {
+    const { GoalsSchema } = await import('../src/profile');
+    expect(GoalsSchema.safeParse(['get_perspectives']).success).toBe(true);
+    expect(GoalsSchema.safeParse(['meet_people', 'get_perspectives']).success).toBe(true);
+    expect(GoalsSchema.safeParse([]).success).toBe(false);
+    expect(GoalsSchema.safeParse(['meet_people', 'meet_people']).success).toBe(false);
+    expect(GoalsSchema.safeParse(['date']).success).toBe(false);
+  });
+
+  it('keeps orientation, goal and the old dating intention out of the public profile', async () => {
+    const { PublicProfileSchema } = await import('../src/profile');
+    const keys = Object.keys(PublicProfileSchema.shape);
+    expect(keys).not.toContain('orientation');
+    expect(keys).not.toContain('goals');
+    expect(keys).not.toContain('datingIntention');
   });
 });

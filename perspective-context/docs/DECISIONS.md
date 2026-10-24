@@ -94,6 +94,55 @@ Decision: to accept a connect request the receiver must have given the asker a p
 Consequences: more effort to accept, so some requests may sit unanswered or be declined; stronger give-to-get. Older connections have no `reply`. Declining is unchanged.
 Alternatives: only show both when both exist (kept the old rule), or leave the chat showing one perspective (rejected).
 
+## ADR-017: The boost slot spreads out and skips reported or inactive profiles
+Status: accepted (product owner, 2026-10-19).
+Context: every viewer's boost went to the single least-served profile, and "served" only counted perspectives already received, so everyone opening the app the same morning got the same person (a simulation showed about 44 sets for one profile at 200 users and about 250 at 1,000). The boost also ignored reports and whether the owner still used the app, and one reporter could apply the full report penalty. `PRODUCT.md` already lists an over-exposure penalty that was never built.
+Decision:
+- "Served" counts perspectives received in the lookback window plus mandatory slots already holding the profile today. Need in the ranking score uses the same count.
+- The boost is chosen from up to 5 least-served profiles (those at most one above the lowest), at random with weight 0.5 + compatibility, seeded by viewer and day (`apps/api/src/domain/random.ts`), so a replay gives the same set.
+- A soft cap of 6 mandatory slots per profile per day; an over-cap profile is used only when nobody else is left.
+- The boost only goes to owners with a daily-progress row in the last 3 days, or accounts under 48 hours old.
+- Reports count distinct reporters in the last 30 days (ignoring reports a reviewer allowed and reports whose reporter deleted their account). 2 or more keep a profile out of every mandatory slot; it may still appear as a bonus profile.
+- When no profile qualifies for the boost, the slot becomes a relevance slot.
+Consequences: one additive index (`daily_assignments(targetId, dayKey)`); six new config values. The cap is soft under concurrency (two sets built at the same instant can exceed it by one). Fit drops slightly at small pools because the boost spreads to less-matched people.
+Alternatives: a hard received cap (kept as the existing optional config); a nightly batch allocator (later, once there is a job runner); a "needs it" threshold that leaves the boost empty (product owner to decide; it changes the "each set has a boost slot" rule).
+Activation/rollback: set `BOOST_CANDIDATE_POOL=1`, `MAX_MANDATORY_ASSIGNMENTS_PER_PROFILE_PER_DAY=0`, `BOOST_ACTIVE_DAYS=0` and `REPORT_PAUSE_REPORTERS=0` to return to the old pick (counting today's sets stays).
+
+## ADR-018: The beta product model (goal, one audience, rule-based matching, safety holds)
+Status: accepted (product owner, 2026-10-20).
+Context: an algorithm review (two external research reports, a speed-dating sandbox and our own simulation) found that at 50 to 200 users the pool size and gender balance matter more than ranking weights. Machine learning did not beat a constant guess on the sandbox data, and several profile fields conflicted with the "no intents or labels" rule.
+Decision:
+- A private onboarding goal (Get perspectives and/or Meet new people) replaces the "dating intention" and its dealbreaker. It only changes matching and never labels anyone.
+- One audience setting, used both ways, worded by the goal. "Perspectives only" people start with all genders selected. Orientation becomes optional and private and is not used for matching during the beta; the beta decides whether orientation-based matching is needed (`BETA_PLAN.md`).
+- Automatic age widening: 2 years at a time, at most 4 beyond the person's choice, never below 18, never gender, always with a notice.
+- Rule-based matching only. Ranking starts at 0.45 shared interests, 0.20 need, 0.15 recently active, 0.10 new member and 0.10 giving quality, minus distinct-reporter penalties. Daily rhythm and social energy are not used.
+- Mandatory count 1/2/3 by eligible people available; the boost goes to active people with no perspectives in 3 days or is not used; people inactive for 7 days are skipped; then 4 to 5 more profiles a day.
+- Caps: 5 connect requests a day; a soft received limit of 10 a day; 6 mandatory sets per person per day.
+- Safety: automatic steps only hold; admins decide every ban; banned people can always appeal.
+Consequences: schema changes (goal, optional orientation, account hold and suspension state, admin tables), a new admin web app (ADR-019), and in-app notices. The "national launch" exclusion is replaced by a worldwide public launch after the beta.
+Alternatives: two settings ("hear from" and "interested in"); an open perspective pool; an orientation-driven feed; logistic-regression ranking from the start (rejected for now: no data of our own, and no gain on the sandbox).
+Activation/rollback criteria: reviewed after the 4-week beta using `BETA_PLAN.md`.
+
+Step 1 built (2026-10-20): mandatory count 1/2/3, the new boost rule (no boost slot when nobody qualifies), inactive and soft-limit exclusions, 5 connect requests a day, 4 to 5 profiles after the set, the new ranking, reports on posts, perspectives and messages counted, and the relationship-goal dealbreaker removed from matching. Details the product owner settled while building: the after-set count is 5 at 15+ people left, 4 at 6 to 14, else as many as are left up to 3, with the last one a seeded random discovery pick; recently active = 1.0 today or yesterday, 0.5 at 2 to 3 days, 0.2 at 4 to 7, else 0; new member = 1.0 for the first 7 days; giving quality = (helpful + 2.5) / (marks + 5); need and the boost use a 3-day window; the count pool is everyone who could hold a set slot (6-set-cap profiles included). Weights and thresholds are config.
+
+Step 2 built (2026-10-20): the private goal (required to go live, onboarding step 2, editable), the audience step worded by the goal (perspectives-only starts with every gender), orientation optional and private (out of public DTOs), the dating intention and dealbreaker removed from contracts and the app (columns kept, unused), automatic age widening, and the in-app notices list (`notices` table, You → Notices). Details the product owner settled while building: the goal does not change matching in the beta; widening starts when fewer than 6 people could fill a set slot (`POOL_PARTIAL_AT`) and widens both ends 2 years per step, at most 4 beyond the chosen range at each end. Implementation choices: only steps that bring in more people are kept (no notice otherwise); the chosen range is stored separately and saving the range already in use keeps it; one widening notice per day. Fresh people first (decided 2026-10-20): fresh-only pool while 6 or more fresh remain, merged with returning people below 6, plus a 0.10 ranking head start for fresh people (`RANK_WEIGHT_FRESH`); skips hidden for 2 days. Changing the audience mid-day: rebuild today's set if nothing was given, otherwise keep what was given and re-check waiting slots (`DailyService.onAudienceChanged`).
+
+## ADR-019: Admin access through separate identities and a separate web page
+Status: accepted (product owner, 2026-10-20); built 2026-10-21 (see the note below).
+Context: bans need a human review tool. Giving normal accounts an admin role would put ban powers one stolen phone or missed role check away, and admin screens in the mobile app would ship to every user.
+Decision: separate admin identities (own table, own password, created only by a server command), an authenticator-app code at each sign-in, a web-only `apps/admin` project, admin-only endpoints under `/v1/admin` with a separate token, short sessions, and an audit log of every admin action (`SECURITY.md` → Admin access and enforcement).
+Consequences: one new app in the workspace and one new dependency (a TOTP library), both added to the stack table when built.
+Built 2026-10-21 (step 3), with one change: no TOTP library. The codes are RFC 6238 on `node:crypto` (about 60 lines, `apps/api/src/admin/totp.ts`), tested against the RFC vectors, so no new dependency was added. The product owner chose password-only admin sign-in for now (2026-10-21): the code check is behind `ADMIN_REQUIRE_CODE` (default false) and is to be switched on before the beta; the dev seed creates `admin@perspective.test`. Admin tokens use `ADMIN_JWT_SECRET` or a secret derived from the user one. The admin client is a separate package entry point (`@perspective/api-client/admin`). Step 3 rule details the product owner settled: weak-giver line fixed at 60%, harsh markers half weight, weak givers 0.2 lower in Explore and kept from brand-new members, insulting marks count as a report and sexual or unsafe as a serious report, holds last until an admin decides and are not announced, extending adds 3 days, one appeal per ban (`PRODUCT.md` → Reports, holds and bans → Details).
+Alternatives: an admin role on user accounts with admin screens in the mobile app (rejected for the risk above); editing the database by hand (no audit trail, error-prone).
+
+## ADR-020: Push notifications through Expo's push service
+Status: accepted (product owner, 2026-10-21); built as a placeholder.
+Context: the beta needs pushes (`BETA_PLAN.md` step 5). The product owner chose to send all seven events for now with placeholder texts, to check delivery works, and to write the real rules once most of the build is done.
+Decision: `expo-notifications` and `expo-device` in the mobile app (new dependencies, Expo SDK 58 versions); the API sends through Expo's push service over HTTPS (no SDK), behind a `PushSender` class (`ExpoPushSender`, or `LogPushSender` for tests with `PUSH_SENDER=log`). Device tokens in `push_tokens`; one-time pushes deduplicated in `push_log`. Events: connect request (no name, since requests are locked until the daily set is done), connected, new message, daily "profiles ready" after `PUSH_DAILY_HOUR`, new perspective (no name or text), quiet-chat nudges, and account or notice updates. No push ever carries message or perspective text. Sending never blocks or fails the action; devices Expo reports as `DeviceNotRegistered` are switched off.
+Consequences: real pushes need an Expo account, `eas init` (a project id in `app.json`) and a development build on a real device; Expo Go, the simulator and the web preview register nothing. No in-app push settings, quiet hours or receipt checks yet.
+Alternatives: direct APNs and FCM (more setup, two providers); pg-boss jobs for sending (not needed at beta volume).
+Activation/rollback criteria: `PUSH_SENDER=log` stops all sending without a release.
+
 ## ADR template
 - ID/title
 - Status: proposed/accepted/superseded

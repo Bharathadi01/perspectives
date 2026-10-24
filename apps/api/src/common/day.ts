@@ -19,6 +19,11 @@ export function todayKey(timeZone: string, now: Date = new Date()): string {
   return dayKeyFor(now, timeZone);
 }
 
+/** Whole calendar days from day key `from` to day key `to` (both YYYY-MM-DD); 0 when the same day. */
+export function daysBetweenKeys(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+}
+
 export function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }

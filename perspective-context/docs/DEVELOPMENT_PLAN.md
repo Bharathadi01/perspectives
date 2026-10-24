@@ -11,16 +11,19 @@ The core loop from `PRODUCT.md` is implemented end to end on PostgreSQL, and the
 - **Tests (2026-10-18):** unit: contracts 23, API 47, api-client 6, mobile 20; end-to-end 26 against PostgreSQL 16.
 
 ### Decisions to revisit
-- **Who sees whom (decided 2026-10-16: keep as is for now).** Today one audience setting (gender and age range) decides both who can see you and whose profiles you see; two people only meet when each is inside the other's audience. Revisit during development. Options: (A) keep it, (B) the setting controls only who can see you, (C) two separate settings, "who can see me" and "who I want to see" (recommended direction, one extra field). Why it matters: a person who shows their profile to women 18-25 can't also see men's profiles (for example a gym buddy), and narrow settings shrink the pool and weaken the "nobody is left out" guarantee. Code: `apps/api/src/domain/eligibility.ts` (`mutuallyVisible`) and `apps/api/src/daily/candidates.service.ts`.
+- **Who sees whom (decided 2026-10-20, ADR-018).** One audience setting, used both ways, worded by the onboarding goal; orientation optional and private. The beta decides whether a separate "who I want to meet" setting is needed (`BETA_PLAN.md`).
 
 ### Stubs and gaps (next work)
 - Selfie verification and text moderation are stubs (`apps/api/src/moderation/moderation.ts`); no media moderation or EXIF stripping yet.
 - Media is stored on local disk (`MEDIA_STORAGE_DIR`); move to the canonical provider (ADR-003).
-- No push notifications, rate limiting, moderation operations, admin tools, analytics, or audit logs.
+- No push notifications, rate limiting, moderation operations, admin tools (decided: ADR-019), analytics, or audit logs.
 - Chat is polled; messages are not cursor-paginated.
 - Algorithms are simple v1 versions with placeholder weights (`apps/api/src/domain/ranking.ts`); the mandatory count is fixed at 3 (`domain/daily.ts`).
 - No dark mode yet (tokens are light only), and the Hinge-like UI is temporary (ADR-011).
 - Post reordering and editing a post's media are not built.
+
+### Next: what the beta needs (decided 2026-10-20)
+The build order is in `BETA_PLAN.md` → What must exist before the beta: the algorithm changes, the goal and audience onboarding with notices, the admin dashboard with holds, bans and appeals plus the weak-giver loop, the blocked list, then push notifications.
 
 ## Phase 0 — Validate
 Prototype and user tests of the profile, give, and connect loop. Threat model and data map. Narrow launch community. Exit: profiles reliably receive useful perspectives, and people keep giving.

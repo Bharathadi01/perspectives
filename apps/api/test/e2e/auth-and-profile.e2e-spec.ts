@@ -76,11 +76,11 @@ describe('auth, guards and profile (e2e)', () => {
   });
 
   describe('profile', () => {
-    it('stays offline until basics, audience, selfie and a primary photo post exist', async () => {
+    it('stays offline until basics, goal, audience, selfie and a primary photo post exist', async () => {
       const c = await signUp(app, 'new@test.local');
       const me = await c.get('/v1/me').expect(200);
       expect(me.body.isLive).toBe(false);
-      expect(me.body.missing).toEqual(['basics', 'audience', 'selfie', 'primary_photo_post']);
+      expect(me.body.missing).toEqual(['basics', 'goal', 'audience', 'selfie', 'primary_photo_post']);
       const explore = await c.get('/v1/explore').expect(403);
       expect(explore.body.error.code).toBe('SELFIE_VERIFICATION_REQUIRED');
 
@@ -119,9 +119,12 @@ describe('auth, guards and profile (e2e)', () => {
     it('never exposes private fields or the selfie to other users', async () => {
       const ravi = await liveUser(app, { name: 'Ravi', gender: 'man', audience: { genders: ['woman'], minAge: 18, maxAge: 30 } });
       const meera = await liveUser(app, { name: 'Meera', gender: 'woman', audience: { genders: ['man'], minAge: 18, maxAge: 30 } });
+      await ravi.patch('/v1/me', { orientation: 'bisexual' }).expect(200);
       const view = await meera.get(`/v1/profiles/${ravi.id}`).expect(200);
       const json = JSON.stringify(view.body);
       expect(json).not.toMatch(/email|birthDate|selfie|audience/i);
+      // Orientation and the goal are private (decided 2026-10-20).
+      expect(json).not.toMatch(/orientation|bisexual|goals|get_perspectives|meet_people|datingIntention/);
       const selfie = await prisma.profile.findUniqueOrThrow({ where: { userId: ravi.id } });
       expect(json).not.toContain(selfie.selfieMediaId!);
       // A signed URL for the selfie cannot be forged without the secret.

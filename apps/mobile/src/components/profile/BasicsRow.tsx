@@ -2,16 +2,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { PublicProfile } from '@perspective/contracts';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { GENDER_LABEL, ORIENTATION_LABEL, formatHeight } from '../../lib/labels';
+import { GENDER_LABEL, formatHeight } from '../../lib/labels';
 import { theme } from '../../theme';
 import type { IconName } from '../ui/IconButton';
 
-/** The profile "basics" strip: age, gender, orientation, height, city. */
+/** The profile "basics" strip: age, gender, height, city. Orientation is private (decided 2026-10-20). */
 export function BasicsRow({ profile }: { profile: PublicProfile }) {
   const items: { icon: IconName; label: string; a11y: string }[] = [
     { icon: 'calendar-clear-outline', label: String(profile.age), a11y: `Age ${profile.age}` },
     { icon: 'person-outline', label: GENDER_LABEL[profile.gender], a11y: GENDER_LABEL[profile.gender] },
-    { icon: 'heart-outline', label: ORIENTATION_LABEL[profile.orientation], a11y: ORIENTATION_LABEL[profile.orientation] },
     { icon: 'resize-outline', label: formatHeight(profile.heightCm), a11y: `Height ${profile.heightCm} centimetres` },
     { icon: 'location-outline', label: profile.city, a11y: `Lives in ${profile.city}` },
   ];

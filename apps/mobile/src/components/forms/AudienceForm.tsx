@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useUpdateProfile } from '../../features/hooks';
 import { errorMessage } from '../../lib/errors';
-import { GENDER_LABEL } from '../../lib/labels';
+import { GENDER_LABEL, PERSPECTIVES_ONLY_HINT, audienceQuestion, perspectivesOnly } from '../../lib/labels';
 import { theme } from '../../theme';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
@@ -31,7 +31,10 @@ function Stepper({ label, value, min, max, onChange }: { label: string; value: n
   );
 }
 
-/** Who may see your profile (and, in v1, whose profiles you see): gender and age range, 18+. */
+/**
+ * The one audience setting (decided 2026-10-20): whose profiles you see and who sees yours, worded
+ * by the goal. The age range shown is the one in use, which may have been widened automatically.
+ */
 export function AudienceForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProfile; onSaved: () => void; submitTitle?: string }) {
   const update = useUpdateProfile();
   const toast = useToast();
@@ -52,14 +55,15 @@ export function AudienceForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProf
 
   return (
     <View style={s.form}>
-      <Muted>Your profile is shown only to people in this group, and you see people whose group includes you.</Muted>
+      <Muted>You see people in this group, and they see you only if you are in theirs.</Muted>
       <View style={s.group}>
-        <Label>Show me to</Label>
+        <Label>{audienceQuestion(me.goals)}</Label>
         <View style={s.chips}>
           {Gender.options.map((g) => (
             <Chip key={g} label={GENDER_LABEL[g]} selected={genders.includes(g)} onPress={() => toggle(g)} />
           ))}
         </View>
+        {perspectivesOnly(me.goals) ? <Muted>{PERSPECTIVES_ONLY_HINT}</Muted> : null}
       </View>
       <View style={s.row}>
         <Stepper label="Youngest" value={minAge} min={RULES.minAge} max={maxAge} onChange={setMin} />
