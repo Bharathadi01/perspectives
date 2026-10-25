@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-26 (voice and written cards can be dragged to reorder; section 6.3)
+**Last updated:** 2026-10-25 (Explore: black progress pill, notices bell and filter button ("Your feed"), no note above cards, a "things in common" card after the first post, smaller name with the tick beside it and pronouns underneath; sections 9.1 and 9.11)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -243,7 +243,7 @@ Switching between them does not leave the tab. Leaving for another tab and comin
 Everything else moved behind the **gear in the top right**, which opens **Settings**:
 - **Settings → The basics:** change name, height, gender, orientation (optional, can be cleared), city.
 - **Settings → Your goal (private):** change the goal (one or both).
-- **Settings → the audience row** (its title is the goal-worded question): change genders and age range. The age range shown is the one in use, which may have been widened (section 8.1). Picking new ages makes them your chosen range; saving the range already shown (for example while changing genders) keeps your earlier chosen range, so widening never goes further than 4 years past what you actually chose.
+- **Settings → the audience row** (its title is the goal-worded question): change genders and age range. The same setting is also behind Explore's filter button (section 9.11). The age range shown is the one in use, which may have been widened (section 8.1). Picking new ages makes them your chosen range; saving the range already shown (for example while changing genders) keeps your earlier chosen range, so widening never goes further than 4 years past what you actually chose.
 - **Settings → Notices:** the notices list (section 8.2). The row shows how many are new.
 - **Settings → Perspectives you gave:** the ones you wrote (section 11).
 - **Settings → Blocked people:** the people you blocked, with Unblock (section 14.2).
@@ -394,13 +394,14 @@ Code: `apps/api/src/daily/*`, `apps/api/src/explore/explore.service.ts`, `apps/a
 
 ### 9.1 What Explore shows
 **One profile at a time.** Order of what appears:
-1. First, the profiles of **today's daily set** (1, 2 or 3 people, see 9.3), one after another. A short note above each card says "Part of today's set. Give a perspective on any one post." The boost person (9.3) looks exactly like everyone else in the set: there is no note saying they have had few perspectives.
-2. After the set is done, **4 to 5 more profiles** (fewer when few people are left, see 9.8), with the note "Bonus profile. Give a perspective if you want to."
-3. When nothing is left: "You're done for today" (if the set is finished) or "No one to show right now" (if nobody is available).
+1. First, the profiles of **today's daily set** (1, 2 or 3 people, see 9.3), one after another. The boost person (9.3) looks exactly like everyone else in the set.
+2. After the set is done, **4 to 5 more profiles** (fewer when few people are left, see 9.8).
+   Cards carry **no note** about which kind they are (removed 2026-10-25): a set, boost or bonus profile all look the same. The progress pill is what tells you how much of the set is left.
+3. When nothing is left: "You're done for today" (if the set is finished) or "No one to show right now" (if nobody is available). The second one has a **"Change who you see"** button that opens "Your feed" (9.11).
 
-A **progress line** at the top shows "X of N given today" and "Today's perspectives are unlocked" once finished. A "..." menu on the card offers Report or Block. A close (X) button **skips** the profile.
+The **top bar** has, on the left, a **black progress pill**, and on the right a **bell** and a **filter button**. The bell opens **Notices** (8.2) and shows a small black badge with the number of new notices (up to "9+"); opening Notices marks them read, which clears the badge. The filter button opens "Your feed" (9.11). The pill shows "X of N given today" with one dot per profile, and "Today's perspectives are unlocked" once finished (the Inbox keeps the same pill in its usual purple). Each card starts with the person's **name** with a **verified tick** right beside it (only for selfie-verified people), and their **pronouns** on the line underneath (left out when they gave none). A "..." button beside the name offers Report or Block. A close (X) button **skips** the profile.
 
-On each profile, a person gives a perspective on **one specific post** by tapping its "Give perspective" button. Posts you already answered on someone who comes back are **hidden** from the card. The card can show a short note about shared interests ("You both share passion for Photography"); nothing else is used for that note.
+On each profile, a person gives a perspective on **one specific post** by tapping its "Give perspective" button. Posts you already answered on someone who comes back are **hidden** from the card. **Right after the first post**, a black card says **"You + Tara have 4 things in common"** and lists them as chips (decided 2026-10-25). What counts, in this order: **shared interests**, then the **same city** (ignoring capitals and spaces), the **same daily rhythm**, and the **same social energy**. Only answers both people actually gave count; two blank answers never match. When nothing is shared the card is not shown. It is worked out in the app from both public profiles and is **display only**: it never changes who you see or the ranking. Code: `apps/mobile/src/features/explore/inCommon.ts`, `src/components/profile/InCommonCard.tsx`. (This replaced the purple "You both share passion for…" line that used to sit above the name; the server still sends that line, but the app no longer shows it.)
 
 ### 9.2 What "today" means
 "Today" is the calendar date in `APP_TIMEZONE` (India time by default), decided by the server's clock. At midnight in that timezone the day changes and a fresh set is made on the person's first visit.
@@ -465,6 +466,19 @@ Code: `domain/assignment.ts` (`freshFirstPool`), `daily/daily.service.ts` (`fres
 The set unlocks the moment you have given a perspective to **every person currently required**. Only perspectives given to people **in your set** count toward the set; giving to a profile after the set does not.
 
 **History:** before 2026-10-19 the boost went to the single profile with the fewest perspectives, so one person could land in everyone's set (fixed: today's sets count, a random pick, at most 6 sets a day). On 2026-10-20 the set became 1 to 3 by pool size, the boost became "active, no perspectives in 3 days, or none", inactive people and people at 10 perspectives today stopped being put into sets, and the ranking changed to the formula above.
+
+### 9.11 The filter button: "Your feed" [Built 2026-10-25]
+Code: `apps/mobile/app/filters/*`, `apps/mobile/src/features/filters/audienceUpdate.ts`.
+- The filter button at the top right of Explore opens a full-screen **"Your feed"** page (close it with the ✕). It holds **exactly the settings that already exist**, nothing new (decided 2026-10-25):
+  - **Who you see → Show me:** the genders (shows "Women, Men", or "Everyone" when all three are picked).
+  - **Who you see → Age range:** youngest and oldest (shows "22–28"). This is the range in use, which may have been widened (8.1).
+  - **Just for you → Your goal:** the private goal, with the note "Only you see this. In the beta it only changes how we word things."
+- Each row opens its own small page with a **Save** button, then comes back to the list showing the new value. Save stays greyed out until something actually changed, and Show me cannot be saved with no gender picked.
+- These are the **same settings** as Settings → the audience row and Settings → Your goal; changing them in either place changes both. Interests, height, lifestyle and the other "about me" answers are not filters (they only affect ranking, 9.5).
+- **Changing it mid-day follows the usual rule** (8.1 point 6): profiles you haven't given to yet follow the new audience; perspectives already given stay counted.
+- **An unchanged audience is never sent.** Saving it would rebuild today's set for nothing, so both "Your feed" and Settings now skip the save when the genders and ages are the same as before.
+- A notice created by the save (for example an age widening) now shows up right away in Notices.
+- Not built: neighbourhood, distance and other filters some apps have; a card at the top of "Your feed" when the age range was widened (possible follow-up).
 
 ---
 
@@ -841,9 +855,21 @@ Everything else happens when someone does something: the daily set is built on a
 
 Newest first. Add an entry for every change that affects how the app behaves.
 
+### 2026-10-25: Explore gets a filter button, a black progress pill and a new name header
+- **Filter button** at the top right of Explore opens a full-screen **"Your feed"** page: Show me (genders), Age range and Your goal, each with its current value and its own small page to change it. Nothing new is decided; these are the settings that were only in Settings. Changing them mid-day follows the existing rule. (Section 9.11.)
+- **The progress pill on Explore is black** and sits on the left. The Inbox pill is unchanged. (Section 9.1.)
+- **A bell** next to the filter button opens Notices, with a badge for new ones. (Section 9.1.)
+- **The note above each card is gone** ("Part of today's set. Give a perspective on any one post." and "Bonus profile…"). All cards look the same; the pill shows progress. (Section 9.1.)
+- **Every profile header is now a smaller name with the verified tick right beside it, and the pronouns underneath** (Explore, your own View tab, and opened profiles). Only the tick is shown, no "Verified" word. The "..." Report/Block button on Explore moved next to the name. (Section 9.1.)
+- **"No one to show right now"** now points to the filter button and has a "Change who you see" button (it used to say "You → Edit", which no longer exists).
+- **Saving an unchanged audience no longer rebuilds today's set.** Both "Your feed" and Settings skip the save when nothing changed. Notices refresh right after a profile save.
+- **Decided by the product owner: the limit stays at 1 to 6 posts in total** (photos, voice and written together). The request to allow 6 photos *plus* voice and written cards is closed; the profile editor will be adjusted to match.
+- **New "things in common" card** right after the first post: "You + Tara have 4 things in common", listing shared interests, same city, same daily rhythm and same social energy. Black card; hidden when nothing is shared. It replaces the purple "You both share passion for…" line above the name. (Section 9.1.)
+- No rule, number, server or database change.
+
 ### 2026-10-26: voice and written cards can be reordered by dragging
 - **Hold a voice or written row and drag it onto another to swap them**, the same way photos work. Swapping two rows trades their places on your profile; photos never move. The ⋯ menu still moves a card past a photo ("After photo 1" → "After photo 2"). (Section 6.3.)
-- **Not changed: the limit of 6 cards in total.** A request to allow 6 photos *plus* voice and written cards on top changes the rule "1 to 6 posts" in `docs/PRODUCT.md`, so it waits for the product owner's decision.
+- **Not changed: the limit of 6 cards in total.** A request to allow 6 photos *plus* voice and written cards on top would change the rule "1 to 6 posts" in `docs/PRODUCT.md`. (Decided 2026-10-25: the limit stays at 6 in total; see the entry above.)
 - No rule, number, server or database change.
 
 ### 2026-10-25 (after midnight): photos in the grid, voice and written cards in a list under it

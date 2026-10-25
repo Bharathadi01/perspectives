@@ -65,6 +65,8 @@ export function useUpdateProfile() {
       qc.setQueryData(queryKeys.me, me);
       // A changed audience changes who Explore may show, so the card on screen can be out of date.
       void qc.invalidateQueries({ queryKey: queryKeys.explore });
+      // A narrower audience can widen the age range at once, which leaves a notice.
+      void qc.invalidateQueries({ queryKey: queryKeys.notices });
     },
   });
 }

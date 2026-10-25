@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Gender, MyProfile, RULES } from '@perspective/contracts';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { audienceUpdate } from '../../features/filters/audienceUpdate';
 import { useUpdateProfile } from '../../features/hooks';
 import { errorMessage } from '../../lib/errors';
 import { GENDER_LABEL, PERSPECTIVES_ONLY_HINT, audienceQuestion, perspectivesOnly } from '../../lib/labels';
@@ -31,6 +32,28 @@ function Stepper({ label, value, min, max, onChange }: { label: string; value: n
   );
 }
 
+/** The gender chips of the audience: who you see, and who may see you. */
+export function GenderChips({ value, onChange }: { value: Gender[]; onChange: (next: Gender[]) => void }) {
+  const toggle = (g: Gender) => onChange(value.includes(g) ? value.filter((x) => x !== g) : [...value, g]);
+  return (
+    <View style={s.chips}>
+      {Gender.options.map((g) => (
+        <Chip key={g} label={GENDER_LABEL[g]} selected={value.includes(g)} onPress={() => toggle(g)} />
+      ))}
+    </View>
+  );
+}
+
+/** Youngest and oldest of the audience, within the server's bounds. */
+export function AgeRangeFields({ minAge, maxAge, onChange }: { minAge: number; maxAge: number; onChange: (range: { minAge: number; maxAge: number }) => void }) {
+  return (
+    <View style={s.row}>
+      <Stepper label="Youngest" value={minAge} min={RULES.minAge} max={maxAge} onChange={(v) => onChange({ minAge: v, maxAge })} />
+      <Stepper label="Oldest" value={maxAge} min={minAge} max={RULES.maxAudienceAge} onChange={(v) => onChange({ minAge, maxAge: v })} />
+    </View>
+  );
+}
+
 /**
  * The one audience setting (decided 2026-10-20): whose profiles you see and who sees yours, worded
  * by the goal. The age range shown is the one in use, which may have been widened automatically.
@@ -39,14 +62,13 @@ export function AudienceForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProf
   const update = useUpdateProfile();
   const toast = useToast();
   const [genders, setGenders] = useState<Gender[]>(me.audience?.genders ?? []);
-  const [minAge, setMin] = useState(me.audience?.minAge ?? RULES.minAge);
-  const [maxAge, setMax] = useState(me.audience?.maxAge ?? 35);
-
-  const toggle = (g: Gender) => setGenders((cur) => (cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]));
+  const [range, setRange] = useState({ minAge: me.audience?.minAge ?? RULES.minAge, maxAge: me.audience?.maxAge ?? 35 });
 
   const save = async () => {
+    const audience = audienceUpdate(me.audience, { genders, ...range });
     try {
-      await update.run({ audience: { genders, minAge, maxAge } });
+      // Unchanged: nothing to send, so today's set is not rebuilt for nothing.
+      if (audience) await update.run({ audience });
       onSaved();
     } catch (err) {
       toast(errorMessage(err), 'error');
@@ -58,17 +80,10 @@ export function AudienceForm({ me, onSaved, submitTitle = 'Save' }: { me: MyProf
       <Muted>You see people in this group, and they see you only if you are in theirs.</Muted>
       <View style={s.group}>
         <Label>{audienceQuestion(me.goals)}</Label>
-        <View style={s.chips}>
-          {Gender.options.map((g) => (
-            <Chip key={g} label={GENDER_LABEL[g]} selected={genders.includes(g)} onPress={() => toggle(g)} />
-          ))}
-        </View>
+        <GenderChips value={genders} onChange={setGenders} />
         {perspectivesOnly(me.goals) ? <Muted>{PERSPECTIVES_ONLY_HINT}</Muted> : null}
       </View>
-      <View style={s.row}>
-        <Stepper label="Youngest" value={minAge} min={RULES.minAge} max={maxAge} onChange={setMin} />
-        <Stepper label="Oldest" value={maxAge} min={minAge} max={RULES.maxAudienceAge} onChange={setMax} />
-      </View>
+      <AgeRangeFields minAge={range.minAge} maxAge={range.maxAge} onChange={setRange} />
       <Button title={submitTitle} onPress={() => void save()} disabled={genders.length === 0} loading={update.isPending} />
     </View>
   );

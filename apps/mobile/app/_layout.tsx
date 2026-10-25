@@ -64,6 +64,7 @@ export default function RootLayout() {
           >
             <Stack.Screen name="give/[postId]" options={{ presentation: 'modal' }} />
             <Stack.Screen name="post/new" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
             <Stack.Screen name="connected" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
           </Stack>
         </ToastProvider>

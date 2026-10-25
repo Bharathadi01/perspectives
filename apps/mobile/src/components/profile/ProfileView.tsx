@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { MatchReason, Post, PublicProfile } from '@perspective/contracts';
+import type { Post, PublicProfile } from '@perspective/contracts';
 import {
   getInterestById,
   LIFESTYLE_PACE_LABELS,
@@ -17,11 +17,11 @@ interface ProfileViewProps {
   givenPostIds?: readonly string[];
   /** Explore: leave out posts the viewer already answered, so a returning profile is not repetitive. */
   hideAnswered?: boolean;
-  compatibilityScore?: number;
-  matchReasons?: MatchReason[];
   /** Give a perspective on one post. Omit for read-only (your own profile). */
   onGive?: (post: Post) => void;
   headerRight?: React.ReactNode;
+  /** Shown right after the first post (Explore's "things in common" card). */
+  afterPrimary?: React.ReactNode;
 }
 
 /**
@@ -32,10 +32,9 @@ export function ProfileView({
   profile,
   givenPostIds = [],
   hideAnswered = false,
-  compatibilityScore,
-  matchReasons,
   onGive,
   headerRight,
+  afterPrimary,
 }: ProfileViewProps) {
   const unanswered = profile.posts.filter((p) => !givenPostIds.includes(p.id));
   // The server only offers profiles that still have an unanswered post; fall back to all posts just in case.
@@ -52,34 +51,23 @@ export function ProfileView({
 
   return (
     <View style={s.stack}>
-      {/* Explainable Match Reasons Banner (in Explore Feed) */}
-      {matchReasons && matchReasons.length > 0 && (
-        <View style={s.matchBanner}>
-          <Ionicons name="sparkles" size={16} color={theme.colors.brand} />
-          <View style={s.matchBannerText}>
-            {matchReasons.map((r, i) => (
-              <Text key={i} style={s.matchReasonLine}>
-                {r.text}
-              </Text>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Header with Name, Pronouns, Verified Badge, and Settings/Share */}
+      {/* Name with the verified tick beside it, pronouns underneath; an optional control (Explore's ⋯) on the right */}
       <View style={s.header}>
-        <View style={s.nameRow}>
-          <Text style={s.name} accessibilityRole="header">
-            {profile.displayName}
-          </Text>
-          {profile.pronouns ? <Text style={s.pronouns}>({profile.pronouns})</Text> : null}
-          {profile.verified ? <VerifiedBadge /> : null}
+        <View style={s.nameBlock}>
+          <View style={s.nameRow}>
+            <Text style={s.name} accessibilityRole="header">
+              {profile.displayName}
+            </Text>
+            {profile.verified ? <VerifiedBadge size={20} /> : null}
+          </View>
+          {profile.pronouns ? <Text style={s.pronouns}>{profile.pronouns}</Text> : null}
         </View>
         {headerRight}
       </View>
 
       {/* Primary Photo Card */}
       {primary ? card(primary) : null}
+      {afterPrimary}
 
       {/* Basics Strip */}
       <BasicsRow profile={profile} />
@@ -140,41 +128,22 @@ export function ProfileView({
 
 const s = StyleSheet.create({
   stack: { gap: theme.spacing.base },
-  matchBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.brandSoft,
-    paddingHorizontal: theme.spacing.base,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.card,
-    gap: theme.spacing.sm,
-  },
-  matchBannerText: { flex: 1, gap: 2 },
-  matchReasonLine: {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.brand,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: theme.touchTarget.min,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  },
+  nameBlock: { flexShrink: 1, gap: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexShrink: 1 },
   name: {
-    fontSize: theme.typography.fontSize.hero,
+    fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.ink,
+    flexShrink: 1,
   },
   pronouns: {
-    fontSize: theme.typography.fontSize.base,
+    fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.regular,
     color: theme.colors.muted,
   },
