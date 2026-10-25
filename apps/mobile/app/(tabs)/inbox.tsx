@@ -16,6 +16,7 @@ import { useToast } from '../../src/components/ui/Toast';
 import { useAcceptConnect, useDeclineConnect, useFeedback, useInbox } from '../../src/features/hooks';
 import { errorMessage } from '../../src/lib/errors';
 import { NOT_HELPFUL_LABEL } from '../../src/lib/labels';
+import { useTabBarSpace } from '../../src/components/ui/GlassTabBar';
 import { theme } from '../../src/theme';
 
 function PostHeader({ post }: { post: PostRef }) {
@@ -50,6 +51,7 @@ function SmallAction({ icon, label, onPress, active }: { icon: React.ComponentPr
 
 export default function Inbox() {
   const inbox = useInbox();
+  const space = useTabBarSpace();
   const feedback = useFeedback();
   const accept = useAcceptConnect();
   const decline = useDeclineConnect();
@@ -90,7 +92,7 @@ export default function Inbox() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={inbox.isRefetching} onRefresh={() => void inbox.refetch()} />}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: space + theme.spacing.xxl }]} refreshControl={<RefreshControl refreshing={inbox.isRefetching} onRefresh={() => void inbox.refetch()} />}>
         <Title>Inbox</Title>
         <DailyProgress daily={daily} />
 

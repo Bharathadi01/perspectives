@@ -11,11 +11,13 @@ import { Label, Muted, Title } from '../../src/components/ui/Text';
 import { useToast } from '../../src/components/ui/Toast';
 import { useMe, useRemovePost } from '../../src/features/hooks';
 import { errorMessage } from '../../src/lib/errors';
+import { useTabBarSpace } from '../../src/components/ui/GlassTabBar';
 import { theme } from '../../src/theme';
 
 /** Your posts: up to six; the first is your primary photo. */
 export default function YourPosts() {
   const me = useMe();
+  const space = useTabBarSpace();
   const remove = useRemovePost();
   const toast = useToast();
   const [toRemove, setToRemove] = useState<Post | null>(null);
@@ -38,7 +40,7 @@ export default function YourPosts() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: space + theme.spacing.xxl }]}>
         <Title>Your posts</Title>
         <Muted>
           {posts.length} of {RULES.maxPosts}. People give perspectives on one post at a time, so variety helps.

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Avatar, VerifiedBadge } from '../../src/components/profile/Avatar';
+import { useTabBarSpace } from '../../src/components/ui/GlassTabBar';
 import { Screen } from '../../src/components/ui/Screen';
 import { EmptyState, ErrorState, LoadingState } from '../../src/components/ui/States';
 import { Title } from '../../src/components/ui/Text';
@@ -11,6 +12,7 @@ import { theme } from '../../src/theme';
 
 export default function Connections() {
   const connections = useConnections();
+  const space = useTabBarSpace();
 
   if (connections.isLoading) return <LoadingState />;
   if (connections.isError || !connections.data) return <ErrorState error={connections.error} onRetry={() => void connections.refetch()} />;
@@ -20,7 +22,7 @@ export default function Connections() {
       <FlatList
         data={connections.data}
         keyExtractor={(c) => c.id}
-        contentContainerStyle={s.content}
+        contentContainerStyle={[s.content, { paddingBottom: space + theme.spacing.base }]}
         refreshControl={<RefreshControl refreshing={connections.isRefetching} onRefresh={() => void connections.refetch()} />}
         ListHeaderComponent={<Title style={s.title}>Connections</Title>}
         ListEmptyComponent={

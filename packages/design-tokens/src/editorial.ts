@@ -15,8 +15,16 @@ export const editorial = {
     accent: '#B5502A',
     /** Text and icons on ink. */
     onInk: '#F6F1E7',
-    /** Chips on an ink card. */
+    /** Chips on an ink card; the resting tab-bar selection. */
     onInkSoft: 'rgba(246,241,231,0.12)',
+    /** Secondary text and icons on ink (about 9:1). */
+    onInkMuted: 'rgba(246,241,231,0.72)',
+    /** Hairlines and the lifted lens's rim on ink. */
+    onInkLine: 'rgba(246,241,231,0.24)',
+    /** The tab bar's fill where there is no native glass: ink, barely see-through. */
+    inkGlass: 'rgba(36,29,21,0.94)',
+    /** The tab bar's lens while it is lifted and moving. */
+    onInkLens: 'rgba(246,241,231,0.14)',
     /** Played part of a voice waveform, unplayed part. */
     wavePlayed: '#241D15',
     waveRest: '#D9CDB8',

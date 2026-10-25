@@ -2,15 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ProfileView } from '../../src/components/profile/ProfileView';
 import { VerifiedBadge } from '../../src/components/profile/Avatar';
 import { Screen } from '../../src/components/ui/Screen';
 import { SegmentedControl } from '../../src/components/ui/SegmentedControl';
 import { ErrorState, LoadingState } from '../../src/components/ui/States';
 import { Muted } from '../../src/components/ui/Text';
 import { useMe } from '../../src/features/hooks';
+import { ExploreProfile } from '../../src/features/explore/ExploreProfile';
 import { asPublicProfile } from '../../src/features/profile-editor/asPublicProfile';
 import { ProfileEditor } from '../../src/features/profile-editor/ProfileEditor';
+import { useTabBarSpace } from '../../src/components/ui/GlassTabBar';
 import { theme } from '../../src/theme';
 
 type Mode = 'view' | 'edit';
@@ -29,6 +30,7 @@ const SEGMENTS = [
  */
 export default function You() {
   const me = useMe();
+  const space = useTabBarSpace();
   const params = useLocalSearchParams<{ mode?: Mode }>();
   const [mode, setMode] = useState<Mode>(params.mode === 'edit' ? 'edit' : 'view');
 
@@ -55,9 +57,9 @@ export default function You() {
   const profile = asPublicProfile(me.data);
 
   return (
-    <Screen>
+    <Screen style={s.paper}>
       <View style={s.header}>
-        {/* ProfileView draws its own name, badge and pronouns, so View mode would
+        {/* The profile in View draws its own name, tick and details line, so View mode would
             otherwise show the name twice. Edit mode has no such header. */}
         {mode === 'edit' ? (
           <View style={s.name}>
@@ -91,9 +93,10 @@ export default function You() {
       />
 
       {mode === 'view' ? (
-        <ScrollView contentContainerStyle={s.viewContent}>
+        <ScrollView contentContainerStyle={[s.viewContent, { paddingBottom: space + theme.spacing.xxl }]}>
           {profile ? (
-            <ProfileView profile={profile} />
+            // The same editorial layout others see on Explore, read-only (2026-10-25).
+            <ExploreProfile profile={profile} />
           ) : (
             <Muted>Add your basics and a first photo to see how your profile looks.</Muted>
           )}
@@ -127,5 +130,7 @@ const s = StyleSheet.create({
   },
   pressed: { opacity: theme.opacity.pressed },
   segments: { marginHorizontal: theme.spacing.base, marginVertical: theme.spacing.md },
-  viewContent: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl },
+  // Matches Explore: warm paper and the same side margins.
+  paper: { backgroundColor: theme.editorial.colors.paper },
+  viewContent: { paddingHorizontal: theme.spacing.lg - 4, paddingTop: theme.spacing.xs, paddingBottom: theme.spacing.xxl },
 });

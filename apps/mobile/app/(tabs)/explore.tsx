@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DailyProgress } from '../../src/components/perspective/DailyProgress';
 import { SafetyMenu } from '../../src/components/SafetyMenu';
+import { useTabBarSpace } from '../../src/components/ui/GlassTabBar';
 import { IconButton } from '../../src/components/ui/IconButton';
 import { Screen } from '../../src/components/ui/Screen';
 import { EmptyState, ErrorState, LoadingState } from '../../src/components/ui/States';
@@ -20,12 +21,15 @@ import { theme } from '../../src/theme';
  * first screen in the editorial look (theme.editorial, chosen 2026-10-25).
  */
 const e = theme.editorial;
+/** Room under the last card for the floating skip button. */
+const SKIP_CLEARANCE = 88;
 
 export default function Explore() {
   const explore = useExplore();
   const skip = useSkip();
   const notices = useNotices();
   const me = useMe();
+  const space = useTabBarSpace();
   const toast = useToast();
   const [safetyOpen, setSafetyOpen] = useState(false);
   const unread = notices.data?.unreadCount ?? 0;
@@ -88,7 +92,7 @@ export default function Explore() {
       ) : (
         <>
           <ScrollView
-            contentContainerStyle={s.scroll}
+            contentContainerStyle={[s.scroll, { paddingBottom: space + SKIP_CLEARANCE }]}
             refreshControl={<RefreshControl refreshing={explore.isRefetching} onRefresh={() => void explore.refetch()} />}
           >
             <ExploreProfile
@@ -108,7 +112,14 @@ export default function Explore() {
               }
             />
           </ScrollView>
-          <IconButton icon="close" renderIcon={({ size, color }) => <XIcon size={size} color={color} />} onPress={() => void doSkip()} accessibilityLabel={`Skip ${card.profile.displayName}`} style={s.skip} disabled={skip.isPending} />
+          <IconButton
+            icon="close"
+            renderIcon={({ size, color }) => <XIcon size={size} color={color} />}
+            onPress={() => void doSkip()}
+            accessibilityLabel={`Skip ${card.profile.displayName}`}
+            style={{ ...s.skip, bottom: space + theme.spacing.md }}
+            disabled={skip.isPending}
+          />
           <SafetyMenu
             visible={safetyOpen}
             onClose={() => setSafetyOpen(false)}
@@ -150,6 +161,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { fontFamily: e.fonts.bodyBold, fontSize: 10, color: e.colors.onInk },
-  scroll: { paddingHorizontal: theme.spacing.lg - 4, paddingTop: theme.spacing.sm, paddingBottom: 120 },
-  skip: { position: 'absolute', left: theme.spacing.lg, bottom: theme.spacing.lg },
+  scroll: { paddingHorizontal: theme.spacing.lg - 4, paddingTop: theme.spacing.sm },
+  // The skip button floats just above the tab bar; the screen runs underneath both.
+  skip: { position: 'absolute', left: theme.spacing.lg },
 });

@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PostComposer } from '../post-composer/PostComposer';
 import { PostEditor } from '../post-composer/PostEditor';
 import { ConfirmSheet } from '../../components/ui/ConfirmSheet';
+import { useTabBarSpace } from '../../components/ui/GlassTabBar';
 import { useToast } from '../../components/ui/Toast';
 import { useRemovePost, useReorderPosts } from '../../features/hooks';
 import { errorMessage } from '../../lib/errors';
@@ -48,6 +49,8 @@ interface ProfileEditorProps {
  */
 export function ProfileEditor({ me, onRefetch, onNavigateAway }: ProfileEditorProps) {
   const toast = useToast();
+  // Room for the floating tab bar on the You tab (0 on the standalone edit screen).
+  const space = useTabBarSpace();
   const reorderPosts = useReorderPosts();
   const removePost = useRemovePost();
 
@@ -175,7 +178,7 @@ export function ProfileEditor({ me, onRefetch, onNavigateAway }: ProfileEditorPr
   return (
     <>
       <ScrollView
-        contentContainerStyle={s.content}
+        contentContainerStyle={[s.content, { paddingBottom: space + theme.spacing.xxl }]}
         keyboardShouldPersistTaps="handled"
         // A lifted card owns the finger; the page must not scroll under it.
         scrollEnabled={!dragging}

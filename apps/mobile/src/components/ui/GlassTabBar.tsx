@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import type { BottomTabBarProps } from 'expo-router/tabs';
-import React, { useEffect, useRef, useState } from 'react';
+import { BottomTabBarHeightCallbackContext, BottomTabBarHeightContext, type BottomTabBarProps } from 'expo-router/tabs';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -74,7 +74,17 @@ function useReduceTransparency(): boolean {
  * springs to the new tab, enlarges the tab beneath it, ticks a haptic per tab it crosses, then
  * settles. Reduce Motion skips the travel; Reduce Transparency uses a solid fill.
  */
+/**
+ * Extra bottom space a screen needs so its last item scrolls clear of the floating bar (the bar sits
+ * on top of the tab screens, which run underneath it). 0 outside the tabs, so shared views can use it.
+ */
+export function useTabBarSpace(): number {
+  return useContext(BottomTabBarHeightContext) ?? 0;
+}
+
 export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, avatar }: Props) {
+  // Tell the navigator how tall the bar is, so useTabBarSpace() can report it to the screens.
+  const reportHeight = useContext(BottomTabBarHeightCallbackContext);
   const routes = state.routes.filter((r) => tabs.some((t) => t.name === r.name));
   const count = routes.length;
   const activeIndex = Math.max(0, routes.findIndex((r) => r.key === state.routes[state.index]?.key));
@@ -84,6 +94,8 @@ export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, a
   const liquidGlass = Platform.OS === 'ios' && !reduceTransparency && isLiquidGlassAvailable();
 
   const [barWidth, setBarWidth] = useState(0);
+  /** The tab under the lifted lens, drawn at full brightness so the glass never washes it out. */
+  const [lensOver, setLensOver] = useState<number | null>(null);
   const barX = useRef(0);
   const barRef = useRef<React.ComponentRef<typeof View>>(null);
   const x = useRef(new Animated.Value(0)).current;
@@ -100,6 +112,7 @@ export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, a
     if (hover.current === index) return;
     if (index !== null && hover.current !== null) selection();
     hover.current = index;
+    setLensOver(index);
     scales.forEach((v, i) =>
       Animated.spring(v, { toValue: i === index ? 1 : REST, useNativeDriver: false, speed: 24, bounciness: 6 }).start(),
     );
@@ -189,15 +202,20 @@ export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, a
 
   // The bar grows by moving its edges out, not by scaling, so its icons stay sharp.
   const barGrow = lift.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
-  const frost = lift.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] });
+  const frost = lift.interpolate({ inputRange: [0, 1], outputRange: [0, 0.1] });
   const lensScaleX = lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.14] });
   const lensScaleY = lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.26] });
 
   return (
-    <View style={[s.wrap, { paddingBottom: Math.max(insets.bottom - 6, theme.spacing.md) }]}>
+    // Floats over the screen with a transparent background, so content shows around and behind it.
+    <View
+      pointerEvents="box-none"
+      style={[s.wrap, { paddingBottom: Math.max(insets.bottom - 6, theme.spacing.md) }]}
+      onLayout={(ev) => reportHeight?.(ev.nativeEvent.layout.height)}
+    >
       <Animated.View style={[s.bar, { marginHorizontal: barGrow }]}>
         {liquidGlass ? (
-          <GlassView style={s.fill} glassEffectStyle="regular" colorScheme="light" tintColor="rgba(246,241,231,0.35)" isInteractive />
+          <GlassView style={s.fill} glassEffectStyle="regular" colorScheme="dark" tintColor={e.colors.ink} isInteractive />
         ) : (
           <View style={[s.fill, reduceTransparency ? s.solid : s.frosted, Platform.OS === 'web' && WEB_BLUR]} />
         )}
@@ -227,6 +245,7 @@ export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, a
             const tab = tabs.find((t) => t.name === route.name);
             if (!tab) return null;
             const selected = index === activeIndex;
+            const bright = selected || index === lensOver;
             const badge = descriptors[route.key]?.options.tabBarBadge;
             const showAvatar = route.name === 'you' && avatar;
             return (
@@ -246,7 +265,7 @@ export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, a
                         <Avatar name={avatar.name} url={avatar.url} size={AVATAR} />
                       </View>
                     ) : (
-                      <Ionicons name={selected ? tab.iconActive : tab.icon} size={ICON} color={e.colors.ink} />
+                      <Ionicons name={selected ? tab.iconActive : tab.icon} size={ICON} color={bright ? e.colors.onInk : e.colors.onInkMuted} />
                     )}
                     {badge ? (
                       <View style={s.badge}>
@@ -254,7 +273,7 @@ export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, a
                       </View>
                     ) : null}
                   </View>
-                  <Text style={[s.label, selected && s.labelOn]} numberOfLines={1}>
+                  <Text style={[s.label, bright && s.labelBright, selected && s.labelOn]} numberOfLines={1}>
                     {tab.label}
                   </Text>
                 </Animated.View>
@@ -271,7 +290,7 @@ export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, a
 const WEB_BLUR = { backdropFilter: 'blur(24px) saturate(160%)' } as unknown as ViewStyle;
 
 const s = StyleSheet.create({
-  wrap: { paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.sm - 2, backgroundColor: e.colors.paper },
+  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.sm - 2 },
   bar: {
     height: BAR_HEIGHT,
     borderRadius: BAR_HEIGHT / 2,
@@ -282,18 +301,19 @@ const s = StyleSheet.create({
     elevation: 10,
   },
   fill: { ...StyleSheet.absoluteFill, borderRadius: BAR_HEIGHT / 2, overflow: 'hidden' },
-  frosted: { backgroundColor: 'rgba(255,253,248,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)' },
-  solid: { backgroundColor: e.colors.surface, borderWidth: 1, borderColor: e.colors.line },
-  frostOverlay: { backgroundColor: '#FFFFFF' },
+  // Dark brown-black, the same ink as Explore's progress pill (2026-10-25).
+  frosted: { backgroundColor: e.colors.inkGlass, borderWidth: 1, borderColor: e.colors.onInkLine },
+  solid: { backgroundColor: e.colors.ink, borderWidth: 1, borderColor: e.colors.onInkLine },
+  frostOverlay: { backgroundColor: e.colors.onInk },
   // userSelect: dragging across the labels in the web preview must not select their text.
   row: { flex: 1, flexDirection: 'row', alignItems: 'center', userSelect: 'none' },
   lens: { position: 'absolute', left: 0, top: (BAR_HEIGHT - LENS_HEIGHT) / 2, height: LENS_HEIGHT },
-  lensFlat: { borderRadius: LENS_HEIGHT / 2, backgroundColor: 'rgba(36,29,21,0.08)' },
+  lensFlat: { borderRadius: LENS_HEIGHT / 2, backgroundColor: e.colors.onInkSoft },
   lensGlass: {
     borderRadius: LENS_HEIGHT / 2,
-    backgroundColor: 'rgba(255,255,255,0.78)',
+    backgroundColor: e.colors.onInkLens,
     borderWidth: 1,
-    borderColor: '#FFFFFF',
+    borderColor: e.colors.onInkLine,
     shadowColor: '#000000',
     shadowOpacity: 0.14,
     shadowRadius: 12,
@@ -302,10 +322,11 @@ const s = StyleSheet.create({
   tab: { flex: 1, height: BAR_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   tabInner: { alignItems: 'center', gap: 2 },
   // 11 pt on screen at rest (drawn larger, see REST).
-  label: { fontFamily: e.fonts.bodyMedium, fontSize: 11 * MAGNIFY, color: e.colors.ink },
+  label: { fontFamily: e.fonts.bodyMedium, fontSize: 11 * MAGNIFY, color: e.colors.onInkMuted },
+  labelBright: { color: e.colors.onInk },
   labelOn: { fontFamily: e.fonts.bodySemibold },
   avatarRing: { padding: 2, borderRadius: 999, borderWidth: 2, borderColor: 'transparent' },
-  avatarRingOn: { borderColor: e.colors.ink },
+  avatarRingOn: { borderColor: e.colors.onInk },
   // Sized for the tab's REST scale, so it is about 17 px on screen.
   badge: {
     position: 'absolute',

@@ -37,8 +37,10 @@ The product owner compared three directions on a design canvas and chose **Edito
   - The selection capsule lifts into a lens on tap or drag, springs to the tab (about 0.6 s), magnifies the tab under it, fires `lib/haptics.selection()` per tab, then settles.
   - `expo-glass-effect` provides Liquid Glass on iOS 26 (native). Elsewhere a frosted fill, with a CSS backdrop blur on web.
   - Reduce Motion and Reduce Transparency are respected.
-  - It stays in the normal layout flow (not absolutely positioned), so no screen needed extra bottom padding.
+  - It floats over the screens (absolutely positioned, transparent around the capsule; changed after the product owner asked why a cream strip hid Explore). The bar reports its height through `BottomTabBarHeightCallbackContext`, and `useTabBarSpace()` (in `GlassTabBar.tsx`) reads it, returning 0 outside the tabs.
+  - Each tab screen adds that height to its bottom padding: `explore` (plus room for the skip button, which now sits just above the bar), `inbox`, `create`, `connections`, `you`, and `features/profile-editor/ProfileEditor.tsx`.
   - Built with RN `Animated` + `PanResponder`, without Reanimated. Refraction and colour fringes are not reproduced.
+  - Dark theme (product owner, after the first push): ink bar (`editorial.inkGlass`), cream icons and labels (`onInk`, with `onInkMuted` at rest), lens `onInkSoft`/`onInkLens`, cream avatar ring. On iOS 26, `GlassView` uses `colorScheme="dark"` with an ink tint. The tab under the lifted lens is drawn at full `onInk`.
   - Sharpness: tabs are drawn at the magnified size and shrunk to `1/MAGNIFY` at rest. Scaling them up made the icon under the lens pixelated (reported by the product owner). The bar grows by animating its horizontal margin, not with a scale transform.
 - **`ProfileView`'s `afterPrimary` slot was removed.** It was added earlier today and is no longer used.
 
@@ -85,4 +87,6 @@ The product owner compared three directions on a design canvas and chose **Edito
 
 ## 7. Potential Overlap / Conflict Warning
 - **For Bharath, after pulling:** `pnpm install` (new packages), then `pnpm build` (the tokens package is compiled, and Metro reads its `dist`).
-- `PostCard.tsx` (`Waveform` export) and `IconButton.tsx` (`renderIcon`) got additive, optional props only. If you run a development build, rebuild it once after pulling (`npx expo run:ios`); Expo Go needs nothing.
+- `PostCard.tsx` (`Waveform` export) and `IconButton.tsx` (`renderIcon`) got additive, optional props only.
+- **You → View uses `ExploreProfile` read-only** (product owner, 2026-10-25). `onGive`, `givenPostIds` and `inCommon` became optional; the You screen has the paper background and Explore's side margins. `ProfileView` is now used only by `app/profile/[id].tsx` (profiles opened from the Inbox, a chat or "Perspectives you gave").
+- **Bharath's files touched for the floating tab bar:** `app/(tabs)/you.tsx` and `features/profile-editor/ProfileEditor.tsx` each gained `const space = useTabBarSpace()` and `space +` in their scroll content's `paddingBottom`. Any new tab screen with a scroll view needs the same. If you run a development build, rebuild it once after pulling (`npx expo run:ios`); Expo Go needs nothing.

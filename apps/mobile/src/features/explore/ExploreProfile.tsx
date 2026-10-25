@@ -11,9 +11,11 @@ const e = theme.editorial;
 
 interface Props {
   profile: PublicProfile;
-  givenPostIds: readonly string[];
-  inCommon: InCommonItem[];
-  onGive: (post: Post) => void;
+  givenPostIds?: readonly string[];
+  /** Empty on your own profile, so the card is not shown. */
+  inCommon?: InCommonItem[];
+  /** Give a perspective on one post. Omit for read-only (your own profile on You → View). */
+  onGive?: (post: Post) => void;
   /** Explore's report/block menu, beside the name. */
   headerRight?: React.ReactNode;
 }
@@ -21,15 +23,20 @@ interface Props {
 /**
  * A profile on Explore in the editorial look (chosen 2026-10-25): name with the tick, then
  * "pronouns · age · height · city", the first post, what you have in common, their personality answer,
- * more about them, then the rest.
- * Gender and height are not shown on Explore (decided 2026-10-25). Other screens still use ProfileView.
+ * more about them, then the rest. Gender is not shown (decided 2026-10-25).
+ * Also used read-only for You → View, so your profile looks exactly as others see it on Explore.
  */
-export function ExploreProfile({ profile, givenPostIds, inCommon, onGive, headerRight }: Props) {
+export function ExploreProfile({ profile, givenPostIds = [], inCommon = [], onGive, headerRight }: Props) {
   const unanswered = profile.posts.filter((p) => !givenPostIds.includes(p.id));
   // The server only offers profiles with an unanswered post; fall back to all posts just in case.
   const [primary, ...rest] = unanswered.length > 0 ? unanswered : profile.posts;
   const card = (post: Post) => (
-    <EditorialPostCard key={post.id} post={post} alreadyGiven={givenPostIds.includes(post.id)} onGive={() => onGive(post)} />
+    <EditorialPostCard
+      key={post.id}
+      post={post}
+      alreadyGiven={givenPostIds.includes(post.id)}
+      onGive={onGive ? () => onGive(post) : undefined}
+    />
   );
   const about = moreAbout(profile);
   const prompt = profile.personalityPrompts[0];
