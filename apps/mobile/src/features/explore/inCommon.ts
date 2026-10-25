@@ -4,6 +4,7 @@ import {
   SOCIAL_PREFERENCE_LABELS,
   type PublicProfile,
 } from '@perspective/contracts';
+import { formatFeetInches } from '../../lib/labels';
 
 export interface InCommonItem {
   kind: 'interest' | 'city' | 'lifestyle' | 'social';
@@ -33,6 +34,28 @@ export function thingsInCommon(me: Side, other: Side): InCommonItem[] {
     items.push({ kind: 'social', label: SOCIAL_PREFERENCE_LABELS[other.socialPreference].label });
   }
   return items;
+}
+
+/** At most this many chips in Explore's "More about" block (decided 2026-10-25, to keep it clean). */
+export const MORE_ABOUT_MAX = 5;
+
+/** "More about [name]": interests, then daily rhythm and social energy, capped at MORE_ABOUT_MAX. */
+export function moreAbout(
+  profile: Pick<PublicProfile, 'interests' | 'lifestylePace' | 'socialPreference'>,
+  limit = MORE_ABOUT_MAX,
+): string[] {
+  return [
+    ...(profile.interests ?? []).map((id) => getInterestById(id)?.label ?? id),
+    ...(profile.lifestylePace ? [LIFESTYLE_PACE_LABELS[profile.lifestylePace].label] : []),
+    ...(profile.socialPreference ? [SOCIAL_PREFERENCE_LABELS[profile.socialPreference].label] : []),
+  ].slice(0, limit);
+}
+
+/** The line under the name on Explore: "she/her · 26 · 5'4" · Mumbai" (pronouns left out when not given). */
+export function nameLine(profile: Pick<PublicProfile, 'pronouns' | 'age' | 'heightCm' | 'city'>): string {
+  return [profile.pronouns?.trim(), String(profile.age), formatFeetInches(profile.heightCm), profile.city?.trim()]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** "You + Tara have 4 things in common" / "1 thing". */

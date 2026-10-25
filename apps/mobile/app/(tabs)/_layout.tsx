@@ -1,21 +1,19 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { ConnectedMomentWatcher } from '../../src/components/connect/ConnectedMomentWatcher';
+import { GlassTabBar, type GlassTab } from '../../src/components/ui/GlassTabBar';
 import { LoadingState } from '../../src/components/ui/States';
 import { useConnections, useInbox, useMe } from '../../src/features/hooks';
 import { usePushRegistration } from '../../src/push/push';
 import { useSession } from '../../src/session/sessionStore';
-import { theme } from '../../src/theme';
 
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const TABS: { name: string; title: string; icon: IconName; iconActive: IconName }[] = [
-  { name: 'explore', title: 'Explore', icon: 'compass-outline', iconActive: 'compass' },
-  { name: 'inbox', title: 'Inbox', icon: 'mail-outline', iconActive: 'mail' },
-  { name: 'create', title: 'Your posts', icon: 'add-circle-outline', iconActive: 'add-circle' },
-  { name: 'connections', title: 'Connections', icon: 'chatbubbles-outline', iconActive: 'chatbubbles' },
-  { name: 'you', title: 'You', icon: 'person-circle-outline', iconActive: 'person-circle' },
+/** The floating glass tab bar's tabs (2026-10-25). "You" shows your first photo when there is one. */
+const TABS: GlassTab[] = [
+  { name: 'explore', label: 'Explore', icon: 'compass-outline', iconActive: 'compass' },
+  { name: 'inbox', label: 'Inbox', icon: 'mail-outline', iconActive: 'mail' },
+  { name: 'create', label: 'Your posts', icon: 'add-circle-outline', iconActive: 'add-circle' },
+  { name: 'connections', label: 'Connections', icon: 'chatbubbles-outline', iconActive: 'chatbubbles' },
+  { name: 'you', label: 'You', icon: 'person-circle-outline', iconActive: 'person-circle' },
 ];
 
 export default function TabsLayout() {
@@ -37,29 +35,25 @@ export default function TabsLayout() {
   const connectionsBadge = connections.data
     ? connections.data.filter((c) => c.isNew || c.expiry.state === 'you_owe_reply').length || undefined
     : undefined;
+  const firstPhoto = me.data?.posts
+    .filter((p) => p.kind === 'photo' && p.mediaUrl)
+    .sort((a, b) => a.position - b.position)[0];
+  const avatar = me.data ? { name: me.data.displayName ?? 'You', url: firstPhoto?.mediaUrl ?? null } : undefined;
 
   return (
     <>
     <ConnectedMomentWatcher enabled={live} />
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarActiveTintColor: theme.colors.onDark,
-        tabBarInactiveTintColor: theme.colors.tabBarInactive,
-        tabBarStyle: { backgroundColor: theme.colors.tabBar, borderTopWidth: 0, height: 64, paddingTop: 8 },
-        tabBarBadgeStyle: { backgroundColor: theme.colors.brand, color: theme.colors.onDark },
-      }}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <GlassTabBar {...props} tabs={TABS} avatar={avatar} />}
     >
       {TABS.map((t) => (
         <Tabs.Screen
           key={t.name}
           name={t.name}
           options={{
-            title: t.title,
-            tabBarAccessibilityLabel: t.title,
+            title: t.label,
             tabBarBadge: t.name === 'inbox' ? inboxBadge : t.name === 'connections' ? connectionsBadge : undefined,
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? t.iconActive : t.icon} size={26} color={String(color)} />,
           }}
         />
       ))}

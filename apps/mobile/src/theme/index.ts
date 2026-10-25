@@ -1,6 +1,7 @@
 import {
   borderWidth,
   colors,
+  editorial,
   elevation,
   iconButton,
   iconSize,
@@ -28,5 +29,6 @@ export const theme = {
   opacity,
   scale,
   borderWidth,
+  editorial,
 };
 export type Theme = typeof theme;

@@ -56,9 +56,14 @@ export const REPORT_LABEL: Record<ReportReason, string> = {
   other: 'Something else',
 };
 
-export function formatHeight(cm: number): string {
+/** 162 → 5'4" */
+export function formatFeetInches(cm: number): string {
   const totalInches = Math.round(cm / 2.54);
-  return `${Math.floor(totalInches / 12)}'${totalInches % 12}" · ${cm} cm`;
+  return `${Math.floor(totalInches / 12)}'${totalInches % 12}"`;
+}
+
+export function formatHeight(cm: number): string {
+  return `${formatFeetInches(cm)} · ${cm} cm`;
 }
 
 /** Normalizes any Unicode digits (Devanagari, Arabic-Indic, Fullwidth, etc.) to ASCII 0-9. */

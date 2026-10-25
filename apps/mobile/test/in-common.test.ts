@@ -1,4 +1,4 @@
-import { inCommonTitle, thingsInCommon } from '../src/features/explore/inCommon';
+import { inCommonTitle, MORE_ABOUT_MAX, moreAbout, nameLine, thingsInCommon } from '../src/features/explore/inCommon';
 
 const me = { interests: ['photography', 'hiking_trails', 'podcasts'], city: 'Mumbai', lifestylePace: 'early_bird', socialPreference: 'small_groups' } as const;
 
@@ -24,5 +24,34 @@ describe('inCommonTitle', () => {
   it('uses the singular for one thing', () => {
     expect(inCommonTitle('Tara', 1)).toBe('You + Tara have 1 thing in common');
     expect(inCommonTitle('Tara', 4)).toBe('You + Tara have 4 things in common');
+  });
+});
+
+describe('nameLine', () => {
+  it('joins pronouns, age, height and city', () => {
+    expect(nameLine({ pronouns: 'she/her', age: 26, heightCm: 162, city: 'Mumbai' })).toBe(`she/her · 26 · 5'4" · Mumbai`);
+  });
+
+  it('leaves out pronouns when none were given', () => {
+    expect(nameLine({ pronouns: null, age: 28, heightCm: 182, city: 'Bengaluru' })).toBe(`28 · 6'0" · Bengaluru`);
+    expect(nameLine({ pronouns: '  ', age: 28, heightCm: 182, city: 'Bengaluru' })).toBe(`28 · 6'0" · Bengaluru`);
+  });
+});
+
+describe('moreAbout', () => {
+  it('shows at most 5, interests first', () => {
+    const items = moreAbout({
+      interests: ['photography', 'hiking_trails', 'podcasts', 'cinema_film', 'street_food', 'running'],
+      lifestylePace: 'night_owl',
+      socialPreference: 'extrovert',
+    });
+    expect(items).toHaveLength(MORE_ABOUT_MAX);
+    expect(MORE_ABOUT_MAX).toBe(5);
+    expect(items[0]).toBe('Photography');
+  });
+
+  it('adds daily rhythm and social energy when there is room', () => {
+    const items = moreAbout({ interests: ['photography'], lifestylePace: 'night_owl', socialPreference: null });
+    expect(items).toEqual(['Photography', 'Night Owl (Midnight thoughts)']);
   });
 });

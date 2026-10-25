@@ -7,6 +7,8 @@ export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 interface IconButtonProps {
   icon: IconName;
+  /** Draws a different icon set in place of `icon` (Explore uses Phosphor). */
+  renderIcon?: (p: { size: number; color: string }) => React.ReactNode;
   onPress: () => void;
   accessibilityLabel: string;
   size?: 'large' | 'small';
@@ -16,9 +18,10 @@ interface IconButtonProps {
 }
 
 /** Round floating action (skip, give perspective). */
-export function IconButton({ icon, onPress, accessibilityLabel, size = 'large', tone = 'light', disabled, style }: IconButtonProps) {
+export function IconButton({ icon, renderIcon, onPress, accessibilityLabel, size = 'large', tone = 'light', disabled, style }: IconButtonProps) {
   const d = theme.iconButton[size];
   const color = tone === 'light' ? theme.colors.ink : theme.colors.onDark;
+  const glyph = size === 'large' ? 26 : 20;
   return (
     <Pressable
       accessibilityRole="button"
@@ -36,7 +39,7 @@ export function IconButton({ icon, onPress, accessibilityLabel, size = 'large', 
         style,
       ]}
     >
-      <Ionicons name={icon} size={size === 'large' ? 26 : 20} color={color} />
+      {renderIcon ? renderIcon({ size: glyph, color }) : <Ionicons name={icon} size={glyph} color={color} />}
     </Pressable>
   );
 }

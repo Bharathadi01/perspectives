@@ -20,8 +20,6 @@ interface ProfileViewProps {
   /** Give a perspective on one post. Omit for read-only (your own profile). */
   onGive?: (post: Post) => void;
   headerRight?: React.ReactNode;
-  /** Shown right after the first post (Explore's "things in common" card). */
-  afterPrimary?: React.ReactNode;
 }
 
 /**
@@ -34,7 +32,6 @@ export function ProfileView({
   hideAnswered = false,
   onGive,
   headerRight,
-  afterPrimary,
 }: ProfileViewProps) {
   const unanswered = profile.posts.filter((p) => !givenPostIds.includes(p.id));
   // The server only offers profiles that still have an unanswered post; fall back to all posts just in case.
@@ -67,7 +64,6 @@ export function ProfileView({
 
       {/* Primary Photo Card */}
       {primary ? card(primary) : null}
-      {afterPrimary}
 
       {/* Basics Strip */}
       <BasicsRow profile={profile} />

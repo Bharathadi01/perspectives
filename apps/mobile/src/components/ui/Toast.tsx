@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, StyleSheet, Text } from 'react-native';
+import { CheckCircleIcon, InfoIcon, WarningCircleIcon } from './icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../theme';
 
@@ -41,6 +42,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           accessibilityLiveRegion="polite"
           style={[s.toast, s[message.tone], { opacity, top: insets.top + theme.spacing.sm }]}
         >
+          {message.tone === 'success' ? (
+            <CheckCircleIcon size={20} weight="fill" color={e.colors.onInk} />
+          ) : message.tone === 'error' ? (
+            <WarningCircleIcon size={20} weight="fill" color={theme.colors.onDark} />
+          ) : (
+            <InfoIcon size={20} color={e.colors.onInk} />
+          )}
           <Text style={s.text}>{message.text}</Text>
         </Animated.View>
       )}
@@ -50,21 +58,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 export const useToast = () => useContext(ToastContext);
 
+// In the editorial look (2026-10-25): dark ink instead of green; errors stay red so they stand out.
+const e = theme.editorial;
+
 const s = StyleSheet.create({
   toast: {
     position: 'absolute',
     left: theme.spacing.base,
     right: theme.spacing.base,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.base,
-    borderRadius: theme.radius.control,
+    borderRadius: 16,
     shadowColor: theme.colors.shadow,
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 6,
   },
-  info: { backgroundColor: theme.colors.ink },
-  success: { backgroundColor: theme.colors.success },
+  info: { backgroundColor: e.colors.ink },
+  success: { backgroundColor: e.colors.ink },
   error: { backgroundColor: theme.colors.danger },
-  text: { color: theme.colors.onDark, fontSize: theme.typography.fontSize.sm, fontWeight: theme.typography.fontWeight.medium },
+  text: { flex: 1, color: e.colors.onInk, fontFamily: e.fonts.bodyMedium, fontSize: theme.typography.fontSize.sm },
 });

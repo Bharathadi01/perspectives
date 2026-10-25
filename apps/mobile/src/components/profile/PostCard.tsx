@@ -95,7 +95,8 @@ export function PhotoPostCard({ post, onGive, alreadyGiven }: PostCardProps) {
   );
 }
 
-function Waveform({ seed, progress }: { seed: string; progress: number }) {
+/** Bars for a voice clip; `colors` lets the editorial Explore card use its own palette. */
+export function Waveform({ seed, progress, colors }: { seed: string; progress: number; colors?: { played: string; rest: string } }) {
   const bars = useMemo(() => {
     let h = 0;
     for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -108,7 +109,15 @@ function Waveform({ seed, progress }: { seed: string; progress: number }) {
   return (
     <View style={s.wave} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {bars.map((b, i) => (
-        <View key={i} style={[s.bar, { height: 6 + b * 26 }, i / bars.length <= progress && s.barPlayed]} />
+        <View
+          key={i}
+          style={[
+            s.bar,
+            { height: 6 + b * 26 },
+            colors && { backgroundColor: colors.rest },
+            i / bars.length <= progress && (colors ? { backgroundColor: colors.played } : s.barPlayed),
+          ]}
+        />
       ))}
     </View>
   );

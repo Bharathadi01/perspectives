@@ -1,15 +1,14 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DailyProgress } from '../../src/components/perspective/DailyProgress';
-import { InCommonCard } from '../../src/components/profile/InCommonCard';
-import { ProfileView } from '../../src/components/profile/ProfileView';
 import { SafetyMenu } from '../../src/components/SafetyMenu';
 import { IconButton } from '../../src/components/ui/IconButton';
 import { Screen } from '../../src/components/ui/Screen';
 import { EmptyState, ErrorState, LoadingState } from '../../src/components/ui/States';
 import { useToast } from '../../src/components/ui/Toast';
+import { ExploreProfile } from '../../src/features/explore/ExploreProfile';
+import { BellIcon, DotsThreeIcon, SlidersHorizontalIcon, XIcon } from '../../src/components/ui/icons';
 import { thingsInCommon } from '../../src/features/explore/inCommon';
 import { useExplore, useMe, useNotices, useSkip } from '../../src/features/hooks';
 import { errorMessage } from '../../src/lib/errors';
@@ -17,8 +16,11 @@ import { theme } from '../../src/theme';
 
 /**
  * One profile at a time: today's mandatory set first, then a short optional batch. Cards carry no
- * slot note (removed 2026-10-25): set, boost and bonus profiles all look the same.
+ * slot note (removed 2026-10-25): set, boost and bonus profiles all look the same. Explore is the
+ * first screen in the editorial look (theme.editorial, chosen 2026-10-25).
  */
+const e = theme.editorial;
+
 export default function Explore() {
   const explore = useExplore();
   const skip = useSkip();
@@ -43,7 +45,7 @@ export default function Explore() {
   };
 
   return (
-    <Screen>
+    <Screen style={s.paper}>
       <View style={s.topBar}>
         <DailyProgress daily={daily} tone="dark" />
         <View style={s.actions}>
@@ -53,7 +55,7 @@ export default function Explore() {
             accessibilityLabel={unread > 0 ? `Notices, ${unread} new` : 'Notices'}
             style={({ pressed }) => [s.iconTap, pressed && s.pressed]}
           >
-            <Ionicons name="notifications-outline" size={24} color={theme.colors.ink} />
+            <BellIcon size={25} color={e.colors.ink} />
             {unread > 0 ? (
               <View style={s.badge}>
                 <Text style={s.badgeText}>{unread > 9 ? '9+' : unread}</Text>
@@ -66,7 +68,7 @@ export default function Explore() {
             accessibilityLabel="Filters: who you see"
             style={({ pressed }) => [s.iconTap, pressed && s.pressed]}
           >
-            <Ionicons name="options-outline" size={26} color={theme.colors.ink} />
+            <SlidersHorizontalIcon size={25} color={e.colors.ink} />
           </Pressable>
         </View>
       </View>
@@ -89,11 +91,10 @@ export default function Explore() {
             contentContainerStyle={s.scroll}
             refreshControl={<RefreshControl refreshing={explore.isRefetching} onRefresh={() => void explore.refetch()} />}
           >
-            <ProfileView
+            <ExploreProfile
               profile={card.profile}
               givenPostIds={card.givenPostIds}
-              hideAnswered
-              afterPrimary={me.data ? <InCommonCard name={card.profile.displayName} items={thingsInCommon(me.data, card.profile)} /> : null}
+              inCommon={me.data ? thingsInCommon(me.data, card.profile) : []}
               onGive={(post) => router.push({ pathname: '/give/[postId]', params: { postId: post.id, profileId: card.profile.id } })}
               headerRight={
                 <Pressable
@@ -102,12 +103,12 @@ export default function Explore() {
                   accessibilityLabel="Report or block"
                   style={({ pressed }) => [s.iconTap, pressed && s.pressed]}
                 >
-                  <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.ink} />
+                  <DotsThreeIcon size={28} weight="bold" color={e.colors.ink} />
                 </Pressable>
               }
             />
           </ScrollView>
-          <IconButton icon="close" onPress={() => void doSkip()} accessibilityLabel={`Skip ${card.profile.displayName}`} style={s.skip} disabled={skip.isPending} />
+          <IconButton icon="close" renderIcon={({ size, color }) => <XIcon size={size} color={color} />} onPress={() => void doSkip()} accessibilityLabel={`Skip ${card.profile.displayName}`} style={s.skip} disabled={skip.isPending} />
           <SafetyMenu
             visible={safetyOpen}
             onClose={() => setSafetyOpen(false)}
@@ -122,6 +123,7 @@ export default function Explore() {
 }
 
 const s = StyleSheet.create({
+  paper: { backgroundColor: e.colors.paper },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -141,13 +143,13 @@ const s = StyleSheet.create({
     height: 18,
     paddingHorizontal: 4,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.ink,
+    backgroundColor: e.colors.ink,
     borderWidth: 2,
-    borderColor: theme.colors.background,
+    borderColor: e.colors.paper,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeText: { fontSize: 10, fontWeight: theme.typography.fontWeight.bold, color: theme.colors.onDark },
-  scroll: { padding: theme.spacing.base, paddingBottom: 120, gap: theme.spacing.sm },
+  badgeText: { fontFamily: e.fonts.bodyBold, fontSize: 10, color: e.colors.onInk },
+  scroll: { paddingHorizontal: theme.spacing.lg - 4, paddingTop: theme.spacing.sm, paddingBottom: 120 },
   skip: { position: 'absolute', left: theme.spacing.lg, bottom: theme.spacing.lg },
 });

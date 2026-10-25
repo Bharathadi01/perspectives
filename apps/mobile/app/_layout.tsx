@@ -1,4 +1,11 @@
+import { Fraunces_500Medium_Italic } from '@expo-google-fonts/fraunces/500Medium_Italic';
+import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { ApiError } from '@perspective/api-client';
+import { useFonts } from 'expo-font';
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +25,16 @@ const toBanScreen = (err: unknown) => {
 };
 
 configurePushDisplay();
+
+/** The editorial look's fonts (theme.editorial.fonts), bundled with the app: only the weights in use. */
+const FONTS = {
+  Fraunces_600SemiBold,
+  Fraunces_500Medium_Italic,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+};
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: toBanScreen }),
@@ -51,6 +68,10 @@ export default function RootLayout() {
   useBootstrapSession();
   useAppFocus();
   usePushNavigation();
+  const [fontsLoaded, fontError] = useFonts(FONTS);
+  if (fontError) console.warn('Could not load the app fonts; using the system font', fontError);
+  // Wait for the bundled fonts (fast, no network); if they fail, carry on with the system font.
+  if (!fontsLoaded && !fontError) return null;
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>

@@ -12,7 +12,7 @@ This table is the single source for the stack. If README, CLAUDE.md, BLUEPRINT.m
 | Area | Built and used now | Planned (switch on by ADR when the trigger is met) |
 |---|---|---|
 | Monorepo | pnpm workspaces, TypeScript; `turbo.json` exists but scripts use `pnpm -r` | Turborepo only if build times need caching |
-| Mobile | Expo SDK 58 (React 19, React Native 0.88), Expo Router 58, expo-audio, expo-haptics, expo-notifications and expo-device (push, ADR-020), TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | Expo Development Builds, needed now to receive pushes, and for a real selfie SDK |
+| Mobile | Expo SDK 58 (React 19, React Native 0.88), Expo Router 58, expo-audio, expo-haptics, expo-notifications and expo-device (push, ADR-020), expo-font with bundled Fraunces and Inter from `@expo-google-fonts` (editorial look, ADR-021), Phosphor icons on Explore via `phosphor-react-native` + `react-native-svg` (ADR-021; Ionicons from `@expo/vector-icons` elsewhere), a custom floating glass tab bar using `expo-glass-effect` on iOS 26 (ADR-021), TanStack Query, Zustand, React Hook Form + Zod, run in Expo Go | Expo Development Builds, needed now to receive pushes, and for a real selfie SDK |
 | API | NestJS 10, Zod validation (no class-validator), Swagger at `/docs`, JWT + rotating refresh tokens | Rate limiting: `@nestjs/throttler` in-process first; Redis-backed only with several API instances |
 | Database | PostgreSQL 16 + Prisma 6 (Homebrew or Docker) | pgvector only after a ranking experiment |
 | Media | Local disk behind `MediaStorage`, HMAC-signed URLs | Cloudinary (ADR-003) for signed upload and EXIF stripping; S3 + CDN only if cost or control demands |

@@ -8,3 +8,4 @@ export * from './icon';
 export * from './motion';
 export * from './opacity';
 export * from './textStyles';
+export * from './editorial';
