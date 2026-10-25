@@ -81,9 +81,21 @@ export const ConnectionSchema = z.object({
     comment: z.string(),
     postPrompt: z.string(),
     postCategory: PostCategory,
+    /** The post it was given on, so the chat can show the photo it was about. Optional: added 2026-10-26. */
+    post: PostRefSchema.optional(),
+    createdAt: IsoDateTimeSchema.optional(),
   }),
   /** The perspective the other person gave back before accepting, so the chat can show both. */
-  reply: z.object({ fromUserId: IdSchema, comment: z.string(), postPrompt: z.string() }).nullable(),
+  reply: z
+    .object({
+      fromUserId: IdSchema,
+      comment: z.string(),
+      postPrompt: z.string(),
+      /** As on `origin`. Optional: added 2026-10-26. */
+      post: PostRefSchema.optional(),
+      createdAt: IsoDateTimeSchema.optional(),
+    })
+    .nullable(),
   lastMessage: z
     .object({ text: z.string(), senderId: IdSchema, createdAt: IsoDateTimeSchema })
     .nullable(),

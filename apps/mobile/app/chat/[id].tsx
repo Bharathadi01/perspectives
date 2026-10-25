@@ -1,35 +1,39 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { RULES, conversationIdeas } from '@perspective/contracts';
-import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { queryKeys } from '../../src/api/queryKeys';
-import { Avatar } from '../../src/components/profile/Avatar';
+import React, { useMemo, useRef, useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { SafetyMenu } from '../../src/components/SafetyMenu';
-import { Button } from '../../src/components/ui/Button';
-import { Screen } from '../../src/components/ui/Screen';
-import { Sheet } from '../../src/components/ui/Sheet';
-import { EmptyState, ErrorState, LoadingState } from '../../src/components/ui/States';
-import { Label } from '../../src/components/ui/Text';
 import { useToast } from '../../src/components/ui/Toast';
-import { useConnections, useMessages, useSendMessage, useUnmatch } from '../../src/features/hooks';
+import { ChatHeader, QuietNotice, StartIdeas } from '../../src/features/connections/components/ChatParts';
+import { Composer, type ComposerHandle } from '../../src/features/connections/components/Composer';
+import { DayDivider, MessageBubble } from '../../src/features/connections/components/MessageBubble';
+import { PaperSheet, SheetAction } from '../../src/components/editorial/PaperSheet';
+import { PaperLoading, PaperState } from '../../src/components/editorial/PaperState';
+import { Prologue } from '../../src/features/connections/components/Prologue';
+import { ChatsCircleIcon, FlagIcon, TrashIcon, WarningCircleIcon } from '../../src/features/connections/icons';
+import { ideaCount, ideasForRound } from '../../src/features/connections/ideas';
+import { buildThread, type ThreadItem } from '../../src/features/connections/thread';
+import { useSendQueue } from '../../src/features/connections/useSendQueue';
+import { useConnections, useMessages, useUnmatch } from '../../src/features/hooks';
 import { errorCode, errorMessage } from '../../src/lib/errors';
+import { selection, warn } from '../../src/lib/haptics';
 import { timeUntil } from '../../src/lib/labels';
 import { theme } from '../../src/theme';
 
-/** Shown when a quiet connection closed on its own (or the conversation is otherwise gone). */
+const e = theme.editorial;
+
+/** Shown when a quiet connection closed on its own, or the conversation is otherwise gone. */
 function ClosedConversation() {
   return (
-    <Screen edges={['top', 'bottom']}>
-      <EmptyState
-        icon="chatbubble-ellipses-outline"
+    <SafeAreaView edges={['top', 'bottom']} style={s.screen}>
+      <PaperState
+        icon={<ChatsCircleIcon size={32} color={e.colors.ink} />}
         title="This connection closed"
-        description="Conversations stay open when both people reply. You can still connect again from their profile."
-        actionTitle="Back to connections"
+        body="Conversations stay open when both people reply. You can still connect again from their profile."
+        action="Back to connections"
         onAction={() => router.replace('/(tabs)/connections')}
       />
-    </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -38,29 +42,52 @@ export default function Chat() {
   const connectionId = id ?? '';
   const connections = useConnections();
   const messages = useMessages(connectionId);
-  const send = useSendMessage(connectionId);
   const unmatch = useUnmatch();
   const toast = useToast();
-  const qc = useQueryClient();
-  const [text, setText] = useState('');
-  const [menu, setMenu] = useState(false);
-  const [safety, setSafety] = useState(false);
   const [closed, setClosed] = useState(false);
-  const list = useRef<FlatList>(null);
+  const queue = useSendQueue(connectionId, () => setClosed(true));
+  const [sheet, setSheet] = useState<'none' | 'menu' | 'confirm'>('none');
+  const [safety, setSafety] = useState(false);
+  const safetyNext = useRef(false);
+  const composer = useRef<ComposerHandle>(null);
+  const [ideaRound, setIdeaRound] = useState(0);
+  const [ideasHidden, setIdeasHidden] = useState(false);
 
   const connection = connections.data?.find((c) => c.id === connectionId);
-  if (connections.isLoading || messages.isLoading) return <LoadingState />;
+  const partnerId = connection?.partner.id ?? '';
+
+  // Newest first, for the inverted list: it opens at the latest message and stays there as the keyboard moves.
+  const items = useMemo(
+    () => buildThread(messages.data ?? [], queue.pending, partnerId, new Date(), connection?.connectedAt).reverse(),
+    [messages.data, queue.pending, partnerId, connection?.connectedAt],
+  );
+
+  if (connections.isLoading || messages.isLoading) return <PaperLoading />;
   const goneQuiet = closed || errorCode(messages.error) === 'CONNECTION_CLOSED';
   if (goneQuiet || (!connection && connections.isSuccess && !messages.isError)) return <ClosedConversation />;
   if (!connection || messages.isError) {
-    return <ErrorState error={messages.error} onRetry={() => router.back()} />;
+    return (
+      <SafeAreaView edges={['top', 'bottom']} style={s.screen}>
+        <PaperState
+          icon={<WarningCircleIcon size={30} color={e.colors.ink} />}
+          title="Couldn’t open this conversation"
+          body={errorMessage(messages.error ?? connections.error)}
+          action="Try again"
+          onAction={() => {
+            void connections.refetch();
+            void messages.refetch();
+          }}
+        />
+      </SafeAreaView>
+    );
   }
+
   const partner = connection.partner;
-  const history = messages.data ?? [];
-  const empty = history.length === 0;
-  // The person who asked to connect wrote the perspective; ideas differ for them and for the post's owner.
+  const empty = items.length === 0;
+  // The person who asked to connect wrote the first perspective; ideas differ for them and the post's owner.
   const role = connection.origin.fromUserId === partner.id ? 'owner' : 'giver';
-  const ideas = empty ? conversationIdeas(connection.origin.postCategory, role, connection.id) : [];
+  const category = connection.origin.postCategory;
+  const ideas = empty && !ideasHidden ? ideasForRound(category, role, connection.id, ideaRound) : [];
   const { expiry } = connection;
   const notice =
     expiry.state === 'you_owe_reply' && expiry.closesAt
@@ -68,146 +95,118 @@ export default function Chat() {
       : expiry.state === 'remind' && expiry.closesAt
         ? `Nobody has said hi yet. This connection closes ${timeUntil(expiry.closesAt)} if nobody writes.`
         : null;
+  const openProfile = () => router.push({ pathname: '/profile/[id]', params: { id: partner.id } });
 
-  const submit = async () => {
-    const body = text.trim();
-    if (!body) return;
-    setText('');
+  const doUnmatch = async () => {
     try {
-      await send.run(body);
+      await unmatch.run(connectionId);
+      setSheet('none');
+      toast(`You unmatched ${partner.displayName}.`, 'info');
+      router.back();
     } catch (err) {
-      setText(body);
-      if (errorCode(err) === 'CONNECTION_CLOSED') {
-        setClosed(true);
-        void qc.invalidateQueries({ queryKey: queryKeys.connections });
-        return;
-      }
       toast(errorMessage(err), 'error');
     }
   };
 
-  return (
-    <Screen edges={['top', 'bottom']}>
-      <View style={s.header}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" style={s.icon}>
-          <Ionicons name="chevron-back" size={26} color={theme.colors.ink} />
-        </Pressable>
-        <Pressable
-          style={s.who}
-          onPress={() => router.push({ pathname: '/profile/[id]', params: { id: partner.id } })}
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${partner.displayName}'s profile`}
-        >
-          <Avatar name={partner.displayName} url={partner.primaryPhotoUrl} size={32} />
-          <Text style={s.name}>{partner.displayName}</Text>
-        </Pressable>
-        <Pressable onPress={() => setMenu(true)} accessibilityRole="button" accessibilityLabel="Conversation options" style={s.icon}>
-          <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.ink} />
-        </Pressable>
-      </View>
+  const renderItem = ({ item }: { item: ThreadItem }) =>
+    item.type === 'day' ? (
+      <DayDivider label={item.label} />
+    ) : (
+      <MessageBubble item={item} partnerName={partner.displayName} onRetry={queue.retry} />
+    );
 
-      {notice ? (
-        <View style={s.notice} accessibilityRole="alert">
-          <Ionicons name="time-outline" size={18} color={theme.colors.warning} />
-          <Text style={s.noticeText}>{notice}</Text>
-        </View>
-      ) : null}
+  return (
+    <SafeAreaView edges={['top', 'bottom']} style={s.screen}>
+      <ChatHeader
+        partner={partner}
+        subtitle="View profile"
+        onBack={() => router.back()}
+        onOpenProfile={openProfile}
+        onMenu={() => setSheet('menu')}
+      />
+      {notice ? <QuietNotice text={notice} /> : null}
 
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
-          ref={list}
-          data={history}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={s.list}
-          onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+          inverted
+          data={items}
+          keyExtractor={(item) => item.key}
+          renderItem={renderItem}
+          // Inverted, so this sits at the top: the two perspectives the conversation grew from.
+          ListFooterComponent={<Prologue connection={connection} />}
           ListHeaderComponent={
-            <View style={s.origin}>
-              <Label>How you connected</Label>
-              <Text style={s.originPrompt}>
-                {connection.origin.fromUserId === partner.id ? `${partner.displayName} said` : 'You said'}, on “{connection.origin.postPrompt}”
-              </Text>
-              <Text style={s.originComment}>“{connection.origin.comment}”</Text>
-              {connection.reply ? (
-                <>
-                  <Text style={[s.originPrompt, s.originReply]}>
-                    {connection.reply.fromUserId === partner.id ? `${partner.displayName} said` : 'You said'} back, on “{connection.reply.postPrompt}”
-                  </Text>
-                  <Text style={s.originComment}>“{connection.reply.comment}”</Text>
-                </>
-              ) : null}
-            </View>
-          }
-          renderItem={({ item }) => {
-            const mine = item.senderId !== partner.id;
-            return (
-              <View style={[s.bubble, mine ? s.mine : s.theirs]}>
-                <Text style={[s.text, mine && s.textMine]}>{item.text}</Text>
-              </View>
-            );
-          }}
-          ListFooterComponent={
             expiry.state === 'waiting' && !empty ? <Text style={s.waiting}>Waiting for {partner.displayName} to reply.</Text> : undefined
           }
+          // Keeps a short thread at the top of the screen under the prologue, not stuck to the composer.
+          contentContainerStyle={s.list}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
         />
-        {ideas.length > 0 ? (
-          <View style={s.ideas}>
-            <Label>Ideas to start</Label>
-            {ideas.map((idea) => (
-              <View key={idea} style={s.idea}>
-                <Ionicons name="bulb-outline" size={16} color={theme.colors.brand} />
-                <Text style={s.ideaText}>{idea}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-        <View style={s.composer}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            autoFocus={focus === '1' || empty}
-            placeholder={empty ? `Say hi to ${partner.displayName}` : 'Write a message'}
-            placeholderTextColor={theme.colors.muted}
-            accessibilityLabel="Message"
-            maxLength={RULES.messageMaxLength}
-            multiline
-            style={s.input}
-          />
-          <Pressable
-            onPress={() => void submit()}
-            disabled={!text.trim() || send.isPending}
-            accessibilityRole="button"
-            accessibilityLabel="Send"
-            style={[s.send, (!text.trim() || send.isPending) && s.sendOff]}
-          >
-            <Ionicons name="arrow-up" size={22} color={theme.colors.onDark} />
-          </Pressable>
-        </View>
+        <StartIdeas
+          ideas={ideas}
+          onPick={(line) => {
+            selection();
+            composer.current?.fill(line);
+          }}
+          onShuffle={
+            ideaCount(category, role) > ideas.length
+              ? () => {
+                  selection();
+                  setIdeaRound((r) => r + 1);
+                }
+              : undefined
+          }
+          onHide={() => setIdeasHidden(true)}
+        />
+        <Composer
+          ref={composer}
+          placeholder={empty ? `Say hi to ${partner.displayName}` : 'Write a message'}
+          autoFocus={focus === '1'}
+          onSend={queue.send}
+        />
       </KeyboardAvoidingView>
 
-      <Sheet visible={menu} onClose={() => setMenu(false)} title={partner.displayName}>
-        <Button
-          title="Unmatch"
-          variant="secondary"
-          onPress={() =>
-            void unmatch
-              .run(connectionId)
-              .then(() => {
-                setMenu(false);
-                toast('Unmatched.', 'info');
-                router.back();
-              })
-              .catch((err: unknown) => toast(errorMessage(err), 'error'))
-          }
-        />
-        <Button
-          title="Report or block"
-          variant="danger"
-          onPress={() => {
-            setMenu(false);
+      <PaperSheet
+        visible={sheet !== 'none'}
+        onClose={() => setSheet('none')}
+        onDismiss={() => {
+          if (safetyNext.current) {
+            safetyNext.current = false;
             setSafety(true);
-          }}
-        />
-      </Sheet>
+          }
+        }}
+        title={sheet === 'confirm' ? `Unmatch ${partner.displayName}?` : partner.displayName}
+        subtitle={sheet === 'confirm' ? 'The conversation closes for both of you.' : undefined}
+      >
+        {sheet === 'confirm' ? (
+          <>
+            <SheetAction label="Unmatch" tone="danger" disabled={unmatch.isPending} onPress={() => void doUnmatch()} />
+            <SheetAction label="Keep talking" onPress={() => setSheet('none')} />
+          </>
+        ) : (
+          <>
+            <SheetAction
+              label="Report or block"
+              icon={<FlagIcon size={20} color={e.colors.ink} />}
+              onPress={() => {
+                setSheet('none');
+                // iOS cannot present the next sheet until this one has gone.
+                if (Platform.OS === 'ios') safetyNext.current = true;
+                else setSafety(true);
+              }}
+            />
+            <SheetAction
+              label="Unmatch"
+              icon={<TrashIcon size={20} color={e.colors.ink} />}
+              onPress={() => {
+                warn();
+                setSheet('confirm');
+              }}
+            />
+          </>
+        )}
+      </PaperSheet>
+
       <SafetyMenu
         visible={safety}
         onClose={() => setSafety(false)}
@@ -215,59 +214,20 @@ export default function Chat() {
         userId={partner.id}
         onDone={() => router.back()}
       />
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: e.colors.paper },
   flex: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  icon: { width: theme.touchTarget.min, height: theme.touchTarget.min, alignItems: 'center', justifyContent: 'center' },
-  who: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, minHeight: theme.touchTarget.min },
-  name: { fontSize: theme.typography.fontSize.md, fontWeight: theme.typography.fontWeight.semibold, color: theme.colors.ink },
-  list: { padding: theme.spacing.base, gap: theme.spacing.sm },
-  origin: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.media, padding: theme.spacing.base, gap: theme.spacing.xs, marginBottom: theme.spacing.md },
-  originPrompt: { fontSize: theme.typography.fontSize.sm, color: theme.colors.muted },
-  originReply: { marginTop: theme.spacing.sm },
-  originComment: { fontSize: theme.typography.fontSize.base, color: theme.colors.ink, fontStyle: 'italic' },
-  bubble: { maxWidth: '80%', paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm + 2, borderRadius: 18 },
-  mine: { alignSelf: 'flex-end', backgroundColor: theme.colors.ink, borderBottomRightRadius: 4 },
-  theirs: { alignSelf: 'flex-start', backgroundColor: theme.colors.surface, borderBottomLeftRadius: 4 },
-  text: { fontSize: theme.typography.fontSize.base, color: theme.colors.ink },
-  textMine: { color: theme.colors.onDark },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.sm, padding: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  input: {
-    flex: 1,
-    minHeight: theme.touchTarget.min,
-    maxHeight: 120,
-    borderRadius: theme.radius.card,
-    backgroundColor: theme.colors.surfaceMuted,
-    paddingHorizontal: theme.spacing.base,
-    paddingVertical: theme.spacing.md,
-    fontSize: theme.typography.fontSize.base,
-    color: theme.colors.ink,
+  list: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.md },
+  waiting: {
+    alignSelf: 'flex-end',
+    fontFamily: e.fonts.body,
+    fontSize: 12,
+    color: e.colors.muted,
+    marginTop: theme.spacing.sm,
+    marginRight: 6,
   },
-  send: { width: theme.touchTarget.min, height: theme.touchTarget.min, borderRadius: theme.touchTarget.min / 2, backgroundColor: theme.colors.brand, alignItems: 'center', justifyContent: 'center' },
-  sendOff: { opacity: 0.4 },
-  notice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    backgroundColor: theme.colors.noticeBackground,
-    paddingHorizontal: theme.spacing.base,
-    paddingVertical: theme.spacing.sm,
-  },
-  noticeText: { flex: 1, fontSize: theme.typography.fontSize.sm, color: theme.colors.ink },
-  waiting: { alignSelf: 'flex-end', fontSize: theme.typography.fontSize.xs, color: theme.colors.muted, marginTop: theme.spacing.xs },
-  ideas: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.sm, gap: theme.spacing.xs },
-  idea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    backgroundColor: theme.colors.brandSoft,
-    borderRadius: theme.radius.control,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  ideaText: { flex: 1, fontSize: theme.typography.fontSize.sm, color: theme.colors.ink },
 });

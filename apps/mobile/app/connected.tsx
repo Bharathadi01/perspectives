@@ -1,15 +1,19 @@
 import type { Connection } from '@perspective/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Avatar } from '../src/components/profile/Avatar';
+import { PaperAvatar } from '../src/components/editorial/Person';
+import { theirOpening } from '../src/features/connections/thread';
 import { useConnections, useMarkConnectionsSeen, useMe } from '../src/features/hooks';
 import { playConnectedMoment } from '../src/lib/celebrate';
+import { useReduceMotion } from '../src/lib/useReduceMotion';
 import { theme } from '../src/theme';
 
+const e = theme.editorial;
 const SHOW_FOR_MS = 2600;
-const CONFETTI = [theme.colors.confettiGold, theme.colors.confettiCoral, theme.colors.confettiMint, theme.colors.confettiLilac];
+// Paper, clay and sand on ink: the editorial palette, not party colours.
+const CONFETTI = [e.colors.accent, e.colors.onInk, e.colors.waveRest, e.colors.line];
 
 /** One falling confetti piece; positions are fixed per index so the layout is stable. */
 function ConfettiPiece({ index, width, height, play }: { index: number; width: number; height: number; play: boolean }) {
@@ -57,7 +61,7 @@ export default function Connected() {
   const me = useMe();
   const markSeen = useMarkConnectionsSeen();
   const { width, height } = useWindowDimensions();
-  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  const reduceMotion = useReduceMotion();
   const left = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0)).current;
@@ -73,12 +77,6 @@ export default function Connected() {
     else router.replace('/(tabs)/connections');
   };
 
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then(setReduceMotion)
-      .catch(() => setReduceMotion(false));
-  }, []);
-
   // Mark seen straight away, so the moment shows once even if the app is closed now.
   useEffect(() => {
     if (ids.length === 0) {
@@ -93,7 +91,6 @@ export default function Connected() {
   }, [ids.join(',')]);
 
   useEffect(() => {
-    if (reduceMotion === null) return;
     Animated.timing(fade, { toValue: 1, duration: reduceMotion ? 200 : 350, useNativeDriver: true }).start();
     if (reduceMotion) {
       left.setValue(1);
@@ -111,7 +108,9 @@ export default function Connected() {
   }, [reduceMotion, fade, left, glow]);
 
   const myName = me.data?.displayName ?? 'You';
-  const myPhoto = me.data?.posts[0]?.mediaUrl ?? null;
+  const theirWords = single ? (theirOpening(single)?.comment ?? null) : null;
+  // The first photo, not the first card: a voice or written card has no picture to show.
+  const myPhoto = me.data?.posts.find((p) => p.kind === 'photo')?.mediaUrl ?? null;
   const title = ids.length > 1 ? `${ids.length} new connections` : 'You’re connected';
   const subtitle = single
     ? `You and ${single.partner.displayName} can talk now.`
@@ -121,7 +120,7 @@ export default function Connected() {
 
   return (
     <Pressable style={s.screen} onPress={go} accessibilityRole="button" accessibilityLabel={`${title}. Tap to continue.`}>
-      {!reduceMotion && reduceMotion !== null
+      {!reduceMotion
         ? Array.from({ length: 22 }, (_, i) => <ConfettiPiece key={i} index={i} width={width} height={height} play />)
         : null}
       <SafeAreaView style={s.safe}>
@@ -132,7 +131,7 @@ export default function Connected() {
               style={[s.glow, { opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }), transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] }) }] }]}
             />
             <Animated.View style={[s.avatarWrap, { transform: [{ translateX: left.interpolate({ inputRange: [0, 1], outputRange: [-70, -26] }) }] }]}>
-              <Avatar name={myName} url={myPhoto} size={112} />
+              <PaperAvatar person={{ displayName: myName, primaryPhotoUrl: myPhoto }} size={112} />
             </Animated.View>
             {ids.length > 1 ? (
               <Animated.View style={[s.avatarWrap, s.many, { transform: [{ translateX: left.interpolate({ inputRange: [0, 1], outputRange: [70, 26] }) }] }]}>
@@ -140,7 +139,10 @@ export default function Connected() {
               </Animated.View>
             ) : (
               <Animated.View style={[s.avatarWrap, { transform: [{ translateX: left.interpolate({ inputRange: [0, 1], outputRange: [70, 26] }) }] }]}>
-                <Avatar name={single?.partner.displayName ?? '?'} url={single?.partner.primaryPhotoUrl ?? null} size={112} />
+                <PaperAvatar
+                  person={{ displayName: single?.partner.displayName ?? '?', primaryPhotoUrl: single?.partner.primaryPhotoUrl ?? null }}
+                  size={112}
+                />
               </Animated.View>
             )}
           </View>
@@ -148,7 +150,8 @@ export default function Connected() {
             {title}
           </Text>
           {subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}
-          {single ? <Text style={s.origin}>Over “{single.origin.postPrompt}”</Text> : null}
+          {/* What they said to you, as the thread will show it. Never your own words. */}
+          {theirWords ? <Text style={s.origin}>“{theirWords}”</Text> : null}
         </Animated.View>
         <Text style={s.hint}>{ids.length > 1 ? 'Tap to see them' : 'Tap to say hi'}</Text>
       </SafeAreaView>
@@ -157,22 +160,31 @@ export default function Connected() {
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.colors.celebrationBackground, overflow: 'hidden' },
+  screen: { flex: 1, backgroundColor: e.colors.ink, overflow: 'hidden' },
   safe: { flex: 1, justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.lg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: theme.spacing.md },
   avatars: { height: 150, width: 260, alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.lg },
-  glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: theme.colors.celebrationGlow },
+  glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: e.colors.onInkSoft },
   avatarWrap: {
     position: 'absolute',
     borderRadius: 60,
     borderWidth: 4,
-    borderColor: theme.colors.onDark,
+    borderColor: e.colors.onInk,
+    overflow: 'hidden',
   },
-  many: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.brand },
-  manyText: { color: theme.colors.onDark, fontSize: theme.typography.fontSize.xl, fontWeight: theme.typography.fontWeight.bold },
-  title: { color: theme.colors.onDark, fontSize: theme.typography.fontSize.hero, fontWeight: theme.typography.fontWeight.bold, textAlign: 'center' },
-  subtitle: { color: theme.colors.onDark, fontSize: theme.typography.fontSize.md, textAlign: 'center' },
-  origin: { color: theme.colors.confettiLilac, fontSize: theme.typography.fontSize.base, textAlign: 'center', fontStyle: 'italic', paddingHorizontal: theme.spacing.lg },
-  hint: { color: theme.colors.confettiLilac, fontSize: theme.typography.fontSize.sm, marginBottom: theme.spacing.base },
-  confetti: { position: 'absolute', top: 0, width: 10, height: 14, borderRadius: 3 },
+  many: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center', backgroundColor: e.colors.accent },
+  manyText: { color: e.colors.onInk, fontFamily: e.fonts.display, fontSize: 30 },
+  title: { color: e.colors.onInk, fontFamily: e.fonts.display, fontSize: 38, lineHeight: 44, textAlign: 'center', letterSpacing: -0.4 },
+  subtitle: { color: e.colors.onInkMuted, fontFamily: e.fonts.body, fontSize: 16, lineHeight: 22, textAlign: 'center' },
+  origin: {
+    color: e.colors.onInk,
+    fontFamily: e.fonts.bodyMedium,
+    fontSize: 18,
+    lineHeight: 26,
+    textAlign: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+  },
+  hint: { color: e.colors.onInkMuted, fontFamily: e.fonts.bodyMedium, fontSize: 14, marginBottom: theme.spacing.base },
+  confetti: { position: 'absolute', top: 0, width: 8, height: 12, borderRadius: 2 },
 });

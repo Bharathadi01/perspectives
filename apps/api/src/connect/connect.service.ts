@@ -16,7 +16,7 @@ import { isRevealed } from '../domain/daily';
 import { TextModerator } from '../moderation/moderation';
 import { PushService } from '../push/push.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { PROFILE_USER_INCLUDE, ProfileMapper } from '../profiles/profile.mapper';
+import { POST_INCLUDE, PROFILE_USER_INCLUDE, ProfileMapper } from '../profiles/profile.mapper';
 import { SocialService } from '../social/social.service';
 
 function pair(a: string, b: string): { userAId: string; userBId: string } {
@@ -464,7 +464,7 @@ export class ConnectService {
       include: {
         userA: { include: PROFILE_USER_INCLUDE },
         userB: { include: PROFILE_USER_INCLUDE },
-        originRequest: { include: { perspective: { include: { post: true } } } },
+        originRequest: { include: { perspective: { include: { post: { include: POST_INCLUDE } } } } },
         messages: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1 },
       },
     });
@@ -475,7 +475,7 @@ export class ConnectService {
     const reply = await this.prisma.perspective.findFirst({
       where: { giverId: answererId, ownerId: askerId, status: { not: 'removed' } },
       orderBy: { createdAt: 'desc' },
-      include: { post: true },
+      include: { post: { include: POST_INCLUDE } },
     });
     const decision =
       c.status === 'active'
@@ -490,8 +490,18 @@ export class ConnectService {
         comment: c.originRequest.perspective.comment,
         postPrompt: c.originRequest.perspective.post.prompt,
         postCategory: c.originRequest.perspective.post.category,
+        post: this.mapper.postRef(c.originRequest.perspective.post),
+        createdAt: c.originRequest.perspective.createdAt.toISOString(),
       },
-      reply: reply ? { fromUserId: answererId, comment: reply.comment, postPrompt: reply.post.prompt } : null,
+      reply: reply
+        ? {
+            fromUserId: answererId,
+            comment: reply.comment,
+            postPrompt: reply.post.prompt,
+            post: this.mapper.postRef(reply.post),
+            createdAt: reply.createdAt.toISOString(),
+          }
+        : null,
       lastMessage: last ? { text: last.text, senderId: last.senderId, createdAt: last.createdAt.toISOString() } : null,
       createdAt: c.createdAt.toISOString(),
       connectedAt: c.connectedAt.toISOString(),

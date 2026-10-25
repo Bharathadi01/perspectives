@@ -52,6 +52,10 @@ describe('connected moment and quiet connections (e2e)', () => {
     const { meera, ravi, id, accepted } = await connected();
     expect(accepted.isNew).toBe(false);
     expect(accepted.origin.postCategory).toBe('style');
+    // Both perspectives carry the post they were given on, so the chat can show the photo and question.
+    expect(accepted.origin.post).toMatchObject({ prompt: accepted.origin.postPrompt });
+    expect(typeof accepted.origin.createdAt).toBe('string');
+    expect(accepted.reply.post).toMatchObject({ prompt: accepted.reply.postPrompt });
 
     expect((await ravi.get('/v1/connections/unseen').expect(200)).body).toHaveLength(0);
     const unseen = await meera.get('/v1/connections/unseen').expect(200);
@@ -150,7 +154,7 @@ describe('connected moment and quiet connections (e2e)', () => {
     expect(conn).toHaveLength(1);
     expect(conn[0].id).toBe(res.body.connect.connectionId);
     expect(conn[0].isNew).toBe(false);
-    expect(conn[0].reply).toMatchObject({ fromUserId: ravi.id });
+    expect(conn[0].reply).toMatchObject({ fromUserId: ravi.id, post: { id: meera.postIds[0] } });
     // Meera asked, so she still has the connected moment to see.
     expect((await meera.get('/v1/connections/unseen').expect(200)).body).toHaveLength(1);
   });

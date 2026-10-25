@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-25 (Explore is the first screen in the new editorial look: warm paper, serif names and questions, "pronouns · age · height · city" under the name, gender no longer on the card; section 9.1. Earlier the same day: filter, bell, black pill, things in common)
+**Last updated:** 2026-10-26 (the Inbox redesigned: Connect beside the name, "Helpful?" thumbs, no Thank; conversation ideas back as a swipeable row that fills the message box; no italics in Connections; sections 11, 13 and 17)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -531,15 +531,19 @@ Code: `apps/api/src/perspectives/perspectives.service.ts` (inbox, feedback, give
 - People you blocked or who blocked you are left out.
 
 ### 11.2 What the Inbox shows
-1. **Wants to connect:** requests, each with the perspective that came with it (section 12).
-2. **Perspectives, grouped by the post** they are about, newest first.
-3. A row of actions on each perspective: **Helpful**, **Thank** (helpful and a private thank-you), **Not helpful**, **Connect**. A "..." menu offers Report or Block.
+The Inbox uses the editorial look of Explore (warm paper, ink, clay; Fraunces headings, Inter text). Top to bottom:
+1. **Today's progress** as the dark pill ("0 of 1 given today"), then the title **Inbox** with one line under it: "4 perspectives · 3 to rate · 2 want to connect".
+2. **Locked items** (before the daily set is done): a dark card that shows a *hidden preview* of what is waiting (blank avatar circles and blank lines, an eye-slash icon), "N perspectives are waiting", "Give N more today to see what people said about you", and a **Give perspectives** button to Explore. This follows the "post to see" pattern of BeReal.
+3. **Wants to connect:** a row of photo-first cards you swipe sideways. Each shows the person's photo with their name, age and verified seal over a dark fade, what they said about you, which of your posts it was on (thumbnail and question), and one main button: **Connect**, or **Give back** when you have not yet given them a perspective (it opens their profile), with a quiet **Decline** beside it (section 12).
+4. **On your posts:** one card per post, set like a short thread (the way Threads shows replies). The post's question is shown large with its photo beside it ("YOUR PHOTO · 2 PERSPECTIVES"), then each perspective is a reply with the giver's photo on the left, joined to the next reply by a thin line.
+5. **Each reply:** the giver's name and verified seal with "age · time" under it, a small dark **Connect** pill (it reads **Wants to connect**, outlined in clay, when they have already asked you; either way it opens their profile), the "..." menu (Report or Block), their words, and the chips they picked. At the bottom, **"Helpful?"** with a **thumbs-up** and a **thumbs-down** (icons only). Thumbs-down asks for the reason. Once you choose, the chosen thumb fills in, the other fades, and the line reads "Helpful" or "Not helpful · only you see this".
+- **There is no Thank button any more** (removed 2026-10-26). Thumbs-up marks it helpful without a thank-you, so givers no longer see "Thanked you" for new marks. See conflicts (section 17).
 
 ### 11.3 Feedback rules
 - Only the **owner**, only **after the perspective is revealed**.
 - **Helpful:** the perspective is marked helpful. Adding **Thank** also records a private thank-you.
 - **Not helpful:** needs a reason (vague, didn't answer my question, insulting or body shaming, sexual or inappropriate, spam, unsafe). The perspective is archived, and any earlier thank-you is cleared.
-- The owner can change their mind later; the newest answer replaces the old one.
+- The server lets the owner change their mind (the newest answer replaces the old one), but the app does not offer it: once a thumb is chosen it stays, because some "not helpful" reasons have already counted as a report.
 - **What the giver sees:** only whether they were **thanked** ("Thanked you"). They **never** see helpful / not helpful or the reason.
 - **What it affects** (decided 2026-10-21):
   - How often a giver's perspectives were marked helpful feeds the **quality** part of that giver's own ranking (section 9.5).
@@ -602,11 +606,13 @@ Blocking cancels requests in both directions. Accepting cancels the accepter's o
 
 ## 13. After connecting
 
-Code: `apps/api/src/connect/*`, `apps/api/src/domain/connection-expiry.ts`, `apps/mobile/app/connected.tsx`, `app/chat/[id].tsx`, `app/(tabs)/connections.tsx`, `src/components/connect/ConnectedMomentWatcher.tsx`, `packages/contracts/src/conversationIdeas.ts`.
+Code: `apps/api/src/connect/*`, `apps/api/src/domain/connection-expiry.ts`, `apps/mobile/app/connected.tsx`, `app/chat/[id].tsx`, `app/(tabs)/connections.tsx`, `src/features/connections/*`, `src/components/connect/ConnectedMomentWatcher.tsx`, `packages/contracts/src/conversationIdeas.ts`.
+
+All three screens use the editorial look (warm paper, dark ink, a clay accent, Fraunces for names and quotes, Inter for text), the same as Explore.
 
 ### 13.1 The connected moment [Built]
 A short celebration the first time each person learns they are connected.
-- **What it is:** a deep purple screen, both photos sliding together with a soft glow and confetti, the words "You're connected" (or "N new connections"), the post's question the connection started from, and "Tap to say hi". It plays **our own two-note chime** (follows the phone's silent switch) and a **success vibration**. If the phone's "reduce motion" setting is on, there is no movement or confetti, only a fade. It lasts about 2.6 seconds; a tap continues at once.
+- **What it is:** a dark ink screen, both photos sliding together with a soft glow and paper-and-clay confetti, the words "You're connected" (or "N new connections"), **what the other person said to you** in quotes (never your own words; nothing when there is none to show), and "Tap to say hi". Your own photo is your first **photo** card (before, it could wrongly pick a voice card). It plays **our own two-note chime** (follows the phone's silent switch) and a **success vibration**. If the phone's "reduce motion" setting is on, there is no movement or confetti, only a fade. It lasts about 2.6 seconds; a tap continues at once.
 - **Where it goes next:** **one** new connection → straight into that chat, with the keyboard up. **Several** → the Connections list, with the new ones tagged "New".
 - **Who sees it when:**
   - The person **who accepts** sees it immediately.
@@ -615,17 +621,22 @@ A short celebration the first time each person learns they are connected.
 - **It never interrupts** writing: it waits while the person is giving a perspective, creating a post, in a chat, editing their profile or in onboarding.
 
 ### 13.2 The Connections list
-Active connections, newest activity first. Each row shows the photo, name, verified badge, the last message (or "Connected over: [post question]"), and how long ago. Tags: **New** (not yet celebrated), **Reply soon** (you owe a reply and the warning has started), **Say hi** (nobody has written and the reminder has started).
+Active connections, newest activity first. Under the title, one line says how many conversations are your move ("Your move in 2 conversations." or "You're all caught up.").
+- **Each row:** photo, name, verified seal, the last message and its time (the clock time today, then "Yesterday", the weekday, the date). Your own last message starts with **"You:"**. A connection nobody has written in yet says *"You both gave perspectives. Say hi."*
+- **Your turn:** when the other person wrote last, or nobody has written yet, the row's text goes dark, the time turns clay and a **clay dot** shows. This only looks at who wrote last; the app keeps no read state and the other person is never told anything.
+- **Tags:** **Reply soon** (you owe a reply and the warning has started), **Say hi** (nobody has written and the reminder has started), **New** (not yet celebrated). A row shows at most one tag, in that order; a tag replaces the dot.
 
 ### 13.3 The chat
-- **Opening:** from the connected moment, the Connections list, or "Message [name]" on a profile. When the chat is **empty or opened from the connected moment, the keyboard opens**.
-- **The top card, "How you connected":** the asker's perspective and the post it was on, and, below, the perspective the other person gave back (older connections may only have the first).
-- **Idea cards:** while the chat is empty, three small cards under "Ideas to start" suggest what to ask (for example, "Ask what got them into it"). They depend on the **category** of the post the connection started from and on whether you are the giver or the owner. They are **guidance only**: tapping does nothing, they never fill the message box, and they disappear after the first message. They are **hard-coded**; no AI reads any perspective.
+- **Opening:** from the connected moment, the Connections list, or "Message [name]" on a profile. The keyboard opens **only when coming from the connected moment**; opening an empty chat from the list shows how you connected first.
+- **How it started (top of the chat):** only **what the other person said to you**, shown the way a reply to a story is: a small line "[name] gave you a perspective · on your photo" (or voice note / question), your post as a small thumbnail (a photo, or a paper tile with a microphone or quote mark), and their words as the first bubble from their side, in serif italics. **Your own perspective to them is never shown to you here**; they see theirs the same way. Tapping it opens a sheet with your photo, the question it answered, and their words. Then a hairline with "Connected yesterday" (or the day), and the messages. If their give-back was not kept (some older connections where you asked), only the "Connected" line shows.
+- **Messages:** yours are dark ink bubbles on the right, theirs are white on the left. Messages from the same person a few minutes apart are grouped, with one time under the last of the group. A small "Today" / "Yesterday" / date marker shows where the day changes (not repeated when it is the day you connected). Long-press a message's text to copy it.
+- **Sending:** a message appears at once, faded with "Sending…" until the server confirms it. If it fails, it stays with a clay outline, **"Not sent"** and **Retry**; a retry can never post it twice. If the connection has closed meanwhile, the chat switches to the closed screen.
+- **A few ways to start:** while the chat is empty, a slim row of idea cards sits above the message box; swipe sideways to see them. They depend on the **category** of the post the connection started from and on whether you gave or received that first perspective. **Tapping a card puts a first line in the message box** (for example "What does a typical day look like for you?", or an opening to finish such as "The first word that came to mind was "), which you can change before sending; nothing is sent by itself. **Shuffle** shows other ideas, and the cross hides the row for this chat. The ideas and their lines are **written by hand**; no AI is involved and no perspective text is read. They disappear after the first message.
 - **Messages:** text only, 1 to 1000 characters. Each message is checked by the text moderator (the same placeholder). Failing: "That message breaks the community guidelines." The conversation must be active and neither person may have blocked the other.
 - **Paused chats:** while one person is suspended or banned, the other can still open the chat, but sending says "This conversation is paused. The other person can't use Perspective right now." Nothing is deleted; it works again when the ban ends or is lifted.
 - **Refresh:** the chat asks the server for new messages every 4 seconds; it loads the **latest 200** messages [Placeholder: no older history, no instant delivery]. There are no read ticks, typing signs, photos, voice notes or reactions [Not built].
-- **Header menu:** tap the name to open their profile. The "..." menu offers **Unmatch** and **Report or block**.
-- **Unmatch** closes the conversation for both. Nothing is deleted. Either person may ask to connect again straight away (there is no cooldown after an unmatch).
+- **Header menu:** tap the name to open their profile. The "..." menu offers **Report or block** and **Unmatch**.
+- **Unmatch** now asks first ("Unmatch [name]? The conversation closes for both of you." with **Unmatch** and **Keep talking**). It closes the conversation for both. Nothing is deleted. Either person may ask to connect again straight away (there is no cooldown after an unmatch).
 
 ### 13.4 Quiet connections close on their own [Built, decided 2026-10-18]
 So the list stays meaningful. The rule counts only messages since the two people last became connected. Numbers are the settings in section 2.
@@ -813,6 +824,9 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 2. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
 3. **The report confirmation promises to hide the content**, but the server does not.
 4. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
+5. **The chat shows only the other person's perspective** (2026-10-26, Bharath's request), while `docs/PRODUCT.md` ("Chat opens only after accept, and shows both perspectives") and ADR-016 say both. The server still sends both; only the app hides your own. Needs Jana's confirmation.
+6. **Conversation ideas now fill the message box when tapped** (2026-10-26, Bharath's request), while `docs/PRODUCT.md` (the ideas paragraph) and ADR-015 say tapping must not fill it. The ideas and their first lines are still hand-written, so no AI or private text is involved. Needs Jana's confirmation.
+7. **The Thank button is gone from the Inbox** (2026-10-26, Bharath's request), while `docs/PRODUCT.md` (steps of the core loop, and "Actions on a perspective: … Thank privately") lists it. The server still accepts a thank-you; the app no longer sends one. Needs Jana's confirmation.
 
 ---
 
@@ -863,6 +877,34 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-26 (night): the Inbox redesigned again, from the best apps
+- **Researched from the official App Store screenshots** of Hinge, Bumble, Feeld, Threads, Letterboxd, BeReal, Partiful and Instagram, then rebuilt. What was taken: Threads' reply rows (avatar column joined by a line, actions under the words), Hinge's matches rows and large display type, BeReal's "post to see" hidden preview, and Bumble's photo-first cards with the name over the picture.
+- **Locked items now show a hidden preview** (blank circles and lines) instead of a plain notice. **Connect requests are photo-first cards in a swipeable row.** **Perspectives are grouped as a thread under each of your posts**, with the question large and the post's photo beside it. A summary line under the title counts what is waiting. (Section 11.2.)
+- Connect pill beside the name, thumbs-only "Helpful?" and no Thank are kept from the earlier version. No server or data change.
+
+### 2026-10-26 (evening): the Inbox redesigned, ideas back, no italics in Connections
+- **The Inbox uses the editorial look** of Explore: the dark progress pill, a Fraunces title, a dark "N perspectives are waiting" card, group headers with each post's thumbnail and count, and white cards. (Section 11.2.)
+- **Connect sits beside the giver's name** as a small dark pill ("Wants to connect" in clay when they have asked you). **Helpful / Not helpful are now "Helpful?" with two thumbs**; the chosen one fills in. **The Thank button is removed.** (Sections 11.2, 11.3; conflict 7 in section 17.)
+- **Request cards** show which of your posts the perspective was on, with one main button (Connect, or Give them a perspective) and a quiet Decline; only the card you tapped shows the loading spinner.
+- **"A few ways to start" is back in the chat**, as a swipeable row with Shuffle and a cross to hide it. **Tapping an idea puts a hand-written first line in the message box** to finish and send. (Section 13.3; conflict 6 in section 17.)
+- **Connections no longer uses italic type**: the opening, the list's "Say hi" line and the connected moment use the plain text font.
+- No server or data change.
+
+### 2026-10-26 (later): only their words, no idea cards
+- **The chat now opens with only what the other person said to you**, like a reply to a story: "[name] gave you a perspective · on your photo", your post as a thumbnail, and their words as the first bubble. Your own perspective to them is no longer shown to you. The "You're connected" moment quotes their words too (it used to quote the asker's own words back to them). (Sections 13.1, 13.3.)
+- **The "A few ways to start" idea cards are removed;** an empty chat is just the opening and the message box. (Section 13.3.)
+- Both go against `docs/PRODUCT.md` and ADR-015/016 as written; listed under conflicts for Jana (section 17). No server or data change.
+
+### 2026-10-26: Connections and the chat, redesigned
+- **Connections, the chat and the "You're connected" moment now use the editorial look** of Explore. (Section 13.)
+- **The chat opens with how it started:** the two perspectives, centred like the first lines of a book, each with who wrote it and on whose photo. Tap one to see the photo and the question. The server now sends the post each perspective was given on (an additive change; nothing else in the data changed). (Section 13.3.)
+- **The list reads like a messenger:** "You:" before your own last message, clock times, and a clay dot when it is your move, worked out only from who wrote last. (Section 13.2.)
+- **Messages are grouped** with one time per group and day markers. **Sending shows at once**; a failed message says "Not sent" with Retry, and a retry can never send twice.
+- **Unmatch asks first.** It used to happen on the first tap.
+- **Keyboard:** it now opens only when you come from the connected moment, not every time you open an empty chat, so the opening lines are seen first.
+- **Bug fixed:** the connected moment could show a voice card's missing picture as your photo; it now uses your first photo.
+- No rule, number or database change. Not decided yet, and flagged for Jana: whether the asker should see the perspective given back before finishing their daily set (the server shows it today), and whether "reply" should be fixed at the moment of accepting.
 
 ### 2026-10-25 (later): Explore in the new editorial look
 - The product owner compared three looks on a design canvas and chose **"Editorial"**. **Explore is the first screen in it**; the other screens follow later. Warm paper background, dark brown text, a clay-coloured verified tick, the **Fraunces** serif for names and questions and **Inter** for other text. Both fonts are bundled in the app, so no internet is needed for them. (Section 9.1; ADR-021.)
