@@ -99,12 +99,13 @@ export function SegmentedControl<T extends string>({
   );
 }
 
+const e = theme.editorial;
+
+// The editorial switch (2026-10-31): a sand track with a white thumb, as on onboarding's FT / CM.
 const s = StyleSheet.create({
   track: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.surfaceMuted,
-    borderWidth: theme.borderWidth.hairline,
-    borderColor: theme.colors.border,
+    backgroundColor: e.colors.sandDeep,
     borderRadius: theme.radius.pill,
     padding: TRACK_PADDING,
   },
@@ -113,9 +114,13 @@ const s = StyleSheet.create({
     top: TRACK_PADDING,
     left: TRACK_PADDING,
     bottom: TRACK_PADDING,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: e.colors.surface,
     borderRadius: theme.radius.pill,
-    ...theme.elevation.raised,
+    shadowColor: e.colors.ink,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   // 44 rather than 48: each half sits inside a track that is already taller than the minimum.
   segment: {
@@ -124,13 +129,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: {
-    ...theme.textStyles.calloutStrong,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.muted,
-  },
-  labelSelected: {
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.ink,
-  },
+  label: { fontFamily: e.fonts.bodyMedium, fontSize: 15, color: e.colors.muted },
+  labelSelected: { fontFamily: e.fonts.bodySemibold, color: e.colors.ink },
 });

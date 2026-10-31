@@ -238,7 +238,7 @@ export function PostEditor({ visible, post, onClose, onSaved }: PostEditorProps)
                   accessibilityLabel="Add a voice note"
                   style={({ pressed }) => [s.add, pressed && s.pressed]}
                 >
-                  <Ionicons name="mic-outline" size={theme.iconSize.lg} color={theme.colors.brand} />
+                  <Ionicons name="mic-outline" size={theme.iconSize.lg} color={theme.editorial.colors.accent} />
                   <Text style={s.addText}>Add a voice note</Text>
                 </Pressable>
               )}
@@ -252,22 +252,22 @@ export function PostEditor({ visible, post, onClose, onSaved }: PostEditorProps)
 
 const s = StyleSheet.create({
   voice: { gap: theme.spacing.sm },
-  kicker: { ...theme.textStyles.overline, color: theme.colors.muted },
+  kicker: { ...theme.editorialText.overline, color: theme.editorial.colors.muted },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
     minHeight: theme.touchTarget.min + 8,
     paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.editorial.colors.surface,
     borderWidth: theme.borderWidth.hairline,
-    borderColor: theme.colors.border,
+    borderColor: theme.editorial.colors.line,
     borderRadius: theme.radius.control,
   },
-  rowText: { ...theme.textStyles.callout, color: theme.colors.ink },
+  rowText: { ...theme.editorialText.callout, color: theme.editorial.colors.ink },
   spacer: { flex: 1 },
   remove: { minHeight: theme.touchTarget.comfortable, justifyContent: 'center' },
-  removeText: { ...theme.textStyles.calloutStrong, color: theme.colors.danger },
+  removeText: { ...theme.editorialText.calloutStrong, color: theme.editorial.colors.accentText },
   pressed: { opacity: theme.opacity.pressed },
   add: {
     flexDirection: 'row',
@@ -277,8 +277,8 @@ const s = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     borderWidth: theme.borderWidth.thick,
     borderStyle: 'dashed',
-    borderColor: theme.colors.border,
+    borderColor: theme.editorial.colors.line,
     borderRadius: theme.radius.control,
   },
-  addText: { ...theme.textStyles.calloutStrong, fontSize: theme.typography.fontSize.base, color: theme.colors.brand },
+  addText: { ...theme.editorialText.calloutStrong, fontSize: theme.typography.fontSize.base, color: theme.editorial.colors.ink },
 });

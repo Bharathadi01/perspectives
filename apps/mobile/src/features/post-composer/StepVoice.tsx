@@ -52,7 +52,7 @@ export function StepVoice({
             </Text>
           </View>
           <View style={s.previewFoot}>
-            <Ionicons name="mic-outline" size={theme.iconSize.base} color={theme.colors.brand} />
+            <Ionicons name="mic-outline" size={theme.iconSize.base} color={theme.editorial.colors.accent} />
             <Text style={s.previewFootText}>
               {recording ? 'Your voice is on this card' : 'Your voice will be added here'}
             </Text>
@@ -64,12 +64,12 @@ export function StepVoice({
         {isRecording ? (
           <>
             <View style={s.ring}>
-              <View style={[s.ringTrack, { borderColor: theme.colors.border }]} />
+              <View style={[s.ringTrack, { borderColor: theme.editorial.colors.line }]} />
               <View
                 style={[
                   s.ringFill,
                   {
-                    borderColor: theme.colors.brand,
+                    borderColor: theme.editorial.colors.accent,
                     // A quarter-turn per quarter elapsed keeps this honest without SVG.
                     transform: [{ rotate: `${fraction * 360}deg` }],
                   },
@@ -112,7 +112,7 @@ export function StepVoice({
               accessibilityLabel="Start recording"
               style={({ pressed }) => [s.mic, pressed && s.pressed]}
             >
-              <Ionicons name="mic" size={theme.iconSize.display - 8} color={theme.colors.onDark} />
+              <Ionicons name="mic" size={theme.iconSize.display - 8} color={theme.editorial.colors.onInk} />
             </Pressable>
             <Text style={s.micLabel}>Tap to record</Text>
             <Text style={s.hint}>{`Up to ${RULES.audioMaxSeconds} seconds`}</Text>
@@ -130,7 +130,7 @@ export function StepVoice({
           accessibilityLabel="Record it again"
           style={({ pressed }) => [s.redo, pressed && s.pressed]}
         >
-          <Ionicons name="refresh" size={theme.iconSize.base} color={theme.colors.ink} />
+          <Ionicons name="refresh" size={theme.iconSize.base} color={theme.editorial.colors.ink} />
           <Text style={s.redoText}>Record it again</Text>
         </Pressable>
       ) : null}
@@ -142,24 +142,24 @@ export function StepVoice({
 
 const s = StyleSheet.create({
   preview: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.editorial.colors.surface,
     borderWidth: theme.borderWidth.hairline,
-    borderColor: theme.colors.border,
+    borderColor: theme.editorial.colors.line,
     borderRadius: theme.radius.card,
     overflow: 'hidden',
   },
   previewTop: { flexDirection: 'row', gap: theme.spacing.md, padding: theme.spacing.md, alignItems: 'center' },
-  thumb: { width: 58, height: 72, borderRadius: theme.radius.sm, backgroundColor: theme.colors.surfaceMuted },
-  previewPrompt: { ...theme.textStyles.callout, color: theme.colors.ink, flex: 1 },
+  thumb: { width: 58, height: 72, borderRadius: theme.radius.sm, backgroundColor: theme.editorial.colors.sand },
+  previewPrompt: { ...theme.editorialText.callout, color: theme.editorial.colors.ink, flex: 1 },
   previewFoot: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.base,
     paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.brandSoft,
+    backgroundColor: theme.editorial.colors.sand,
   },
-  previewFootText: { ...theme.textStyles.calloutStrong, color: theme.colors.brand },
+  previewFootText: { ...theme.editorialText.calloutStrong, color: theme.editorial.colors.ink },
   stage: { alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, paddingVertical: theme.spacing.xl },
   ring: { width: RING, height: RING, alignItems: 'center', justifyContent: 'center' },
   ringTrack: { ...StyleSheet.absoluteFill, borderRadius: RING / 2, borderWidth: 6 },
@@ -174,44 +174,44 @@ const s = StyleSheet.create({
     width: 104,
     height: 104,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.danger,
+    backgroundColor: theme.editorial.colors.accentText,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stopSquare: { width: 34, height: 34, borderRadius: theme.radius.sm, backgroundColor: theme.colors.onDark },
+  stopSquare: { width: 34, height: 34, borderRadius: theme.radius.sm, backgroundColor: theme.editorial.colors.onInk },
   pressed: { opacity: theme.opacity.pressed },
   timer: {
-    ...theme.textStyles.display,
-    color: theme.colors.ink,
+    ...theme.editorialText.display,
+    color: theme.editorial.colors.ink,
     fontVariant: ['tabular-nums'],
   },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  liveDot: { width: 9, height: 9, borderRadius: theme.radius.pill, backgroundColor: theme.colors.danger },
+  liveDot: { width: 9, height: 9, borderRadius: theme.radius.pill, backgroundColor: theme.editorial.colors.accentText },
   mic: {
     width: 104,
     height: 104,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.brand,
+    backgroundColor: theme.editorial.colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     ...theme.elevation.float,
   },
-  micLabel: { ...theme.textStyles.bodyStrong, color: theme.colors.ink },
-  hint: { ...theme.textStyles.callout, color: theme.colors.muted },
+  micLabel: { ...theme.editorialText.bodyStrong, color: theme.editorial.colors.ink },
+  hint: { ...theme.editorialText.callout, color: theme.editorial.colors.muted },
   playback: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
     width: '100%',
     padding: theme.spacing.base,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.editorial.colors.surface,
     borderWidth: theme.borderWidth.hairline,
-    borderColor: theme.colors.border,
+    borderColor: theme.editorial.colors.line,
     borderRadius: theme.radius.card,
   },
-  track: { flex: 1, height: 6, borderRadius: theme.radius.pill, backgroundColor: theme.colors.surfaceMuted },
-  trackFill: { height: 6, borderRadius: theme.radius.pill, backgroundColor: theme.colors.brand },
-  duration: { ...theme.textStyles.callout, color: theme.colors.muted, minWidth: 32, textAlign: 'right' },
+  track: { flex: 1, height: 6, borderRadius: theme.radius.pill, backgroundColor: theme.editorial.colors.sand },
+  trackFill: { height: 6, borderRadius: theme.radius.pill, backgroundColor: theme.editorial.colors.accent },
+  duration: { ...theme.editorialText.callout, color: theme.editorial.colors.muted, minWidth: 32, textAlign: 'right' },
   redo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -219,6 +219,6 @@ const s = StyleSheet.create({
     gap: theme.spacing.sm,
     minHeight: theme.touchTarget.min,
   },
-  redoText: { ...theme.textStyles.calloutStrong, fontSize: theme.typography.fontSize.base, color: theme.colors.ink },
-  error: { ...theme.textStyles.callout, color: theme.colors.danger, textAlign: 'center' },
+  redoText: { ...theme.editorialText.calloutStrong, fontSize: theme.typography.fontSize.base, color: theme.editorial.colors.ink },
+  error: { ...theme.editorialText.callout, color: theme.editorial.colors.accentText, textAlign: 'center' },
 });

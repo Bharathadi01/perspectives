@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { VerifiedBadge } from '../../src/components/profile/Avatar';
+import { SealCheckIcon } from '../../src/components/ui/icons';
 import { Screen } from '../../src/components/ui/Screen';
 import { SegmentedControl } from '../../src/components/ui/SegmentedControl';
 import { ErrorState, LoadingState } from '../../src/components/ui/States';
@@ -15,6 +15,8 @@ import { useTabBarSpace } from '../../src/components/ui/GlassTabBar';
 import { theme } from '../../src/theme';
 
 type Mode = 'view' | 'edit';
+
+const e = theme.editorial;
 
 const SEGMENTS = [
   { value: 'view' as const, label: 'View' },
@@ -66,7 +68,11 @@ export default function You() {
             <Text style={s.displayName} accessibilityRole="header" numberOfLines={1}>
               {me.data.displayName ?? 'You'}
             </Text>
-            {me.data.selfieStatus === 'verified' ? <VerifiedBadge /> : null}
+            {me.data.selfieStatus === 'verified' ? (
+              <View accessible accessibilityRole="image" accessibilityLabel="Selfie verified">
+                <SealCheckIcon size={22} weight="fill" color={e.colors.accent} />
+              </View>
+            ) : null}
           </View>
         ) : (
           <View style={s.name} />
@@ -80,7 +86,7 @@ export default function You() {
           accessibilityLabel="Settings"
           style={({ pressed }) => [s.gear, pressed && s.pressed]}
         >
-          <Ionicons name="settings-outline" size={theme.iconSize.lg} color={theme.colors.ink} />
+          <Ionicons name="settings-outline" size={theme.iconSize.lg} color={e.colors.ink} />
         </Pressable>
       </View>
 
@@ -121,7 +127,8 @@ const s = StyleSheet.create({
     marginTop: theme.spacing.sm,
   },
   name: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexShrink: 1 },
-  displayName: { ...theme.textStyles.title, color: theme.colors.ink, flexShrink: 1 },
+  // The serif name and clay tick, as on Explore.
+  displayName: { fontFamily: e.fonts.display, fontSize: 28, lineHeight: 34, color: e.colors.ink, flexShrink: 1 },
   gear: {
     width: theme.touchTarget.min,
     height: theme.touchTarget.min,

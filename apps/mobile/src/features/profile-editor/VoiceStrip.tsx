@@ -53,7 +53,7 @@ export function VoiceStrip({ path, durationSec, active, onPlay, variant = 'inset
         <Ionicons
           name={player.playing ? 'pause' : 'play'}
           size={theme.iconSize.md}
-          color={theme.colors.onDark}
+          color={theme.editorial.colors.onInk}
           style={player.playing ? undefined : s.playNudge}
         />
       </Pressable>
@@ -68,7 +68,7 @@ export function VoiceStrip({ path, durationSec, active, onPlay, variant = 'inset
 
       <Text style={s.time}>{time}</Text>
       {player.error ? (
-        <Ionicons name="alert-circle-outline" size={theme.iconSize.base} color={theme.colors.danger} />
+        <Ionicons name="alert-circle-outline" size={theme.iconSize.base} color={theme.editorial.colors.accentText} />
       ) : null}
     </View>
   );
@@ -79,14 +79,14 @@ const s = StyleSheet.create({
   inset: {
     paddingHorizontal: theme.spacing.base,
     paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.brandSoft,
+    backgroundColor: theme.editorial.colors.sand,
   },
   plain: { paddingTop: theme.spacing.sm },
   play: {
     width: 36,
     height: 36,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.brand,
+    backgroundColor: theme.editorial.colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -97,13 +97,13 @@ const s = StyleSheet.create({
     flex: 1,
     height: 4,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.border,
+    backgroundColor: theme.editorial.colors.line,
     overflow: 'hidden',
   },
-  fill: { height: 4, borderRadius: theme.radius.pill, backgroundColor: theme.colors.brand },
+  fill: { height: 4, borderRadius: theme.radius.pill, backgroundColor: theme.editorial.colors.accent },
   time: {
-    ...theme.textStyles.callout,
-    color: theme.colors.ink,
+    ...theme.editorialText.callout,
+    color: theme.editorial.colors.ink,
     fontVariant: ['tabular-nums'],
     minWidth: 36,
     textAlign: 'right',

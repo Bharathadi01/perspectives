@@ -48,7 +48,7 @@ export function VoiceChip({ path, durationSec, active, onPlay, variant }: VoiceC
         <Ionicons
           name={playing ? 'pause' : 'play'}
           size={theme.iconSize.lg}
-          color={theme.colors.onDark}
+          color={e.colors.onInk}
           style={playing ? undefined : s.nudge}
         />
         {/* How far in, as a bar across the foot of the button. */}
@@ -72,7 +72,7 @@ export function VoiceChip({ path, durationSec, active, onPlay, variant }: VoiceC
       <Ionicons
         name={playing ? 'pause' : 'play'}
         size={theme.iconSize.sm}
-        color={theme.colors.onDark}
+        color={e.colors.onInk}
       />
       <Text style={s.chipTime}>{time}</Text>
       {player.progress > 0 ? (
@@ -84,6 +84,9 @@ export function VoiceChip({ path, durationSec, active, onPlay, variant }: VoiceC
   );
 }
 
+const e = theme.editorial;
+
+// The editorial look (2026-10-31): ink buttons with paper icons, a clay progress line.
 const s = StyleSheet.create({
   pressed: { opacity: theme.opacity.pressed },
   nudge: { marginLeft: 2 },
@@ -94,13 +97,13 @@ const s = StyleSheet.create({
     minHeight: 28,
     paddingHorizontal: theme.spacing.sm,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.scrimMedia,
+    backgroundColor: e.colors.inkGlass,
     overflow: 'hidden',
   },
   chipTime: {
-    ...theme.textStyles.calloutStrong,
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.onDark,
+    fontFamily: e.fonts.bodySemibold,
+    fontSize: 12,
+    color: e.colors.onInk,
     fontVariant: ['tabular-nums'],
   },
   chipTrack: {
@@ -109,14 +112,14 @@ const s = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 2,
-    backgroundColor: theme.colors.onDarkMuted,
+    backgroundColor: e.colors.onInkLine,
   },
-  chipFill: { height: 2, backgroundColor: theme.colors.onDark },
+  chipFill: { height: 2, backgroundColor: e.colors.accent },
   round: {
     width: theme.touchTarget.min,
     height: theme.touchTarget.min,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.brand,
+    backgroundColor: e.colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -127,7 +130,7 @@ const s = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 4,
-    backgroundColor: theme.colors.onDarkMuted,
+    backgroundColor: e.colors.onInkLine,
   },
-  roundFill: { height: 4, backgroundColor: theme.colors.onDark },
+  roundFill: { height: 4, backgroundColor: e.colors.accent },
 });

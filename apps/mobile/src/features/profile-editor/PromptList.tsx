@@ -87,23 +87,8 @@ export function PromptList({
               isLifted && { transform: [{ translateY: pan.y }, { scale }] },
             ]}
           >
-            <Pressable
-              onPress={() => onEdit(post)}
-              onLongPress={() => lift(place)}
-              delayLongPress={250}
-              onPressOut={() => letGo(place)}
-              accessibilityRole="button"
-              accessibilityLabel={`${voice ? 'Voice card' : 'Written card'}, after photo ${after}. ${post.prompt}`}
-              accessibilityHint="Double tap to edit. Hold and drag onto another to swap."
-              accessibilityActions={actions}
-              onAccessibilityAction={onAction}
-              style={({ pressed }) => [
-                s.row,
-                pressed && !isLifted && s.pressed,
-                isLifted && s.rowLifted,
-                isTarget(place) && s.rowTarget,
-              ]}
-            >
+            {/* Play, the question and the menu are siblings: a button inside a button is invalid on the web. */}
+            <View style={[s.row, isLifted && s.rowLifted, isTarget(place) && s.rowTarget]}>
               {voice && post.mediaUrl ? (
                 <VoiceChip
                   path={post.mediaUrl}
@@ -117,17 +102,28 @@ export function PromptList({
                   <Ionicons
                     name="chatbubble-ellipses-outline"
                     size={theme.iconSize.lg}
-                    color={theme.colors.brand}
+                    color={e.colors.accent}
                   />
                 </View>
               )}
 
-              <View style={s.body}>
+              <Pressable
+                onPress={() => onEdit(post)}
+                onLongPress={() => lift(place)}
+                delayLongPress={250}
+                onPressOut={() => letGo(place)}
+                accessibilityRole="button"
+                accessibilityLabel={`${voice ? 'Voice card' : 'Written card'}, after photo ${after}. ${post.prompt}`}
+                accessibilityHint="Double tap to edit. Hold and drag onto another to swap."
+                accessibilityActions={actions}
+                onAccessibilityAction={onAction}
+                style={({ pressed }) => [s.body, pressed && !isLifted && s.pressed]}
+              >
                 <Text style={s.question} numberOfLines={2}>
                   {post.prompt}
                 </Text>
                 <Text style={s.meta}>{meta}</Text>
-              </View>
+              </Pressable>
 
               <Pressable
                 onPress={() => onActions(post)}
@@ -136,9 +132,9 @@ export function PromptList({
                 hitSlop={8}
                 style={({ pressed }) => [s.menu, pressed && s.pressed]}
               >
-                <Ionicons name="ellipsis-horizontal" size={theme.iconSize.base} color={theme.colors.muted} />
+                <Ionicons name="ellipsis-horizontal" size={theme.iconSize.base} color={e.colors.muted} />
               </Pressable>
-            </Pressable>
+            </View>
           </Animated.View>
         );
       })}
@@ -171,13 +167,16 @@ function AddButton({
       accessibilityLabel={`Add a ${label.toLowerCase()} card`}
       style={({ pressed }) => [s.add, pressed && s.pressed]}
     >
-      <Ionicons name="add" size={theme.iconSize.md} color={theme.colors.brand} />
-      <Ionicons name={icon} size={theme.iconSize.md} color={theme.colors.brand} />
+      <Ionicons name="add" size={theme.iconSize.md} color={e.colors.ink} />
+      <Ionicons name={icon} size={theme.iconSize.md} color={e.colors.ink} />
       <Text style={s.addText}>{label}</Text>
     </Pressable>
   );
 }
 
+const e = theme.editorial;
+
+// The editorial look (2026-10-31): white rows on paper, serif questions, sand glyphs.
 const s = StyleSheet.create({
   list: { gap: theme.spacing.sm },
   pressed: { opacity: theme.opacity.pressed },
@@ -189,35 +188,35 @@ const s = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     paddingLeft: theme.spacing.md,
     paddingRight: theme.spacing.sm,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: e.colors.surface,
     borderWidth: theme.borderWidth.hairline,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.control,
+    borderColor: e.colors.line,
+    borderRadius: 18,
   },
   liftedRow: { zIndex: 10 },
-  rowLifted: { ...theme.elevation.float },
+  rowLifted: { ...theme.elevation.float, shadowColor: e.colors.ink },
   rowTarget: {
     borderWidth: theme.borderWidth.focus,
-    borderColor: theme.colors.brand,
+    borderColor: e.colors.accent,
   },
   glyph: {
     width: theme.touchTarget.min,
     height: theme.touchTarget.min,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.brandSoft,
+    backgroundColor: e.colors.sand,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: { flex: 1, gap: 2 },
-  question: { ...theme.textStyles.bodyStrong, color: theme.colors.ink },
-  meta: { ...theme.textStyles.caption, color: theme.colors.muted },
+  body: { flex: 1, gap: 3, minHeight: theme.touchTarget.min, justifyContent: 'center' },
+  question: { fontFamily: e.fonts.display, fontSize: 17, lineHeight: 22, color: e.colors.ink },
+  meta: { fontFamily: e.fonts.bodyMedium, fontSize: 12, color: e.colors.muted },
   menu: {
     width: theme.touchTarget.comfortable,
     height: theme.touchTarget.comfortable,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hint: { ...theme.textStyles.callout, color: theme.colors.muted },
+  hint: { fontFamily: e.fonts.body, fontSize: 14, lineHeight: 20, color: e.colors.muted },
   adds: { flexDirection: 'row', gap: theme.spacing.sm },
   add: {
     flex: 1,
@@ -228,8 +227,8 @@ const s = StyleSheet.create({
     minHeight: theme.touchTarget.min,
     borderWidth: theme.borderWidth.thick,
     borderStyle: 'dashed',
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.control,
+    borderColor: e.colors.muted,
+    borderRadius: theme.radius.pill,
   },
-  addText: { ...theme.textStyles.calloutStrong, color: theme.colors.brand },
+  addText: { fontFamily: e.fonts.bodySemibold, fontSize: 14, color: e.colors.ink },
 });

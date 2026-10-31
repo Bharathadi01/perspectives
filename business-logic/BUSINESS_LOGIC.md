@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-31 (the new onboarding: a splash, sign-up over three screens, one question per screen with motion, four "What you get" screens, the selfie camera with a Dev button, the first posts, and a one-time note on Explore; sections 3, 4, 5, 8.3, 9.1, 16, 17 and 20. Earlier: Apple's own glass tab bar on iOS 26; the profile page opened from the Inbox and the safety sheet in the editorial look)
+**Last updated:** 2026-10-31 (later: You → Edit, the card composer and Explore's "done for today" moved to the editorial look; the question library no longer calls questions "perspectives". Before that, the new onboarding: a splash, sign-up over three screens, one question per screen with motion, four "What you get" screens, the selfie camera with a Dev button, the first posts, and a one-time note on Explore; sections 3, 4, 5, 8.3, 9.1, 16, 17 and 20. Earlier: Apple's own glass tab bar on iOS 26; the profile page opened from the Inbox and the safety sheet in the editorial look)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -430,7 +430,7 @@ Code: `apps/api/src/daily/*`, `apps/api/src/explore/explore.service.ts`, `apps/a
 1. First, the profiles of **today's daily set** (1, 2 or 3 people, see 9.3), one after another. The boost person (9.3) looks exactly like everyone else in the set.
 2. After the set is done, **4 to 5 more profiles** (fewer when few people are left, see 9.8).
    Cards carry **no note** about which kind they are (removed 2026-10-25): a set, boost or bonus profile all look the same. The progress pill is what tells you how much of the set is left.
-3. When nothing is left: "You're done for today" (if the set is finished) or "No one to show right now" (if nobody is available). The second one has a **"Change who you see"** button that opens "Your feed" (9.11).
+3. When nothing is left: "You're done for today" (if the set is finished) or "No one to show right now" (if nobody is available). The first shows three fanned cards with a clay tick stamping in and "N of N given", and an **"Open your inbox"** button; the second a drifting hourglass and a **"Change who you see"** button that opens "Your feed" (9.11). Both are in the editorial look with gentle motion (since 2026-10-31), and still under Reduce Motion.
 
 The **top bar** has, on the left, a **black progress pill**, and on the right a **bell** and a **filter button**. The bell opens **Notices** (8.2) and shows a small black badge with the number of new notices (up to "9+"); opening Notices marks them read, which clears the badge. The filter button opens "Your feed" (9.11). The pill shows "X of N given today" with one dot per profile, and "Today's perspectives are unlocked" once finished (the Inbox keeps the same pill in its usual purple). **Explore is the first screen in Perspective's own "editorial" look** (chosen 2026-10-25; the other screens keep the old look for now): a warm paper background, dark brown text, serif type for names and questions, a clay-coloured verified tick. Each card shows, from the top:
 - The person's **name** in large serif type with the **verified tick** right beside it (only for selfie-verified people), and underneath one line: **pronouns · age · height · city**, for example "she/her · 26 · 5'4" · Mumbai" (pronouns left out when they gave none; height in feet and inches). A "..." button beside the name offers Report or Block.
@@ -865,7 +865,7 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 
 **Conflicts with the product rules** (code vs `docs/PRODUCT.md`). On 2026-10-20 the product owner decided the beta model (ADR-018); steps 1 to 3 are built, so what is left here is still open:
 1. **More profile questions than the product defines:** personality answers and pronouns are still not mentioned in `docs/PRODUCT.md`.
-2. **The word "perspective" is used for two things:** the feedback one person gives (the product's meaning) and, in the profile editor, the question attached to a post. Needs one clear word for the second.
+2. ~~**The word "perspective" is used for two things.**~~ *Fixed 2026-10-31:* the question library in the card composer said "Select a Perspective", "Search perspectives" and "Use Custom Perspective"; it now says "Pick a question", "Search questions", "Use this question". A post's question is called a question everywhere in the app; "perspective" is only the feedback someone writes.
 3. **The report confirmation promises to hide the content**, but the server does not.
 4. **"Declined. They won't be told."** is true (no message is sent), but the asker can work it out from the 14-day note.
 5. **The chat shows only the other person's perspective** (2026-10-26, Bharath's request), while `docs/PRODUCT.md` ("Chat opens only after accept, and shows both perspectives") and ADR-016 say both. The server still sends both; only the app hides your own. Needs Jana's confirmation.
@@ -935,6 +935,14 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-31 (later): the profile editor and "done for today" in the editorial look
+- **You → Edit** now matches the rest of the app: serif name with the clay tick, a sand View/Edit switch, sand photo tiles with a clay star on the lead photo, dashed "Add" places with an ink button, white voice and written rows with serif questions and ink play buttons. The card menu ("Your photo", Move earlier/later, Edit the question, Remove) and "Remove this card?" are paper sheets like the safety sheet.
+- **Adding or editing a card** (the composer and "Edit this card"): paper background, serif titles, the question in a white card with a character counter, editorial category list and focus chips, clay accents on the voice recorder, a dark pill button at the bottom.
+- **The question library** says "Pick a question", "Search questions" and "Use this question" instead of calling questions "perspectives" (section 17, item 2).
+- **Explore's "You're done for today"** and **"No one to show right now"** are restyled with motion (section 9.1). Same wording and buttons.
+- On the web preview, the card menu and voice buttons on photo tiles and rows are no longer buttons inside buttons (the browser warned about it). What they do is unchanged.
+- No rule, number, server or data change.
 
 ### 2026-10-31: the new onboarding, from Jana's design
 - **A splash, a new Welcome, and sign-up over three screens** (email; password with the 18+ / terms box; birthday with a "You're 25, born 14 March 2001" confirm sheet). The account is created only at Confirm, with the same server rules as before. (Sections 3 and 4.1.)

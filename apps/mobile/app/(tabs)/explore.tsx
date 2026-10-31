@@ -6,7 +6,8 @@ import { SafetyMenu } from '../../src/components/SafetyMenu';
 import { useTabBarSpace } from '../../src/components/ui/GlassTabBar';
 import { IconButton } from '../../src/components/ui/IconButton';
 import { Screen } from '../../src/components/ui/Screen';
-import { EmptyState, ErrorState, LoadingState } from '../../src/components/ui/States';
+import { ErrorState, LoadingState } from '../../src/components/ui/States';
+import { ExploreEmpty } from '../../src/features/explore/ExploreEmpty';
 import { useToast } from '../../src/components/ui/Toast';
 import { ExploreProfile } from '../../src/features/explore/ExploreProfile';
 import { GiveComposer, type GiveTarget } from '../../src/features/give/GiveComposer';
@@ -89,16 +90,11 @@ export default function Explore() {
       </View>
 
       {!card ? (
-        <EmptyState
-          icon={daily.unlocked ? 'sparkles-outline' : 'hourglass-outline'}
-          title={daily.unlocked ? 'You’re done for today' : 'No one to show right now'}
-          description={
-            daily.unlocked
-              ? 'Your perspectives are unlocked. Come back tomorrow for a new set.'
-              : 'There’s nobody in your audience yet. Your inbox unlocks once there is, or widen who you see with the filter button.'
-          }
-          actionTitle={daily.unlocked ? 'Open your inbox' : 'Change who you see'}
-          onAction={daily.unlocked ? () => router.push('/(tabs)/inbox') : () => router.push('/filters')}
+        <ExploreEmpty
+          daily={daily}
+          bottomSpace={space}
+          onOpenInbox={() => router.push('/(tabs)/inbox')}
+          onChangeAudience={() => router.push('/filters')}
         />
       ) : (
         <>

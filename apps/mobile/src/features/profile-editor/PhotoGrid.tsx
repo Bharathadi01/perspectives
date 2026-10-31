@@ -91,7 +91,7 @@ export function PhotoGrid({
                   <Ionicons
                     name="add"
                     size={next ? theme.iconSize.xl : theme.iconSize.lg}
-                    color={next ? theme.colors.onDark : theme.colors.muted}
+                    color={next ? e.colors.onInk : e.colors.muted}
                   />
                 </View>
               ) : null}
@@ -154,32 +154,33 @@ export function PhotoGrid({
 
               {index === 0 ? (
                 <View style={[s.badge, s.lead]} pointerEvents="none">
-                  <Ionicons name="star" size={theme.iconSize.xs} color={theme.colors.onDark} />
-                </View>
-              ) : null}
-
-              <Pressable
-                onPress={() => onActions(post)}
-                accessibilityRole="button"
-                accessibilityLabel="Card options"
-                hitSlop={10}
-                style={({ pressed }) => [s.badge, s.menu, pressed && s.pressed]}
-              >
-                <Ionicons name="ellipsis-horizontal" size={theme.iconSize.sm} color={theme.colors.onDark} />
-              </Pressable>
-
-              {voicePath ? (
-                <View style={s.voiceOnPhoto} pointerEvents="box-none">
-                  <VoiceChip
-                    path={voicePath}
-                    durationSec={post.audioDurationSec}
-                    active={playingId === post.id}
-                    onPlay={() => onPlay(post.id)}
-                    variant="chip"
-                  />
+                  <Ionicons name="star" size={theme.iconSize.xs} color={e.colors.onInk} />
                 </View>
               ) : null}
             </Pressable>
+
+            {/* Siblings of the tile, not children: a button inside a button is invalid on the web. */}
+            <Pressable
+              onPress={() => onActions(post)}
+              accessibilityRole="button"
+              accessibilityLabel="Card options"
+              hitSlop={10}
+              style={({ pressed }) => [s.badge, s.menu, pressed && s.pressed]}
+            >
+              <Ionicons name="ellipsis-horizontal" size={theme.iconSize.sm} color={e.colors.onInk} />
+            </Pressable>
+
+            {voicePath ? (
+              <View style={s.voiceOnPhoto} pointerEvents="box-none">
+                <VoiceChip
+                  path={voicePath}
+                  durationSec={post.audioDurationSec}
+                  active={playingId === post.id}
+                  onPlay={() => onPlay(post.id)}
+                  variant="chip"
+                />
+              </View>
+            ) : null}
           </Animated.View>
         );
       })}
@@ -188,7 +189,9 @@ export function PhotoGrid({
 }
 
 const BADGE = 26;
+const e = theme.editorial;
 
+// The editorial look (2026-10-31): sand tiles, ink and clay badges, a dashed ink "Add".
 const s = StyleSheet.create({
   grid: {
     flexDirection: 'row',
@@ -199,14 +202,14 @@ const s = StyleSheet.create({
   pressed: { opacity: theme.opacity.pressed },
   liftedCell: { zIndex: 10 },
   tile: {
-    borderRadius: theme.radius.media,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: theme.colors.surfaceMuted,
+    backgroundColor: e.colors.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileLifted: { ...theme.elevation.float },
-  tileTarget: { borderWidth: theme.borderWidth.focus, borderColor: theme.colors.brand },
+  tileLifted: { ...theme.elevation.float, shadowColor: e.colors.ink },
+  tileTarget: { borderWidth: theme.borderWidth.focus, borderColor: e.colors.accent },
   badge: {
     position: 'absolute',
     top: theme.spacing.xs + 2,
@@ -216,8 +219,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  lead: { left: theme.spacing.xs + 2, backgroundColor: theme.colors.brand },
-  menu: { right: theme.spacing.xs + 2, backgroundColor: theme.colors.scrimMedia },
+  lead: { left: theme.spacing.xs + 2, backgroundColor: e.colors.accent },
+  menu: { right: theme.spacing.xs + 2, backgroundColor: e.colors.inkGlass },
   voiceOnPhoto: {
     position: 'absolute',
     left: theme.spacing.xs + 2,
@@ -226,18 +229,18 @@ const s = StyleSheet.create({
   addNext: {
     borderWidth: theme.borderWidth.thick,
     borderStyle: 'dashed',
-    borderColor: theme.colors.brand,
-    backgroundColor: theme.colors.surface,
+    borderColor: e.colors.muted,
+    backgroundColor: e.colors.surface,
     gap: theme.spacing.sm,
   },
   addLater: {
     borderWidth: theme.borderWidth.thick,
     borderStyle: 'dashed',
-    borderColor: theme.colors.border,
+    borderColor: e.colors.waveRest,
     backgroundColor: 'transparent',
   },
   addCircle: { borderRadius: theme.radius.pill, alignItems: 'center', justifyContent: 'center' },
-  addCircleNext: { width: 44, height: 44, backgroundColor: theme.colors.brand },
-  addCircleLater: { width: 32, height: 32, backgroundColor: theme.colors.surfaceMuted },
-  addLabel: { ...theme.textStyles.calloutStrong, color: theme.colors.brand },
+  addCircleNext: { width: 44, height: 44, backgroundColor: e.colors.ink },
+  addCircleLater: { width: 32, height: 32, backgroundColor: e.colors.sand },
+  addLabel: { fontFamily: e.fonts.bodySemibold, fontSize: 14, color: e.colors.ink },
 });

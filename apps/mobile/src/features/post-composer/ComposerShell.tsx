@@ -2,8 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button } from '../../components/ui/Button';
 import { theme } from '../../theme';
+import { PillButton, TextButton } from '../onboarding/ui';
+
+const e = theme.editorial;
 
 interface ComposerShellProps {
   visible: boolean;
@@ -66,7 +68,7 @@ export function ComposerShell({
             <Ionicons
               name={first ? 'close' : 'chevron-back'}
               size={theme.iconSize.xl}
-              color={theme.colors.ink}
+              color={e.colors.ink}
             />
           </Pressable>
           {stepCount > 1 ? (
@@ -97,16 +99,15 @@ export function ComposerShell({
         </ScrollView>
 
         <View style={[s.foot, { paddingBottom: insets.bottom + theme.spacing.base }]}>
-          <Button
-            title={primary.title}
+          <PillButton
+            label={primary.title}
+            wide
             onPress={primary.onPress}
             loading={primary.loading}
             disabled={primary.disabled}
             style={primary.incomplete ? s.incomplete : undefined}
           />
-          {secondary ? (
-            <Button title={secondary.title} variant="ghost" onPress={secondary.onPress} />
-          ) : null}
+          {secondary ? <TextButton label={secondary.title} onPress={secondary.onPress} /> : null}
         </View>
         {overlays}
       </View>
@@ -114,8 +115,9 @@ export function ComposerShell({
   );
 }
 
+// The editorial look (2026-10-31), matching onboarding's post screens.
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
+  screen: { flex: 1, backgroundColor: e.colors.paper },
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -131,20 +133,19 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   pressed: { opacity: theme.opacity.pressed },
-  stepLabel: { ...theme.textStyles.callout, color: theme.colors.muted },
+  stepLabel: { fontFamily: e.fonts.bodyMedium, fontSize: 13, color: e.colors.muted },
   incomplete: { opacity: theme.opacity.disabled },
-  head: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.base, gap: theme.spacing.sm },
+  head: { paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.base, gap: theme.spacing.sm },
   bar: { flexDirection: 'row', gap: theme.spacing.xs, marginBottom: theme.spacing.sm },
-  barPiece: { flex: 1, height: 3, borderRadius: theme.radius.pill, backgroundColor: theme.colors.border },
-  barPieceOn: { backgroundColor: theme.colors.ink },
-  title: { ...theme.textStyles.display, fontSize: theme.typography.fontSize.xl, lineHeight: 30, color: theme.colors.ink },
-  subtitle: { ...theme.textStyles.callout, fontSize: theme.typography.fontSize.base, color: theme.colors.muted },
+  barPiece: { flex: 1, height: 3, borderRadius: theme.radius.pill, backgroundColor: e.colors.line },
+  barPieceOn: { backgroundColor: e.colors.ink },
+  title: { fontFamily: e.fonts.display, fontSize: 29, lineHeight: 35, letterSpacing: -0.4, color: e.colors.ink },
+  subtitle: { fontFamily: e.fonts.body, fontSize: 15, lineHeight: 22, color: e.colors.muted },
   body: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xl, gap: theme.spacing.base },
   foot: {
-    paddingHorizontal: theme.spacing.base,
+    paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
     gap: theme.spacing.xs,
-    borderTopWidth: theme.borderWidth.hairline,
-    borderTopColor: theme.colors.border,
+    backgroundColor: e.colors.paper,
   },
 });

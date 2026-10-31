@@ -1,11 +1,10 @@
 import { CATEGORY_CATALOG, RULES, type PostCategory } from '@perspective/contracts';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Chip } from '../../components/ui/Chip';
-import { Sheet } from '../../components/ui/Sheet';
-import { Muted } from '../../components/ui/Text';
+import { StyleSheet, Text, View } from 'react-native';
+import { PaperSheet, SheetAction } from '../../components/editorial/PaperSheet';
 import { useToast } from '../../components/ui/Toast';
 import { theme } from '../../theme';
+import { ChoiceChip } from '../onboarding/ui';
 import { toggleFocusArea } from './composer';
 
 interface FocusAreaSheetProps {
@@ -16,7 +15,7 @@ interface FocusAreaSheetProps {
   onChange: (focusAreas: string[]) => void;
 }
 
-/** Optional detail, kept folded away until someone asks for it. */
+/** Optional detail, kept folded away until someone asks for it. Editorial chips (2026-10-31). */
 export function FocusAreaSheet({ visible, category, value, onClose, onChange }: FocusAreaSheetProps) {
   const toast = useToast();
   const areas = CATEGORY_CATALOG[category].focusAreas;
@@ -35,7 +34,7 @@ export function FocusAreaSheet({ visible, category, value, onClose, onChange }: 
   };
 
   return (
-    <Sheet
+    <PaperSheet
       visible={visible}
       onClose={onClose}
       title="What should people focus on?"
@@ -43,19 +42,29 @@ export function FocusAreaSheet({ visible, category, value, onClose, onChange }: 
     >
       <View style={s.chips}>
         {areas.map((area) => (
-          <Chip
+          <ChoiceChip
             key={area.key}
+            role="checkbox"
             label={area.label}
             selected={value.includes(area.key)}
             onPress={() => press(area.key)}
           />
         ))}
       </View>
-      <Muted>{CATEGORY_CATALOG[category].label}</Muted>
-    </Sheet>
+      <Text style={s.category}>{CATEGORY_CATALOG[category].label}</Text>
+      <SheetAction label="Done" tone="primary" onPress={onClose} />
+    </PaperSheet>
   );
 }
 
 const s = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, paddingVertical: theme.spacing.xs },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, paddingBottom: theme.spacing.sm },
+  category: {
+    fontFamily: theme.editorial.fonts.bodySemibold,
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: theme.editorial.colors.muted,
+    marginBottom: theme.spacing.md,
+  },
 });

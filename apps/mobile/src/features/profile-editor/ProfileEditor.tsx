@@ -277,6 +277,9 @@ export function ProfileEditor({ me, onRefetch, onNavigateAway }: ProfileEditorPr
   );
 }
 
+const e = theme.editorial;
+
+// The editorial look (2026-10-31): paper, Inter overlines, muted brown hints.
 const s = StyleSheet.create({
   content: {
     paddingHorizontal: theme.spacing.base,
@@ -284,8 +287,8 @@ const s = StyleSheet.create({
     gap: theme.spacing.base,
   },
   sectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  caption: { ...theme.textStyles.overline, color: theme.colors.muted },
-  count: { ...theme.textStyles.callout, color: theme.colors.muted },
-  hint: { ...theme.textStyles.callout, color: theme.colors.muted },
+  caption: { fontFamily: e.fonts.bodySemibold, fontSize: 12, letterSpacing: 0.6, color: e.colors.muted },
+  count: { fontFamily: e.fonts.bodyMedium, fontSize: 13, color: e.colors.muted },
+  hint: { fontFamily: e.fonts.body, fontSize: 14, lineHeight: 20, color: e.colors.muted },
   secondSection: { marginTop: theme.spacing.md },
 });
