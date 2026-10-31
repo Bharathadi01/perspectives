@@ -3,8 +3,11 @@ import { useEffect, useRef } from 'react';
 import { useUnseenConnections } from '../../features/hooks';
 import { useIsBusy } from '../../lib/busyFlag';
 
-/** Screens where the user is writing or busy; the moment waits until they leave. */
-const BUSY_PREFIXES = ['/give', '/post', '/chat', '/connected', '/me/edit', '/onboarding'];
+/**
+ * Screens where the user is writing or busy; the moment waits until they leave. Giving a
+ * perspective is no longer a screen: the give composer marks itself busy instead (busyFlag).
+ */
+const BUSY_PREFIXES = ['/post', '/chat', '/connected', '/me/edit', '/onboarding'];
 
 /**
  * Shows the "you're connected" moment for connections made while the user was away or on another

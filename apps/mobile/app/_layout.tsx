@@ -83,7 +83,9 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           >
-            <Stack.Screen name="give/[postId]" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="(auth)/splash" options={{ animation: 'fade' }} />
+            <Stack.Screen name="(auth)/welcome" options={{ animation: 'fade' }} />
+            <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="post/new" options={{ presentation: 'modal' }} />
             <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
             <Stack.Screen name="connected" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />

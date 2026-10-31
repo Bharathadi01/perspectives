@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { selection } from '../../lib/haptics';
 import { useReduceMotion } from '../../lib/useReduceMotion';
+import { useReduceTransparency } from '../../lib/useReduceTransparency';
 import { theme } from '../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../profile/Avatar';
 import type { IconName } from './IconButton';
 import { LENS_INSET, lensLeft, lensLeftForFinger, slotWidth, tabIndexAt } from './tabBarGeometry';
@@ -50,23 +52,6 @@ interface Props extends BottomTabBarProps {
   avatar?: { name: string; url: string | null };
 }
 
-/** Whether iOS asks for less see-through surfaces; the bar then uses a solid fill. */
-function useReduceTransparency(): boolean {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    let active = true;
-    AccessibilityInfo.isReduceTransparencyEnabled()
-      .then((on) => active && setReduce(on))
-      .catch((err: unknown) => console.warn('Could not read Reduce Transparency', err));
-    const sub = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReduce);
-    return () => {
-      active = false;
-      sub.remove();
-    };
-  }, []);
-  return reduce;
-}
 
 /**
  * The floating glass tab bar (2026-10-25). A capsule of glass (real Liquid Glass on iOS 26, frosted
@@ -75,11 +60,23 @@ function useReduceTransparency(): boolean {
  * settles. Reduce Motion skips the travel; Reduce Transparency uses a solid fill.
  */
 /**
+ * On iOS 26 and later the system draws the tab bar (app/(tabs)/_layout.tsx); elsewhere GlassTabBar does.
+ */
+export const NATIVE_GLASS_TABS = Platform.OS === 'ios' && isLiquidGlassAvailable();
+
+/** The system bar's floating pill above the home indicator, measured on an iOS 26 iPhone 17 (about 50 pt). */
+const NATIVE_BAR_ABOVE_INSET = 50;
+
+/**
  * Extra bottom space a screen needs so its last item scrolls clear of the floating bar (the bar sits
- * on top of the tab screens, which run underneath it). 0 outside the tabs, so shared views can use it.
+ * on top of the tab screens, which run underneath it). GlassTabBar reports its own height; the iOS 26
+ * system bar does not, so it is the bottom safe area plus the pill. 0 outside the tabs elsewhere.
  */
 export function useTabBarSpace(): number {
-  return useContext(BottomTabBarHeightContext) ?? 0;
+  const measured = useContext(BottomTabBarHeightContext);
+  const insets = useSafeAreaInsets();
+  if (measured !== undefined) return measured;
+  return NATIVE_GLASS_TABS ? insets.bottom + NATIVE_BAR_ABOVE_INSET : 0;
 }
 
 export function GlassTabBar({ state, descriptors, navigateToTab, insets, tabs, avatar }: Props) {

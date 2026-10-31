@@ -10,6 +10,8 @@ import { TextField } from '../../src/components/ui/TextField';
 import { Muted, Title } from '../../src/components/ui/Text';
 import { useToast } from '../../src/components/ui/Toast';
 import { useLogIn, useSignUp } from '../../src/features/hooks';
+import { isStepId } from '../../src/features/onboarding/flow';
+import { stepHref } from '../../src/features/onboarding/nav';
 import { errorMessage } from '../../src/lib/errors';
 import { theme } from '../../src/theme';
 
@@ -30,18 +32,12 @@ export default function LogIn() {
           birthDate: '2000-01-01',
           acceptTerms: true,
         })
-        .then(() => {
-          const stepParam = params.step ? `?forceStep=${params.step}` : '';
-          router.replace(`/onboarding${stepParam}` as any);
-        })
+        .then(() => router.replace(isStepId(params.step) ? stepHref(params.step) : stepHref('value-perspectives')))
         .catch((err) => toast(errorMessage(err), 'error'));
     } else if (params.autoLogin === 'ravi') {
       logIn
         .run({ email: 'ravi@perspective.test', password: 'perspective123' })
-        .then(() => {
-          const stepParam = params.step ? `?forceStep=${params.step}` : '';
-          router.replace(`/onboarding${stepParam}` as any);
-        })
+        .then(() => router.replace(isStepId(params.step) ? stepHref(params.step) : '/onboarding'))
         .catch((err) => toast(errorMessage(err), 'error'));
     }
   }, [params.autoLogin, params.step]);
@@ -128,7 +124,7 @@ export default function LogIn() {
                     birthDate: '2000-01-01',
                     acceptTerms: true,
                   });
-                  router.replace('/onboarding');
+                  router.replace(stepHref('value-perspectives'));
                 } catch (err) {
                   toast(errorMessage(err), 'error');
                 }
@@ -136,7 +132,7 @@ export default function LogIn() {
             />
           </>
         ) : null}
-        <Button title="Create an account instead" variant="ghost" onPress={() => router.replace('/(auth)/signup')} />
+        <Button title="Create an account instead" variant="ghost" onPress={() => router.replace('/(auth)/email')} />
         <Muted>Testing locally? Seed accounts like ravi@perspective.test use the password perspective123.</Muted>
       </ScrollView>
     </Screen>

@@ -28,6 +28,18 @@ export const editorial = {
     /** Played part of a voice waveform, unplayed part. */
     wavePlayed: '#241D15',
     waveRest: '#D9CDB8',
+    /** Quiet fills on paper: chips, note boxes, the back cards of a stack. */
+    sand: '#EFE7D8',
+    /** The unchosen side of a segmented switch. */
+    sandDeep: '#EDE5D6',
+    /** Small clay labels on paper or white (about 6:1; the accent itself is under 4.5:1 for text). */
+    accentText: '#9A4222',
+    /** Wheel-picker rows one step away from the chosen value. */
+    faint: '#B3A792',
+    /** Behind a sheet on paper. */
+    scrim: 'rgba(36,29,21,0.42)',
+    /** The soft ring that pulses out of a button to say "tap me next". */
+    accentGlow: 'rgba(181,80,42,0.45)',
   },
   /** Font family names as loaded in apps/mobile/app/_layout.tsx (one family per weight). */
   fonts: {

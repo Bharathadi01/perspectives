@@ -2,15 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useUploadMedia, useVerifySelfie } from '../../features/hooks';
+import { DEV_SELFIE_PNG } from '../../lib/devSelfie';
 import { errorMessage } from '../../lib/errors';
 import { pickPhoto } from '../../lib/media';
 import { theme } from '../../theme';
 import { Button } from '../ui/Button';
 import { Body, Muted } from '../ui/Text';
 import { useToast } from '../ui/Toast';
-
-const DEV_MOCK_SELFIE_PNG =
-  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVQI12P4z8CAFWDEEQZqGgAAeAwBAx7o5SMAAAAASUVORK5CYII=';
 
 /**
  * Selfie verification. The selfie is private: it is never shown on your profile.
@@ -30,7 +28,7 @@ export function SelfieStep({ onVerified }: { onVerified: () => void }) {
         const { mediaId } = await upload.run({
           kind: 'photo',
           mimeType: 'image/png',
-          dataBase64: DEV_MOCK_SELFIE_PNG,
+          dataBase64: DEV_SELFIE_PNG,
         });
         const me = await verify.run(mediaId);
         if (me.selfieStatus === 'verified') {

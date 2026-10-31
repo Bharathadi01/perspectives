@@ -11,7 +11,7 @@ export default function Index() {
   const me = useMe(status === 'signedIn');
 
   if (status === 'loading') return <LoadingState />;
-  if (status === 'signedOut') return <Redirect href="/(auth)/login" />;
+  if (status === 'signedOut') return <Redirect href="/(auth)/splash" />;
   if (me.isLoading) return <LoadingState />;
   if (me.error instanceof ApiError && (me.error.code === 'ACCOUNT_SUSPENDED' || me.error.code === 'ACCOUNT_BANNED')) {
     return <Redirect href="/restricted" />;

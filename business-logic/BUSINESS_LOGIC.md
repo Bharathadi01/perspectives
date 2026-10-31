@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-26 (the Inbox redesigned: Connect beside the name, "Helpful?" thumbs, no Thank; conversation ideas back as a swipeable row that fills the message box; no italics in Connections; sections 11, 13 and 17)
+**Last updated:** 2026-10-31 (the new onboarding: a splash, sign-up over three screens, one question per screen with motion, four "What you get" screens, the selfie camera with a Dev button, the first posts, and a one-time note on Explore; sections 3, 4, 5, 8.3, 9.1, 16, 17 and 20. Earlier: Apple's own glass tab bar on iOS 26; the profile page opened from the Inbox and the safety sheet in the editorial look)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -143,7 +143,7 @@ Perspective is an 18+ app. People who are verified adults post photos or voice c
 Code: `apps/mobile/app/index.tsx`, `app/(tabs)/_layout.tsx`, `src/session/*`.
 
 1. **Loading.** The app reads the saved sign-in from the phone's secure storage (on the web preview it uses the browser's storage, which is not secure; the web build is only for development). A loading screen shows meanwhile.
-2. **Not signed in** → the Welcome screen (Create account / I already have an account).
+2. **Not signed in** → a short splash (the two rings slide together, then "Perspective"; it moves on by itself after about 2.4 seconds, or at a tap) → the Welcome screen (Create account / I already have an account). Signing out goes straight to Welcome, without the splash.
 3. **Signed in** → the app asks the server for "my profile":
    - If the profile is **live** → Explore (the home tab).
    - If it is **not live** → Onboarding.
@@ -163,7 +163,14 @@ Code: `apps/mobile/app/index.tsx`, `app/(tabs)/_layout.tsx`, `src/session/*`.
 Code: `apps/api/src/auth/*`, `apps/mobile/app/(auth)/*`.
 
 ### 4.1 Creating an account [Built]
-The person enters: email, password, date of birth, and ticks "I'm 18 or older and I agree to the Terms, Community Guidelines and Privacy Notice."
+**Welcome** shows the name, "See yourself through other people's eyes.", a small stack of cards where three sample perspectives take turns (on your outfit, your voice, your photos; they are examples, not real people's words), "Honest perspectives from selfie-verified adults. 18+ only.", **Create account** and **I already have an account**.
+
+Create account is three screens, one question each (since 2026-10-31):
+1. **What's your email?** Never shown on the profile. Next checks it looks like an email ("That doesn't look like an email address.").
+2. **Create a password.** At least 8 characters, with Show/Hide, and the tick box "I'm 18 or older and I agree to the Terms, Community Guidelines and Privacy Notice." Next stays greyed out until both are done.
+3. **When's your birthday?** Day, month and year boxes (the cursor moves on by itself). Next checks the date is real and not in the future ("That date doesn't look right. Check the day, month and year.") and that the person is 18 or older ("You must be 18 or older to use Perspective."). Then a sheet asks to confirm: **"You're 25 · Born 14 March 2001 · You can't change your birthday later, and everyone here is 18 or older."** with Edit and Confirm.
+
+Nothing is sent until **Confirm**; then email, password and birthday go to the server together and the account is created. An error (for example the email is taken) closes the sheet and shows on the birthday screen; Back reaches the email screen. The password is held only in the phone's memory until then and is cleared once the account exists.
 
 Rules, in order:
 1. The email is trimmed and lowercased and must look like an email (up to 254 characters).
@@ -171,9 +178,9 @@ Rules, in order:
 3. The date of birth must be a real date. The server calculates the age itself; **under 18 is refused** ("You must be 18 or older to use Perspective") even if the app was bypassed.
 4. The box must be ticked. The server records the time terms were accepted.
 5. If an account with that email exists: "An account with this email already exists." If the email belonged to someone **banned permanently**, it can't sign up again: "This email can't be used to create an account."
-6. On success the server creates the account plus an **empty profile** and signs the person in. They go straight to onboarding.
+6. On success the server creates the account plus an **empty profile** and signs the person in. They go straight to onboarding (section 5); the account screens can no longer be reached with Back.
 
-Not done: email is not verified, there is no phone number, no social login, no password reset [Not built]. The Terms, Community Guidelines and Privacy Notice are not shown anywhere as screens [Not built]; only the tick box exists.
+Not done: email is not verified, there is no phone number, no social login, no password reset [Not built]. The Terms, Community Guidelines and Privacy Notice are not shown anywhere as screens [Not built]; their names are in bold in the tick box but cannot be tapped.
 
 The birthday is stored but never shown to anyone. Only the age is shown.
 
@@ -197,7 +204,7 @@ The server cancels that sign-in's tokens and the app returns to Welcome. Other d
 
 ## 5. Setting up a profile (onboarding)
 
-Code: `apps/mobile/app/onboarding/index.tsx`, `src/components/onboarding/*`, `src/session/onboardingStore.ts`, `apps/api/src/profiles/*`, `apps/api/src/domain/eligibility.ts`.
+Code: `apps/mobile/app/onboarding/*` (one route per step), `apps/mobile/src/features/onboarding/*` (the screens, the step order in `flow.ts`, the motion in `motion.tsx`), `apps/api/src/profiles/*`, `apps/api/src/domain/eligibility.ts`. The look and every animation follow the onboarding design canvas (2026-10-31).
 
 ### 5.1 What makes a profile "live"
 A profile can be seen by others and can use the app only when **all five** are true:
@@ -207,31 +214,57 @@ A profile can be seen by others and can use the app only when **all five** are t
 4. **Selfie:** a selfie has been verified.
 5. **A primary photo post:** the first post (position 1) is a photo.
 
-The server recomputes this every time something changes. **Profiles made before the goal question existed** stay live until the person next changes something on their profile; then the profile goes offline until they answer the goal, and the app opens onboarding straight at the goal step. Until it is live: the tabs are blocked, other people cannot see the profile, and the person is sent to onboarding. The server also refuses Explore, giving perspectives, connecting and viewing profiles until the profile is live ("Verify your selfie to continue" or "Finish your profile to continue").
+The server recomputes this every time something changes. **Profiles made before the goal question existed** stay live until the person next changes something on their profile; then the profile goes offline until they answer the goal, and the app opens onboarding straight at the goal step (section 5.3). Until it is live: the tabs are blocked, other people cannot see the profile, and the person is sent to onboarding. The server also refuses Explore, giving perspectives, connecting and viewing profiles until the profile is live ("Verify your selfie to continue" or "Finish your profile to continue").
 
-### 5.2 The seven onboarding steps
-A progress bar shows the step. "Back" works. The answers are kept in the phone's memory while moving between steps; on reopening, the app refills them from whatever was already saved on the server.
+### 5.2 The onboarding, screen by screen (since 2026-10-31)
+One question per screen, on the warm paper look with serif titles. **Every answer is saved to the server when you press Next**, so nothing is lost if you stop half-way. Question screens have a thin progress bar along the top that fills on from the last screen, a back arrow, a big question, and at the bottom a line saying who sees the answer ("Shown on your profile", "Only you see this" with a clay lock) plus a round dark **Next** button. Next stays greyed out until the answer is valid, and shows a spinner while saving; a failed save shows the server's message above it and stays on the screen. Optional questions have a **Skip** pill (Skip keeps whatever was saved before).
 
-1. **About you.** First name, gender, pronouns (optional), height, **orientation (optional and private)**, city, and the selfie. Orientation starts with nothing picked; tapping a picked option again clears it. A line says only you see it, it is not shown on your profile and it does not change who you see. **Continue stays disabled** until the name, gender, city and height are valid **and the selfie is verified**.
-   - Selfie: a camera photo is uploaded and checked. **The check is a placeholder: it approves any photo** [Placeholder]. The selfie is stored privately and is never shown to anyone. In development builds a button skips the camera with a built-in test image (section 16).
-2. **What brings you here? (the goal, private).** Two tick cards: **Get perspectives** and **Meet new people**; pick one or both. A note says only you see it and it is never shown on your profile or to the people you connect with. **Continue** needs at least one. During the beta the goal **does not change matching** (decided 2026-10-20); it words the next step and is kept for the beta measurements.
-3. **The audience, worded by the goal.** The step title and question are:
-   - Get perspectives only: **"Whose perspectives do you want?"** All three genders start ticked, and a hint says "Including more people brings you more perspectives, faster." (If the person had already picked genders, they are kept.)
-   - Meet new people only: **"Who would you like to meet?"**
-   - Both: **"Who do you want in your feed?"**
+**Motion.** Titles and options rise in one after another, chips pop in, cards drift gently up and down, and the Next or Continue button pops in and then pulses twice to show the way. Pressed buttons dip slightly; chips and rows fill in rather than flip. Questions slide in from the side; the "What you get" screens fade in. **With Reduce Motion turned on in the phone's settings, nothing moves**: every screen shows its finished state.
 
-   Then the age range (starts 18 to 35, steppers, lowest 18, highest 99, minimum never above maximum), with a note that the range may be widened a little if very few people fit (section 8.1). **Continue** needs at least one gender. The old "dating intention" and "strict dealbreaker" questions are gone.
-4. **Your interests.** Pick from 45 interests in 8 groups, with search. At least 3, at most 10. **Next** is disabled below 3.
-5. **What matters to you?** Daily rhythm (Early Riser, Night Owl, Flexible, Always on the Move, Easygoing) and social energy (Introverted, Extroverted, Ambivert, Intimate circles, Social butterfly). Both optional ("Skip for now").
-6. **A little more personality.** Choose from 5 questions and answer in up to 300 characters. Optional.
-7. **Review & finish.** A summary with "Edit" links back to each step: basics, **your goal (private)** and orientation if given, the audience under its goal-worded question, interests, lifestyle and the personality answer, plus a short explanation that matching is mostly on shared interests and that the goal and orientation stay private. Pressing **Complete & Set Up Profile** saves everything **at once** in one update (nothing in steps 1 to 6 is saved to the server until this moment, except the selfie, which uploaded straight away). Then the person goes to the profile editor.
+**What you get.** Four short screens between sections explain what the app gives you, each with its own small animation and a "What you get" label with four dots (1 to 4). They change nothing and save nothing.
 
-### 5.3 The profile editor and finishing
-After step 7, the person lands on a one-off "Add your first photo" screen (`/me/edit?from=onboarding`) holding the same card editor described in section 6.3. The profile still is not live until a **photo post** exists, so **Finish** stays greyed out until there is one; pressing it anyway gives "Add at least one photo with a question." With a photo, the profile goes live and the person lands in Explore.
+The screens, in order:
+1. **What you get 1: "Honest takes on how you show up."** A sample post with three sample perspectives popping in around it (style and outfit, voice, overall vibe).
+2. **"First, a few basics so people see you in context."** A sample profile card (Aanya, she/her, 25, 5′5″, Bengaluru; an example, not a real person).
+3. **First name.** Up to 40 characters. Shown on your profile.
+4. **Gender.** Woman, Man or Non-binary. "It decides whose feeds you can appear in, based on who they've chosen to see." Shown on your profile.
+5. **Pronouns (optional, Skip).** she/her, he/him, they/them, she/they, he/they, or "Or write your own" (up to 30 characters). Tapping a picked one again clears it. Shown next to your name.
+6. **Height.** A scroll wheel in feet and inches (4′ to 7′6″), or in centimetres (120 to 230) with the FT / CM switch; underneath it says the other unit ("That's 168 cm"). Starts at 5′6″ (168 cm) for a new profile. Saved in centimetres. Shown on your profile.
+7. **City.** At least 2 characters. "Only your city is shown. We never ask for your exact location."
+8. **Orientation (optional, private, Skip).** Eight choices in two columns; tapping a picked one again clears it. "Optional, and only for you. It isn't on your profile and doesn't change who you see. It helps us learn how people use Perspective."
+9. **"Here's what people will see."** Your name and pronouns, age, height, city and gender under **On your profile**; "Your orientation" and "Your email and birthday" under **Only you**.
+10. **What you get 2: "Words, never scores."** A star rating gets struck through ("No ratings. No likes. No leaderboards."), then a written sample perspective marked "Only you can read this".
+11. **What brings you here? (the goal, private).** Two tick cards: **Get perspectives** ("Honest takes on how you look, dress, sound and show up.") and **Meet new people** ("After you give someone a perspective, you can ask to connect."); one or both. Never shown on your profile or to the people you connect with. During the beta the goal **does not change matching** (decided 2026-10-20); it words the next question.
+12. **The audience, worded by the goal.** The question is:
+    - Get perspectives only: **"Whose perspectives do you want?"** All three genders start ticked, and a hint says "Including more people brings you more perspectives, faster."
+    - Meet new people only: **"Who would you like to meet?"** Nothing starts ticked.
+    - Both: **"Who do you want in your feed?"** Nothing starts ticked.
 
-This screen deliberately sits outside the five tabs. A profile without a first photo is not live, and the tabs send anyone who is not live back to onboarding, so hosting it inside the tabs would bounce the person between onboarding and the tab forever.
+    Tick rows for Women, Men and Non-binary people (at least one), then **Ages** on a slider with two handles (starts 18 to 35, lowest 18, highest 99; each handle can also be moved a year at a time with a screen reader) and the note "If very few people fit, we may widen the ages a little and tell you." (section 8.1). "One setting, used both ways: you only see people who would also see you." Only you see this.
+13. **What you get 3: "Connect through what you noticed."** A short sample exchange: you give a perspective, ask to connect, they give one back, and "Chat is open" appears. "No messages out of nowhere."
+14. **What are you into?** All 45 interests, grouped under their 8 headings, with search. Pick **3 to 10**; Next is greyed out below 3, and an 11th tap says "You can pick up to 10. Unpick one to swap it." The bottom line counts them ("4 of 10 · shown on your profile").
+15. **How do your days usually go? (optional, Skip).** Daily rhythm (Early riser, Night owl, Flexible & balanced, Always on the move, Easygoing & cozy) and social energy (Introverted, Extroverted, Ambivert, Intimate circles, Social butterfly); one of each at most.
+16. **Say something in your own words (optional, Skip).** One of the 5 personality questions (the pencil switches to the next one, or pick from "Or pick another"); the example answer types itself into the empty box. 2 to 300 characters. Emptying an answer saved earlier removes it.
+17. **"Keep Perspective real."** Why the selfie: everyone is a verified adult; the selfie stays private; a tick appears next to your name. **How we keep you safe** opens a sheet: everyone is 18+ and selfie-checked, the selfie is never shown, perspectives are checked before delivery, you can report or block from a profile or chat, you can delete your account in Settings.
+18. **The selfie camera: "Fit your face in the oval."** A dashed clay oval whose dashes march round a face outline, with a scan line moving up and down. The round shutter opens the phone's **front camera** (a file picker on the web); the photo is uploaded and checked. **The check is a placeholder: it approves any photo** [Placeholder]. While it checks, the line reads "Checking it's you…". If the check says no: "We couldn't verify that selfie. Try again in good light, facing the camera." The selfie is stored privately and never shown. **Dev button:** in development builds only, a **Dev** pill at the top right passes the check without the camera (it uploads a tiny built-in test image to the same check). It does not exist in a release build.
+19. **"You're verified."** The clay tick stamps in, then your name with the tick and "pronouns · age · height · city". There is no going back to the camera from here.
+20. **What you get 4: "Nobody gets left out."** Your initial in the middle with other people circling it and a "New perspective" tag. "Each day, profiles are shared out so everyone hears from someone. If a few quiet days go by, we put yours in front of more people." (This is the boost slot, section 9.3.)
+21. **"Now show people what you'd like perspectives on."** A sample post whose question types itself in, then a sample perspective.
+22. **Add your first photo.** Your question (5 to 150 characters, with a counter) and a photo from the phone's library (Replace changes it). Next needs both.
+23. **What should people focus on?** The category (Style & outfit, Hair & grooming, Looks & photos, Overall vibe, Fitness & physique, or **More…** for the rest; starts on Looks & photos) and 1 to 3 focus areas, with the hint givers will see ("People will see ideas like "…" to help them write."). The round button **saves the post**: the photo uploads and the post is created. This first photo post makes the profile **live** (section 5.1).
+24. **Add up to 5 more (optional, Skip).** Your posts so far ("1 · Style & outfit · Main post"), the next slot with **Photo** and **Voice**, and empty slots up to 6 in all. Photo repeats screens 22 and 23 for another post; afterwards you come back here.
+25. **Let people hear you (voice post).** Your question, a recorder (up to 15 seconds; the bars move while recording or playing; Play to listen back; **Redo**), and "People will focus on" with the voice focus areas (1 to 3). **Save post** uploads the clip and adds a voice post (category Voice), then comes back to screen 24.
+26. **"This already feels like you."** Your card as people will see it: name and tick, "pronouns · age · height · city", your main post's question and photo, your interests. Tap the name to change your basics, the post to go back to your posts, or the interests to change them; each returns here. **Looks good** continues.
+27. **How Perspective works.** Give a few each day (up to 3 people), unlock yours, connect if you click; and "Honest, never cruel. A perspective is one person's view, not a verdict. No body shaming, abuse or sexual content."
+28. **Know when a perspective lands.** Two sample notifications using the real texts. **Turn on notifications** asks the phone for permission now (section 8.3); **Not now** moves on.
+29. **"Your first set is waiting."** Shows "1 of N" for today's set. If nobody is in your audience yet (a set of 0): "You're in" and "There's nobody in your audience yet. Explore fills up as people join." **Let's go** opens Explore with the one-time note (section 9.1).
 
-If someone quits halfway: their basics are saved only if they reached step 7; the profile stays not-live, and next time they open the app they are sent back to onboarding with their saved answers refilled.
+Screens 1, 19 and 27 to 29 cannot be swiped back from (screen 1 would lead back into sign-up, 19 to the camera), and screen 9 has no back arrow. The posts list cannot be swiped back either; its back arrow returns to screen 21.
+
+### 5.3 Leaving half-way and coming back
+Because every answer is saved as you go, someone who stops part-way is sent back to onboarding on their next visit and lands on the **first required answer still missing**, in this order: name (they start at the basics introduction), gender, height, city, goal, audience, interests (fewer than 3), selfie (not verified, or turned down), first photo post. Optional answers never stop them. Once the first photo post exists the profile is live, so the app opens Explore instead; the screens after it (more posts, review, how it works, notifications) are only seen on the way through. Someone who already verified skips the camera and goes from the personality question to "Nobody gets left out"; someone who already has a photo post goes from the posts introduction straight to "Add up to 5 more".
+
+The old seven-step onboarding with one save at the end, and the separate "Add your first photo" editor screen it led to, are gone.
 
 ### 5.4 Changing details later
 The **You** tab is only your profile now. At the top it has one switch with two sides:
@@ -367,7 +400,7 @@ Code: `apps/api/src/notices/*`, `apps/mobile/app/me/notices.tsx`.
 
 ### 8.3 Push notifications [Built 2026-10-21, placeholder texts]
 Code: `apps/api/src/push/*`, `apps/mobile/src/push/push.ts`. Decided 2026-10-21: every event sends a push for now, to check delivery works; the real rules come later.
-- **When the app asks:** once the person is in the main app (after onboarding), the phone asks for permission. Saying no just means no pushes.
+- **When the app asks:** near the end of onboarding, on the "Know when a perspective lands" screen (since 2026-10-31): **Turn on notifications** shows the phone's permission prompt there and then. After **Not now** the app does not ask again until it is next opened; from then on it asks once the person is in the main app, as before. Saying no just means no pushes. A profile that finished onboarding before 2026-10-31 is asked in the main app as before.
 - **Where they work:** only in an Expo **development build on a real phone**, with the Expo project set up (`eas init`). In Expo Go, the simulator and the web preview the app quietly registers nothing [Placeholder until a development build exists].
 - **What sends a push** (texts are placeholders; none ever contains message or perspective text):
 
@@ -409,6 +442,8 @@ The **top bar** has, on the left, a **black progress pill**, and on the right a 
 - **Gender is no longer shown on Explore** (decided 2026-10-25; age, height and city moved up next to the name). It is still part of the profile and still shown on other screens.
 
 A close (X) button **skips** the profile.
+
+**Straight after onboarding** (since 2026-10-31), a clay note points at the progress pill: "Give a perspective to these 3 and the ones people gave you unlock." (the number is today's set; "this person" for a set of 1). It bobs gently, and goes away when tapped or when the person starts giving a perspective. It shows only on that first visit, not on later ones, and not when the set is empty or already done.
 
 On each profile, a person gives a perspective on **one specific post** by tapping its "Give a perspective" button. Posts you already answered on someone who comes back are **hidden** from the card. **Right after the first post**, a dark card shows a big number and **"things you + Tara have in common"** (for example "4 things you + Tara have in common"), and lists them as chips (decided 2026-10-25). What counts, in this order: **shared interests**, then the **same city** (ignoring capitals and spaces), the **same daily rhythm**, and the **same social energy**. Only answers both people actually gave count; two blank answers never match. When nothing is shared the card is not shown. It is worked out in the app from both public profiles and is **display only**: it never changes who you see or the ranking. Code: `apps/mobile/src/features/explore/inCommon.ts`, `src/components/profile/InCommonCard.tsx`. (This replaced the purple "You both share passion for…" line that used to sit above the name; the server still sends that line, but the app no longer shows it.)
 
@@ -496,7 +531,14 @@ Code: `apps/mobile/app/filters/*`, `apps/mobile/src/features/filters/audienceUpd
 Code: `apps/api/src/perspectives/perspectives.service.ts`, `apps/mobile/app/give/[postId].tsx`.
 
 ### 10.1 What the person does
-They tap "Give perspective" on a post. The screen shows the post, a list of **hints** (from the post's category and the owner's focus areas), a text box (40 to 1000 characters, with a counter), optional chips (up to 3), and, depending on the situation, a **connect switch** (section 12). Tapping a hint puts the cursor in the box and shows that hint as the grey placeholder text; it does not write anything for the person. "Send perspective" is disabled until the length is right.
+They tap "Give a perspective" on a post (Explore, or a profile opened from the Inbox, a chat or the given list). **There is no separate screen any more** (changed 2026-10-27): a **composer slides up over the feed**, which stays visible behind a light dim, and the keyboard opens. On iOS 26 the panel is Apple's glass with a paper veil so it always stays readable; elsewhere it is plain paper.
+- **The box:** 40 to 1000 characters. Under it, the line "Be specific and honest. Criticism is welcome; insults and body shaming are not. Only [name] sees this." At the bottom, "40 more" counts down, then becomes a tick.
+- **The spark:** the first hint for the post (from its category and the owner's focus areas) sits faintly inside the empty box with a small spark icon. It fades away on the first character typed, and comes back if the box is emptied. It never writes anything for the person.
+- **Quick picks:** a sideways row of the post category's chips, at most 3. A pick turns clay with a little bounce. A fourth tap at the limit gives a small shake and changes nothing. Optional.
+- **Connect switch** (when allowed, section 12; off by default): "Also send a connection request to [name]", or "Also connect with [name]" when they already asked you. When on, the send button reads "Send + connect". The perspective and the request still go in **one** server call, so they succeed or fail together. The recipient sees who sent it, as always: anonymous feedback is out of scope.
+- **Send:** the round arrow button, greyed out until the length is right. It shows a spinner while sending. On success: a vibration tap, the composer closes, and the usual "Perspective sent" message shows (or the "You're connected" screen for a give-back that connects). Explore then moves on as before. On failure the composer stays open with everything kept, and the error says why.
+- **Closing without sending:** swipe the panel down, tap the dimmed feed, or press back on Android. Whatever was typed (text, picks, the switch) is kept for that post while the app is open, and comes back when the composer is reopened. It is not saved if the app is closed.
+- With "Reduce Motion" on, the panel fades instead of sliding.
 
 ### 10.2 What the server checks, in order
 1. The post exists and is active, else "This is no longer available."
@@ -786,8 +828,9 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 **Development-only shortcuts** (all off in a release build):
 - If no sign-in is saved, the app **signs in as Ravi automatically** (it calls the local server).
 - The login screen is pre-filled with Ravi and has quick sign-in buttons.
-- Links like `/login?autoLogin=ravi` or `autoLogin=fresh` sign in or create a throwaway account and jump into onboarding.
-- The selfie step has a "Take Selfie (Dev Bypass)" button that uploads a built-in image instead of using the camera.
+- Because of that automatic sign-in, **a development build never shows the splash or Welcome on its own**. To walk through the new onboarding from the start: You → Settings → **Sign out** (it lands on Welcome), then Create account. Or use the login screen's "Test Fresh Onboarding (New Account)", which skips the account screens and opens the first "What you get" screen.
+- Links like `/login?autoLogin=ravi` or `autoLogin=fresh` sign in or create a throwaway account and jump into onboarding; add `&step=height` (any step name from `src/features/onboarding/flow.ts`) to open one onboarding screen directly.
+- The onboarding selfie camera has a **Dev** pill (top right) that passes the selfie check with a built-in image instead of the camera. The older selfie screen (opened from the verification row in the profile editor) skips the camera the same way when its button is pressed.
 
 ---
 
@@ -795,7 +838,8 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 
 **Looks real but is a stand-in [Placeholder]**
 - The **Notifications** and **About** groups in Settings are layout only: every row is greyed out, marked "Soon", and takes no tap. Nothing behind them is built.
-- Selfie verification approves any photo (no liveness, no face match).
+- Selfie verification approves any photo (no liveness, no face match). The onboarding camera screen has **no live camera picture**: the oval and face outline are a drawing, and the shutter opens the phone's own camera.
+- The sample people and words on the welcome card, the "What you get" screens, the basics introduction and the posts introduction (Aanya, Meera, the quotes) are illustrations, not real members.
 - Text moderation is a tiny phrase list; no photo or voice moderation.
 - Photos and voice are stored on the server's disk; hidden location data is not removed.
 - Ranking weights (decided starting values, not yet tuned on real data).
@@ -827,6 +871,8 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 5. **The chat shows only the other person's perspective** (2026-10-26, Bharath's request), while `docs/PRODUCT.md` ("Chat opens only after accept, and shows both perspectives") and ADR-016 say both. The server still sends both; only the app hides your own. Needs Jana's confirmation.
 6. **Conversation ideas now fill the message box when tapped** (2026-10-26, Bharath's request), while `docs/PRODUCT.md` (the ideas paragraph) and ADR-015 say tapping must not fill it. The ideas and their first lines are still hand-written, so no AI or private text is involved. Needs Jana's confirmation.
 7. **The Thank button is gone from the Inbox** (2026-10-26, Bharath's request), while `docs/PRODUCT.md` (steps of the core loop, and "Actions on a perspective: … Thank privately") lists it. The server still accepts a thank-you; the app no longer sends one. Needs Jana's confirmation.
+
+*Resolved 2026-10-31:* the onboarding order (selfie after the questions about you) and asking for notification permission during onboarding are now written into `docs/PRODUCT.md` (Core loop, Profile → Onboarding, Push notifications), confirmed by Jana.
 
 ---
 
@@ -861,6 +907,18 @@ Seed state: everyone "opened the app" yesterday (so they count as active). With 
 | VALIDATION_FAILED | Input does not fit the rules | The server's message |
 | NETWORK_ERROR | No connection | "Could not reach Perspective. Check your connection and try again." |
 
+Checked in the app before anything is sent (onboarding, since 2026-10-31):
+
+| When | What the person sees |
+|---|---|
+| The email does not look like an email | "That doesn't look like an email address." |
+| The birthday is not a real date, or is in the future | "That date doesn't look right. Check the day, month and year." |
+| The birthday makes them under 18 | "You must be 18 or older to use Perspective." (the server checks again) |
+| An 11th interest | "You can pick up to 10. Unpick one to swap it." |
+| A post question shorter than 5 characters, with a photo chosen | "Your question needs at least 5 characters." |
+| A 4th focus area, or unticking the last one | "Pick up to 3." / "Keep at least one." |
+| The selfie check says no | "We couldn't verify that selfie. Try again in good light, facing the camera." |
+
 ---
 
 ## 19. Automatic background work
@@ -877,6 +935,27 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-10-31: the new onboarding, from Jana's design
+- **A splash, a new Welcome, and sign-up over three screens** (email; password with the 18+ / terms box; birthday with a "You're 25, born 14 March 2001" confirm sheet). The account is created only at Confirm, with the same server rules as before. (Sections 3 and 4.1.)
+- **Onboarding is now one question per screen** (29 screens from the first "What you get" to Explore), in the warm paper look with motion on every screen and nothing moving under Reduce Motion. **Each answer is saved when you press Next**, instead of all at once at the end, so leaving half-way loses nothing and the next visit resumes at the first required answer still missing. (Sections 5.2 and 5.3.)
+- **Four "What you get" screens** explain the app between sections: honest takes, words never scores, connect through what you noticed, nobody gets left out.
+- **New answer controls:** a height wheel in feet and inches or centimetres; an age slider with two handles; interests grouped by heading; pronouns you can write yourself. Rules and limits are unchanged (height 120 to 230 cm, interests 3 to 10, ages 18 to 99, and so on).
+- **The selfie comes after the questions about you**, on a camera screen with a marching oval. A **Dev** button (development builds only) passes the placeholder check without a camera. Then "You're verified".
+- **The first photo post is made inside onboarding** (photo and question, then category and focus areas), followed by "Add up to 5 more" with photo and voice posts, a review of your card, "How Perspective works", the notifications question and "Your first set is waiting". The old "Add your first photo" editor screen at the end of onboarding is no longer used.
+- **Notification permission is asked during onboarding** (Turn on notifications / Not now). (Section 8.3.)
+- **Explore shows a one-time note** about today's set right after onboarding. (Section 9.1.)
+- No server, database or contract change. New design-token colours for the editorial look (sand, sand deep, a darker clay for small text, the scrim and the pulse glow).
+- `docs/PRODUCT.md` updated to match (Jana confirmed): the selfie comes after the questions about you, a new Onboarding paragraph, and permission for notifications is asked during onboarding.
+
+### 2026-10-27 (later): give a perspective without leaving the feed
+- **"Give a perspective" no longer opens a separate screen.** A composer slides up over Explore (or the profile page) with the spark hint inside the box, a sideways row of quick picks, the connect switch and a round send button. Unsent text is kept per post. Same rules, limits, server call and messages as before. (Section 10.1.)
+
+### 2026-10-27: Apple's glass tab bar on iOS 26, the profile page and the safety sheet restyled
+- **On iPhones with iOS 26 or later the bottom bar is Apple's own** (the system tab bar): the floating see-through glass pill whose lens lifts, magnifies and bends what is under it when you press or drag, then settles. Same tabs and the same icons as before (outline, filled when selected); the selected tab is clay. iOS chooses the glass's light or dark look from what is behind it, so the dark brown-black bar applies only where Apple's bar is not available. **"You" shows the person icon there**, not your photo: the system bar cannot shrink a photo to icon size. Web, Android and older iPhones keep the app's own floating bar. Screens leave room at the bottom for whichever bar is shown. Badges are unchanged. (ADR-021.)
+- **The profile page that opens from the Inbox (Connect), a chat or "Perspectives you gave" now looks like Explore**: paper background, the serif name with the tick, "pronouns · age · height · city", each question above its photo, the "things in common" card, the personality answer and "More about". When they gave you a perspective, a line at the top with a small clay speech-bubble icon says **"Meera left you a perspective"** and, underneath, "Give one back on any of Meera's posts below." The buttons at the bottom (Connect, Decline, Message, Connect with X) are the dark and plain pill buttons used in Connections. "Request sent" is now a line of text instead of a greyed-out button. What each button does is unchanged.
+- **The safety sheet ("...") is restyled everywhere** (Explore, Inbox, profiles, chat): a paper sheet titled "Safety" with the line "Reports are private. Blocking hides you from each other everywhere.", then Report and Block in a white block with icons, and Cancel. The report reasons are a white list with Back. Reporting and blocking work exactly as before.
+- No rule, number, server or database change.
 
 ### 2026-10-26 (night): the Inbox redesigned again, from the best apps
 - **Researched from the official App Store screenshots** of Hinge, Bumble, Feeld, Threads, Letterboxd, BeReal, Partiful and Instagram, then rebuilt. What was taken: Threads' reply rows (avatar column joined by a line, actions under the words), Hinge's matches rows and large display type, BeReal's "post to see" hidden preview, and Bumble's photo-first cards with the name over the picture.

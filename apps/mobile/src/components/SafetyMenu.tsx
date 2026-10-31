@@ -1,13 +1,15 @@
 import { ReportReason, ReportTargetType } from '@perspective/contracts';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useBlock, useReport } from '../features/hooks';
 import { errorMessage } from '../lib/errors';
 import { REPORT_LABEL } from '../lib/labels';
 import { theme } from '../theme';
-import { Button } from './ui/Button';
-import { Sheet } from './ui/Sheet';
+import { PaperSheet, SheetAction } from './editorial/PaperSheet';
+import { CaretRightIcon, FlagIcon, ProhibitIcon } from './ui/icons';
 import { useToast } from './ui/Toast';
+
+const e = theme.editorial;
 
 interface SafetyMenuProps {
   visible: boolean;
@@ -19,12 +21,17 @@ interface SafetyMenuProps {
   onDone?: (action: 'reported' | 'blocked') => void;
 }
 
-/** Report and block, available on every profile, post, perspective and message. */
+/**
+ * Report and block, available on every profile, post, perspective and message. In the editorial
+ * look (2026-10-26): a paper sheet with the choices in a white block. What reporting and blocking do
+ * is unchanged.
+ */
 export function SafetyMenu({ visible, onClose, target, userId, onDone }: SafetyMenuProps) {
   const [step, setStep] = useState<'menu' | 'report'>('menu');
   const report = useReport();
   const block = useBlock();
   const toast = useToast();
+  const busy = report.isPending || block.isPending;
 
   const close = () => {
     setStep('menu');
@@ -55,46 +62,105 @@ export function SafetyMenu({ visible, onClose, target, userId, onDone }: SafetyM
   };
 
   return (
-    <Sheet
+    <PaperSheet
       visible={visible}
       onClose={close}
       title={step === 'menu' ? 'Safety' : 'Why are you reporting this?'}
-      subtitle={step === 'report' ? `Reporting ${target.label}. The other person isn’t told who reported.` : undefined}
+      subtitle={
+        step === 'menu'
+          ? 'Reports are private. Blocking hides you from each other everywhere.'
+          : `Reporting ${target.label}. The other person isn’t told who reported.`
+      }
     >
       {step === 'menu' ? (
         <>
-          <Row label={`Report ${target.label}`} onPress={() => setStep('report')} danger />
-          {userId ? <Row label="Block this person" onPress={() => void submitBlock()} danger /> : null}
-          <Button title="Cancel" variant="secondary" onPress={close} />
+          <View style={s.block}>
+            <Row
+              label={`Report ${target.label}`}
+              icon={<FlagIcon size={20} color={e.colors.accent} />}
+              onPress={() => setStep('report')}
+              chevron
+              disabled={busy}
+            />
+            {userId ? (
+              <Row
+                label="Block this person"
+                icon={<ProhibitIcon size={20} color={e.colors.accent} />}
+                onPress={() => void submitBlock()}
+                last
+                disabled={busy}
+              />
+            ) : null}
+          </View>
+          <SheetAction label="Cancel" onPress={close} />
         </>
       ) : (
         <>
-          {ReportReason.options.map((reason) => (
-            <Row key={reason} label={REPORT_LABEL[reason]} onPress={() => void submitReport(reason)} />
-          ))}
-          <Button title="Back" variant="secondary" onPress={() => setStep('menu')} />
+          <View style={s.block}>
+            {ReportReason.options.map((reason, i) => (
+              <Row
+                key={reason}
+                label={REPORT_LABEL[reason]}
+                onPress={() => void submitReport(reason)}
+                last={i === ReportReason.options.length - 1}
+                disabled={busy}
+              />
+            ))}
+          </View>
+          <SheetAction label="Back" onPress={() => setStep('menu')} />
         </>
       )}
-    </Sheet>
+    </PaperSheet>
   );
 }
 
-function Row({ label, onPress, danger }: { label: string; onPress: () => void; danger?: boolean }) {
+function Row({
+  label,
+  icon,
+  onPress,
+  chevron,
+  last,
+  disabled,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  onPress: () => void;
+  chevron?: boolean;
+  last?: boolean;
+  disabled?: boolean;
+}) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [s.row, pressed && s.pressed]}>
-      <Text style={[s.rowText, danger && s.danger]}>{label}</Text>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [s.row, !last && s.rowLine, (pressed || disabled) && s.pressed]}
+    >
+      {icon}
+      <Text style={s.rowText}>{label}</Text>
+      {chevron ? <CaretRightIcon size={16} color={e.colors.muted} /> : null}
     </Pressable>
   );
 }
 
 const s = StyleSheet.create({
-  row: {
-    minHeight: theme.touchTarget.min,
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+  block: {
+    backgroundColor: e.colors.surface,
+    borderRadius: 20,
+    borderWidth: theme.borderWidth.hairline,
+    borderColor: e.colors.line,
+    overflow: 'hidden',
+    marginBottom: theme.spacing.xs,
   },
-  pressed: { opacity: 0.6 },
-  rowText: { fontSize: theme.typography.fontSize.base, color: theme.colors.ink },
-  danger: { color: theme.colors.danger, fontWeight: theme.typography.fontWeight.semibold },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    minHeight: 54,
+    paddingHorizontal: theme.spacing.base,
+  },
+  rowLine: { borderBottomWidth: theme.borderWidth.hairline, borderBottomColor: e.colors.line },
+  pressed: { opacity: theme.opacity.pressed },
+  rowText: { flex: 1, fontFamily: e.fonts.bodyMedium, fontSize: 16, color: e.colors.ink },
 });

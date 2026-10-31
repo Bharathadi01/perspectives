@@ -14,6 +14,8 @@ import { api } from '../api/client';
  */
 
 let registeredToken: string | null = null;
+/** "Not now" on the onboarding notifications screen: don't ask again until the app restarts. */
+let promptDeferred = false;
 
 /** Show pushes as a banner even while the app is open. */
 export function configurePushDisplay(): void {
@@ -23,7 +25,7 @@ export function configurePushDisplay(): void {
   });
 }
 
-async function devicePushToken(): Promise<string | null> {
+async function devicePushToken(ask = true): Promise<string | null> {
   if (Platform.OS === 'web' || !Device.isDevice) return null;
   const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) {
@@ -34,9 +36,17 @@ async function devicePushToken(): Promise<string | null> {
     await Notifications.setNotificationChannelAsync('default', { name: 'Perspective', importance: Notifications.AndroidImportance.DEFAULT });
   }
   let { status } = await Notifications.getPermissionsAsync();
-  if (status !== 'granted') ({ status } = await Notifications.requestPermissionsAsync());
+  if (status !== 'granted' && ask) ({ status } = await Notifications.requestPermissionsAsync());
   if (status !== 'granted') return null;
   return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+}
+
+async function register(ask: boolean): Promise<boolean> {
+  const token = await devicePushToken(ask);
+  if (!token || (Platform.OS !== 'ios' && Platform.OS !== 'android')) return false;
+  await api.push.register({ token, platform: Platform.OS });
+  registeredToken = token;
+  return true;
 }
 
 /** Asks for permission once the person is signed in, and tells the server about this device. */
@@ -45,14 +55,25 @@ export function usePushRegistration(enabled: boolean): void {
   useEffect(() => {
     if (!enabled || tried.current) return;
     tried.current = true;
-    devicePushToken()
-      .then(async (token) => {
-        if (!token || (Platform.OS !== 'ios' && Platform.OS !== 'android')) return;
-        await api.push.register({ token, platform: Platform.OS });
-        registeredToken = token;
-      })
-      .catch((err: unknown) => console.warn('Could not register for push notifications', err));
+    // After "Not now" in onboarding, only a permission already given is used; no prompt.
+    register(!promptDeferred).catch((err: unknown) => console.warn('Could not register for push notifications', err));
   }, [enabled]);
+}
+
+/** "Turn on notifications" in onboarding: the system prompt now. True when pushes are on. */
+export async function enablePushNow(): Promise<boolean> {
+  promptDeferred = false;
+  try {
+    return await register(true);
+  } catch (err) {
+    console.warn('Could not register for push notifications', err);
+    return false;
+  }
+}
+
+/** "Not now" in onboarding. */
+export function deferPushPrompt(): void {
+  promptDeferred = true;
 }
 
 /** On sign-out, this device stops getting pushes for the account. */

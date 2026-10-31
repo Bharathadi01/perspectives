@@ -19,10 +19,10 @@ Perspective is a dating app at its core, with one unique hook: perspectives. Peo
 - **Hold / ban:** a hold is automatic and only limits where a profile appears while it waits for review. A ban is always decided by a person on the admin dashboard (decided 2026-10-20).
 
 ## Core loop
-1. Sign up (18+), verify with a selfie, and fill in the profile basics.
+1. Sign up (18+) and fill in the profile basics.
 2. Choose your goal: Get perspectives, Meet new people, or both (private).
 3. Choose your audience: genders and age range, set once at profile level. The question is worded by your goal (see Audience).
-4. Create a profile with at least one post (the primary post). Add up to five more.
+4. Verify with a selfie, then create a profile with at least one post (the primary post). Add up to five more. The profile goes live only when the selfie is verified and the primary post exists (see Onboarding).
 5. Each day the app assigns you a mandatory set of profiles (up to 3). You give a perspective on one post of each.
 6. Giving the mandatory set unlocks the perspectives you received that day. You may keep giving more, but you do not have to.
 7. Review received perspectives privately. Mark them helpful or not helpful, thank the giver privately, report, block, or Connect.
@@ -55,6 +55,17 @@ A separate "who I want to meet" setting, orientation-based matching, and an open
 **Automatic widening (decided 2026-10-20):** when someone's audience leaves too few people, the age range widens automatically by 2 years at a time, at most 4 years beyond what the person chose, never below 18, and never by gender. The person gets a notice that names the new range and links to the setting; there is no undo button (they change it back in their profile if they want). *Detail (decided 2026-10-20):* "too few people" means fewer than 6 could fill a set slot (the point where the set drops to 1); each step widens both ends by 2 years (22–26 → 20–28 → 18–30 at most). *Detail (decided 2026-10-20):* when someone saves a new audience during the day, today's set is rebuilt from it if nothing was given yet; if part was given, what was given stays and only the waiting slots follow the new audience; a finished set is left alone, and the profiles after the set always use the current audience.
 
 **Location:** ignored during the beta. Later, for people whose goal includes meeting, the city they pick comes first, then the nearest region, then the state, with a notice when the area widens. People who only want perspectives are matched regardless of location.
+
+**Onboarding (decided 2026-10-31, from the product owner's design):** one question per screen, each answer saved as the person goes, in this order:
+1. Sign-up: email, password with the 18+ and terms agreement, and birthday, confirmed in a sheet showing the resulting age ("You can't change your birthday later").
+2. The basics: name, gender, pronouns (optional), height, city, orientation (optional, private), then a preview of what people see and what stays private.
+3. The goal, then the audience.
+4. Interests (3 to 10), daily rhythm and social energy (optional), one personality answer (optional).
+5. Selfie verification.
+6. The primary photo post, then up to five more (photo or voice).
+7. A review of the profile, how the app works, and the notification permission question.
+
+Between sections, four short "What you get" screens explain the app (honest takes, words never scores, connect through what you noticed, nobody gets left out); they collect nothing. Someone who stops part-way resumes at the first required answer still missing. The selfie comes after the questions about the person, but the rule is unchanged: no profile goes live without a verified selfie.
 
 **Hinge is the UI and structural reference.** For initial development the UI should look and feel similar to Hinge in layout, structure, and interaction (profiles of photos and prompts, audio prompts, a basics row, one profile at a time). This is a temporary placeholder: the product owner will redesign it to Perspective's own look once logic and algorithms are done, and it must be replaced before any public release or store submission. Never use Hinge's name or logo, never claim affiliation, and never copy actual Hinge files (images, exported icons, fonts, sounds, animations). Write our own copy and use our own design tokens.
 
@@ -150,7 +161,7 @@ Connections close on their own when they go quiet, so the list stays meaningful:
 - Marking perspectives unhelpful feeds the quality loop (decided 2026-10-20, details in Trust and safety → Weak givers). Only the reasons vague, didn't answer the question, and spam count toward it; insulting, sexual and unsafe go to the safety track. The giver never learns how anyone marked them, and no score is ever shown.
 
 ## Push notifications (decided 2026-10-21, placeholder)
-For now every event sends a push, to check delivery works; the real rules come once most of the build is done. Pushes never contain message or perspective text.
+For now every event sends a push, to check delivery works; the real rules come once most of the build is done. Pushes never contain message or perspective text. Permission is asked near the end of onboarding, on a screen that explains what the notifications are (decided 2026-10-31); someone who chooses "Not now" is asked again on a later visit.
 - Someone asked to connect (no name, since requests stay locked until the daily set is done).
 - You are connected (to the person who asked).
 - A new chat message (the sender's name only).
@@ -167,7 +178,7 @@ For now every event sends a push, to check delivery works; the real rules come o
 - **You:** profile, posts, goal and audience, settings, privacy, and safety, including the list of people you blocked with unblock (next development round).
 
 ## Trust and safety
-- 18+ only. Selfie verification is required at profile creation, so only verified users exist.
+- 18+ only. Selfie verification is required at profile creation (before the profile goes live), so only verified users are ever seen.
 - Report and block on every profile, post, perspective, and message. Blocking is bidirectional and immediate.
 - Moderation before delivery for text, photos, and audio.
 - In-app account deletion.

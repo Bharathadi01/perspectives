@@ -1,185 +1,25 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { StepAboutYou } from '../../src/components/onboarding/StepAboutYou';
-import { StepAudience } from '../../src/components/onboarding/StepAudience';
-import { StepGoal } from '../../src/components/onboarding/StepGoal';
-import { StepInterests } from '../../src/components/onboarding/StepInterests';
-import { StepPersonality } from '../../src/components/onboarding/StepPersonality';
-import { StepReview } from '../../src/components/onboarding/StepReview';
-import { StepWhatMatters } from '../../src/components/onboarding/StepWhatMatters';
-import { Screen } from '../../src/components/ui/Screen';
-import { ErrorState, LoadingState } from '../../src/components/ui/States';
-import { Label, Muted, Title } from '../../src/components/ui/Text';
+import { Redirect } from 'expo-router';
+import React from 'react';
+import { PaperLoading, PaperState } from '../../src/components/editorial/PaperState';
 import { useMe } from '../../src/features/hooks';
-import { audienceQuestion } from '../../src/lib/labels';
-import { useOnboardingStore } from '../../src/session/onboardingStore';
+import { resumeStep } from '../../src/features/onboarding/flow';
+import { errorMessage } from '../../src/lib/errors';
 import { useSession } from '../../src/session/sessionStore';
-import { theme } from '../../src/theme';
 
-const ONBOARDING_STEPS = [
-  { title: 'About you', subtitle: 'The foundation of your profile and identity' },
-  { title: 'What brings you here?', subtitle: 'Private: only you see your answer' },
-  // The audience title is worded by the goal (see below).
-  { title: 'Your audience', subtitle: 'One setting for your whole profile, used both ways' },
-  { title: 'Your interests', subtitle: 'Select at least 3 passions to power matching' },
-  { title: 'What matters to you?', subtitle: 'Daily rhythm and social energy harmony' },
-  { title: 'A little more personality', subtitle: 'A written perspective prompt to share your voice' },
-  { title: 'Review & finish', subtitle: 'See how your choices power personalized discovery' },
-];
-
-export default function Onboarding() {
+/**
+ * Picks up an unfinished profile at the first answer it still needs. A brand-new account starts
+ * at the first "What you get" screen right after sign-up (app/(auth)/birthday), not here.
+ */
+export default function OnboardingResume() {
   const status = useSession((s) => s.status);
   const me = useMe(status === 'signedIn');
-  const { forceStep } = useLocalSearchParams<{ forceStep?: string }>();
-
-  const stepIndex = useOnboardingStore((s) => s.stepIndex);
-  const setStepIndex = useOnboardingStore((s) => s.setStepIndex);
-  const initializeFromProfile = useOnboardingStore((s) => s.initializeFromProfile);
-  const goals = useOnboardingStore((s) => s.goals);
-
-  const initializedRef = useRef(false);
-
-  useEffect(() => {
-    if (me.data && !initializedRef.current) {
-      initializedRef.current = true;
-      initializeFromProfile(me.data);
-      // A profile made before the goal question existed only needs the goal: start there.
-      if (!forceStep && me.data.missing.length === 1 && me.data.missing[0] === 'goal') setStepIndex(1);
-    }
-  }, [me.data, initializeFromProfile, forceStep, setStepIndex]);
-
-  useEffect(() => {
-    if (forceStep) {
-      const idx = parseInt(forceStep, 10);
-      if (!isNaN(idx) && idx >= 0 && idx < ONBOARDING_STEPS.length) {
-        setStepIndex(idx);
-      }
-    }
-  }, [forceStep, setStepIndex]);
 
   if (status === 'signedOut') return <Redirect href="/(auth)/welcome" />;
-  if (me.isLoading || status === 'loading') return <LoadingState />;
+  if (status === 'loading' || me.isLoading) return <PaperLoading />;
   if (me.isError || !me.data) {
-    return <ErrorState error={me.error} onRetry={() => void me.refetch()} />;
+    return <PaperState title="That didn’t load" body={errorMessage(me.error)} action="Try again" onAction={() => void me.refetch()} />;
   }
-
-  // If user already completed onboarding, photos, and is live, redirect to explore
-  if (me.data.isLive && !forceStep) {
-    return <Redirect href="/(tabs)/explore" />;
-  }
-
-  const step = ONBOARDING_STEPS[stepIndex] ?? ONBOARDING_STEPS[0];
-  const currentStep = stepIndex === 2 ? { ...step, title: audienceQuestion(goals) } : step;
-  const progressPercent = ((stepIndex + 1) / ONBOARDING_STEPS.length) * 100;
-
-  const handleNext = () => {
-    setStepIndex(Math.min(ONBOARDING_STEPS.length - 1, stepIndex + 1));
-  };
-
-  const handleBack = () => {
-    setStepIndex(Math.max(0, stepIndex - 1));
-  };
-
-  const handleComplete = () => {
-    void me.refetch().then(() => {
-      router.replace({ pathname: '/me/edit', params: { from: 'onboarding' } });
-    });
-  };
-
-  return (
-    <Screen edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-        {/* Navigation & Progress Header */}
-        <View style={s.stepHeader}>
-          <View style={s.navRow}>
-            {stepIndex > 0 ? (
-              <Pressable onPress={handleBack} style={s.backBtn} accessibilityLabel="Go back">
-                <Ionicons name="arrow-back" size={20} color={theme.colors.ink} />
-                <Text style={s.backText}>Back</Text>
-              </Pressable>
-            ) : (
-              <View style={s.backPlaceholder} />
-            )}
-            <Label style={s.stepLabel}>
-              Step {stepIndex + 1} of {ONBOARDING_STEPS.length}
-            </Label>
-          </View>
-
-          <View style={s.progressBarTrack}>
-            <View style={[s.progressBarFill, { width: `${progressPercent}%` }]} />
-          </View>
-        </View>
-
-        {/* Title and Subtitle */}
-        <View style={s.titleBox}>
-          <Title>{currentStep.title}</Title>
-          <Muted>{currentStep.subtitle}</Muted>
-        </View>
-
-        {/* Step Views */}
-        {stepIndex === 0 && <StepAboutYou onNext={handleNext} />}
-        {stepIndex === 1 && <StepGoal onNext={handleNext} />}
-        {stepIndex === 2 && <StepAudience onNext={handleNext} />}
-        {stepIndex === 3 && <StepInterests onNext={handleNext} />}
-        {stepIndex === 4 && <StepWhatMatters onNext={handleNext} />}
-        {stepIndex === 5 && <StepPersonality onNext={handleNext} />}
-        {stepIndex === 6 && (
-          <StepReview onJumpToStep={(idx) => setStepIndex(idx)} onComplete={handleComplete} />
-        )}
-      </ScrollView>
-    </Screen>
-  );
+  const step = resumeStep(me.data);
+  if (!step) return <Redirect href="/(tabs)/explore" />;
+  return <Redirect href={{ pathname: '/onboarding/[step]', params: { step } }} />;
 }
-
-const s = StyleSheet.create({
-  content: {
-    padding: theme.spacing.lg,
-    gap: theme.spacing.md,
-    paddingBottom: theme.spacing.xxl,
-  },
-  stepHeader: {
-    gap: theme.spacing.xs,
-    marginBottom: theme.spacing.xs,
-  },
-  navRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: 28,
-  },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingRight: 8,
-  },
-  backText: {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.ink,
-  },
-  backPlaceholder: {
-    width: 40,
-  },
-  stepLabel: {
-    color: theme.colors.muted,
-  },
-  progressBarTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.surfaceMuted,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: theme.colors.brand,
-    borderRadius: 2,
-  },
-  titleBox: {
-    gap: 4,
-    marginBottom: theme.spacing.xs,
-  },
-});
