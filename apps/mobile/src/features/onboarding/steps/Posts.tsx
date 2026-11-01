@@ -441,6 +441,7 @@ export function VoiceStep() {
         <FieldCard
           label="Your question"
           big
+          multiline
           value={prompt}
           onChangeText={setPrompt}
           placeholder="Do I sound as calm as I think I do?"

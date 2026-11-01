@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { getInterestById, type MyProfile } from '@perspective/contracts';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../../api/client';
 import { deferPushPrompt, enablePushNow } from '../../../push/push';
@@ -87,33 +87,35 @@ export function HowItWorksStep() {
   const insets = useSafeAreaInsets();
   return (
     <View style={[s.screen, { paddingTop: insets.top + 56, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-      <Rise>
-        <Text style={ob.bigTitle} accessibilityRole="header">
-          How Perspective works
-        </Text>
-      </Rise>
-      <View style={s.how} accessibilityRole="list">
-        {HOW.map((item, i) => (
-          <Rise key={item.title} delay={250 + i * 300} duration={600} style={s.howItem}>
-            <Pop delay={300 + i * 300} from={0.4} overshoot={1.12}>
-              <Animate frames={keyframes.warm()} duration={4500} delay={2000 + i * 1500} iterations="infinite" easing="ease-in-out" style={s.howNumber}>
-                <Text style={s.howNumberText}>{i + 1}</Text>
-              </Animate>
-            </Pop>
-            <View style={s.howText}>
-              <Text style={s.howTitle}>{item.title}</Text>
-              <Text style={s.howBody}>{item.body}</Text>
-            </View>
-          </Rise>
-        ))}
-      </View>
-      <Rise delay={1200} duration={600}>
-        <View style={s.rule}>
-          <Ionicons name="shield-outline" size={20} color={c.accent} />
-          <Text style={s.ruleText}>Honest, never cruel. A perspective is one person’s view, not a verdict. No body shaming, abuse or sexual content.</Text>
+      {/* The text scrolls when the screen is short, so "Got it" is never pushed off the bottom. */}
+      <ScrollView style={s.flex} showsVerticalScrollIndicator={false} contentContainerStyle={s.howScroll}>
+        <Rise>
+          <Text style={ob.bigTitle} accessibilityRole="header">
+            How Perspective works
+          </Text>
+        </Rise>
+        <View style={s.how} accessibilityRole="list">
+          {HOW.map((item, i) => (
+            <Rise key={item.title} delay={250 + i * 300} duration={600} style={s.howItem}>
+              <Pop delay={300 + i * 300} from={0.4} overshoot={1.12}>
+                <Animate frames={keyframes.warm()} duration={4500} delay={2000 + i * 1500} iterations="infinite" easing="ease-in-out" style={s.howNumber}>
+                  <Text style={s.howNumberText}>{i + 1}</Text>
+                </Animate>
+              </Pop>
+              <View style={s.howText}>
+                <Text style={s.howTitle}>{item.title}</Text>
+                <Text style={s.howBody}>{item.body}</Text>
+              </View>
+            </Rise>
+          ))}
         </View>
-      </Rise>
-      <View style={s.flex} />
+        <Rise delay={1200} duration={600}>
+          <View style={s.rule}>
+            <Ionicons name="shield-outline" size={20} color={c.accent} />
+            <Text style={s.ruleText}>Honest, never cruel. A perspective is one person’s view, not a verdict. No body shaming, abuse or sexual content.</Text>
+          </View>
+        </Rise>
+      </ScrollView>
       <PillButton label="Got it" onPress={() => next()} pulseDelay={1800} />
     </View>
   );
@@ -274,6 +276,7 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: c.ink,
   },
+  howScroll: { paddingBottom: theme.spacing.base },
   how: { marginTop: 36, gap: 26 },
   howItem: { flexDirection: 'row', gap: theme.spacing.base },
   howNumber: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center' },

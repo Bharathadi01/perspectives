@@ -1,6 +1,6 @@
 # Perspective: how the app works (business logic)
 
-**Last updated:** 2026-10-31 (later: You → Edit, the card composer and Explore's "done for today" moved to the editorial look; the question library no longer calls questions "perspectives". Before that, the new onboarding: a splash, sign-up over three screens, one question per screen with motion, four "What you get" screens, the selfie camera with a Dev button, the first posts, and a one-time note on Explore; sections 3, 4, 5, 8.3, 9.1, 16, 17 and 20. Earlier: Apple's own glass tab bar on iOS 26; the profile page opened from the Inbox and the safety sheet in the editorial look)
+**Last updated:** 2026-11-02 (four small onboarding fixes, see the change log: the birthday sheet no longer sits under the number pad, "How Perspective works" scrolls on small phones, the voice-post question wraps, the first "What you get" card no longer covers the sample question). Before that, 2026-10-31 (later: You → Edit, the card composer and Explore's "done for today" moved to the editorial look; the question library no longer calls questions "perspectives". Before that, the new onboarding: a splash, sign-up over three screens, one question per screen with motion, four "What you get" screens, the selfie camera with a Dev button, the first posts, and a one-time note on Explore; sections 3, 4, 5, 8.3, 9.1, 16, 17 and 20. Earlier: Apple's own glass tab bar on iOS 26; the profile page opened from the Inbox and the safety sheet in the editorial look)
 
 This is the single place to find out what the app does, in plain words, from the moment someone opens it. It describes what is **actually built and running**, not what is planned. If this file and the code ever disagree, the code is the truth and this file is wrong: fix it.
 
@@ -935,6 +935,14 @@ Everything else happens when someone does something: the daily set is built on a
 ## 20. Change log
 
 Newest first. Add an entry for every change that affects how the app behaves.
+
+### 2026-11-02: four small onboarding fixes
+- **Birthday (sign-up):** the number pad now goes away when the "You're 22 · Edit / Confirm" sheet opens (its "Done" key used to land on top of the buttons). **Edit** brings the cursor back to the Year box.
+- **"How Perspective works"** scrolls on short phones, so **Got it** is never pushed off the bottom of the screen. On taller phones it looks exactly as before.
+- **Voice post (onboarding):** the question box wraps onto a second line like the photo post's, instead of cutting a longer question off mid-sentence.
+- **First "What you get" screen:** the sample post sits a little lower, so the "Style & outfit" card no longer covers the start of its question.
+- **Not a code change, but worth knowing:** after pulling, run `pnpm install` and `pnpm build`. The built colour list (`packages/design-tokens/dist`) is not committed; a stale copy left the "Chat is open" pill (and others) with no colour, and the dimmed backdrop behind the birthday sheet missing.
+- No rule, number or server change.
 
 ### 2026-10-31 (later): the profile editor and "done for today" in the editorial look
 - **You → Edit** now matches the rest of the app: serif name with the clay tick, a sand View/Edit switch, sand photo tiles with a clay star on the lead photo, dashed "Add" places with an ink button, white voice and written rows with serif questions and ink play buttons. The card menu ("Your photo", Move earlier/later, Edit the question, Remove) and "Remove this card?" are paper sheets like the safety sheet.

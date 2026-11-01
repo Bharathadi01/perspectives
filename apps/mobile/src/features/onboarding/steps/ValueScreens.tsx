@@ -311,7 +311,8 @@ const s = StyleSheet.create({
 
   postCard: {
     left: 72,
-    top: 64,
+    // Low enough that the "Style & outfit" card above does not cover the question.
+    top: 100,
     width: 190,
     backgroundColor: c.surface,
     borderWidth: theme.borderWidth.hairline,

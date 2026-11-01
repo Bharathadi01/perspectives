@@ -1,7 +1,7 @@
 import { SignUpInputSchema } from '@perspective/contracts';
 import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSignUp } from '../../src/features/hooks';
 import { useSignupDraft } from '../../src/features/onboarding/drafts';
@@ -42,7 +42,15 @@ export default function Birthday() {
       return;
     }
     setError(null);
+    // The sheet sits at the bottom of the screen, so put the number pad (and its Done key) away first.
+    Keyboard.dismiss();
     setConfirm({ birthDate: result.birthDate, age: result.age });
+  };
+
+  /** Back to the year field, with the keyboard up again as it was before the sheet. */
+  const edit = () => {
+    setConfirm(null);
+    yearRef.current?.focus();
   };
 
   const create = async () => {
@@ -132,7 +140,7 @@ export default function Birthday() {
       {confirm ? (
         <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
           <Animate frames={keyframes.fade()} duration={400} easing="ease" style={[StyleSheet.absoluteFill, s.scrim]}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setConfirm(null)} accessibilityRole="button" accessibilityLabel="Edit your birthday" />
+            <Pressable style={StyleSheet.absoluteFill} onPress={edit} accessibilityRole="button" accessibilityLabel="Edit your birthday" />
           </Animate>
           <Animate frames={keyframes.sheet()} duration={550} delay={150} style={[s.sheet, { bottom: Math.max(insets.bottom, 12) }]}>
             <Rise delay={500} duration={500}>
@@ -149,7 +157,7 @@ export default function Birthday() {
               </Text>
             </Rise>
             <View style={s.sheetButtons}>
-              <PillButton label="Edit" variant="outline" wide style={s.half} onPress={() => setConfirm(null)} disabled={signUp.isPending} />
+              <PillButton label="Edit" variant="outline" wide style={s.half} onPress={edit} disabled={signUp.isPending} />
               <PillButton label="Confirm" wide style={s.half} onPress={() => void create()} loading={signUp.isPending} />
             </View>
           </Animate>
