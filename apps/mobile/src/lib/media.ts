@@ -1,4 +1,4 @@
-import { RULES } from '@perspective/contracts';
+import { AUDIO_MIME_TYPES, RULES } from '@perspective/contracts';
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
@@ -79,6 +79,15 @@ export async function pickPhoto(source: 'library' | 'camera' = 'library'): Promi
   return { ...fromUri, mimeType, uri: asset.uri };
 }
 
+/**
+ * The phone records m4a, but browsers record webm or ogg; labelling those m4a made them
+ * unplayable in some browsers. Keep a type the server accepts, else assume m4a.
+ */
+function audioMimeType(detected: string): string {
+  const clean = detected.toLowerCase();
+  return clean.startsWith('audio/') && (AUDIO_MIME_TYPES as readonly string[]).includes(clean) ? clean : 'audio/m4a';
+}
+
 export interface Recording extends PickedMedia {
   durationSec: number;
 }
@@ -111,10 +120,15 @@ export function useVoiceRecorder() {
       if (!uri) throw new Error('No recording');
       const durationSec = Math.min(RULES.audioMaxSeconds, Math.max(0.5, Number(seconds.toFixed(1))));
       const data = await uriToBase64(uri);
-      const mimeType = 'audio/m4a';
-      setResult({ ...data, mimeType, uri, durationSec });
-    } catch {
+      setResult({ ...data, mimeType: audioMimeType(data.mimeType), uri, durationSec });
+    } catch (err) {
+      console.warn('Voice recording could not be finished', err);
       setError('Recording failed. Please try again.');
+    } finally {
+      // Leave record mode, or iOS keeps playing the preview through the quiet earpiece.
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch((err: unknown) =>
+        console.warn('Could not leave record mode', err),
+      );
     }
   }, [recorder]);
 
@@ -139,7 +153,8 @@ export function useVoiceRecorder() {
         setElapsed(secs);
         if (secs >= RULES.audioMaxSeconds) void stop();
       }, 200);
-    } catch {
+    } catch (err) {
+      console.warn('Voice recording could not start', err);
       setError(
         Platform.OS === 'web'
           ? 'Recording isn’t available in this browser. Try Chrome, or record on your phone.'

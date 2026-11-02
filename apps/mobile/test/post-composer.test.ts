@@ -107,6 +107,16 @@ describe('buildCreateInput', () => {
     expect(input.prompt).toBe('What would you assume about me?');
   });
 
+  it('sends a voice-only card’s clip as its main media', () => {
+    const input = buildCreateInput(
+      { ...base, kind: 'audio', category: 'voice', focusAreas: ['tone'], hasPhoto: false, hasRecording: true },
+      { mediaId: null, audioMediaId: 'audio-id' },
+    );
+    expect(input.kind).toBe('audio');
+    expect(input.mediaId).toBe('audio-id');
+    expect(input.audioMediaId).toBeNull();
+  });
+
   it('trims the question', () => {
     const input = buildCreateInput({ ...base, prompt: '  spaced out question  ' }, {});
     expect(input.prompt).toBe('spaced out question');

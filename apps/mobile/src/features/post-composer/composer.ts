@@ -79,14 +79,20 @@ export function problemWithStep(step: ComposerStep, state: ComposerState): StepP
   return null;
 }
 
+/**
+ * A voice-only card keeps its clip as the card's main media (`mediaId`); `audioMediaId` is only
+ * the voice note attached to a photo card. The composer records into one place either way, so
+ * the clip is moved here; sending it as `audioMediaId` made the server refuse the card.
+ */
 export function buildCreateInput(
   state: ComposerState,
   media: { mediaId?: string | null; audioMediaId?: string | null },
 ): CreatePostInput {
+  const voiceOnly = state.kind === 'audio';
   return {
     kind: state.kind,
-    mediaId: media.mediaId ?? null,
-    audioMediaId: media.audioMediaId ?? null,
+    mediaId: (voiceOnly ? media.audioMediaId : media.mediaId) ?? null,
+    audioMediaId: voiceOnly ? null : (media.audioMediaId ?? null),
     prompt: state.prompt.trim(),
     category: state.category,
     focusAreas: state.focusAreas,

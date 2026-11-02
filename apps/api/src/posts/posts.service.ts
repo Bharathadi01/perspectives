@@ -78,11 +78,26 @@ export class PostsService {
     }
     if (input.prompt) await this.assertPromptAllowed(input.prompt);
 
+    // A voice-only post's clip is its main media, so a new recording replaces that clip
+    // rather than being attached as a second one. It cannot be removed, only replaced.
+    const voiceOnly = post.kind === 'audio';
+    if (voiceOnly && input.audioMediaId === null) {
+      throw new AppException('VALIDATION_FAILED', 'A voice post needs its clip. Record a new one to replace it.');
+    }
+
     if (input.audioMediaId) {
       const audioMedia = await this.prisma.media.findUnique({
         where: { id: input.audioMediaId },
+        include: { post: true, postAudio: true },
       });
-      if (!audioMedia || audioMedia.ownerId !== userId || audioMedia.purpose !== 'post' || audioMedia.kind !== 'audio') {
+      if (
+        !audioMedia ||
+        audioMedia.ownerId !== userId ||
+        audioMedia.purpose !== 'post' ||
+        audioMedia.kind !== 'audio' ||
+        (audioMedia.post && audioMedia.post.id !== postId) ||
+        (audioMedia.postAudio && audioMedia.postAudio.id !== postId)
+      ) {
         throw new AppException('MEDIA_INVALID', 'Upload the voice audio for this post first.');
       }
     }
@@ -91,7 +106,8 @@ export class PostsService {
       where: { id: postId },
       data: {
         prompt: input.prompt,
-        audioMediaId: input.audioMediaId,
+        mediaId: voiceOnly ? input.audioMediaId : undefined,
+        audioMediaId: voiceOnly ? undefined : input.audioMediaId,
         category: input.category,
         focusAreas: input.focusAreas,
       },

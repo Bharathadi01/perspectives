@@ -111,6 +111,27 @@ describe('auth, guards and profile (e2e)', () => {
       expect(seventh.body.error.code).toBe('POST_LIMIT_REACHED');
     });
 
+    it('replaces a voice post’s clip when it is recorded again, and never removes it', async () => {
+      const c = await signUp(app, 'rerecord@test.local');
+      await c
+        .post('/v1/me/posts', { kind: 'photo', mediaId: await uploadPhoto(c), prompt: 'First photo', category: 'looks', focusAreas: ['photo'] })
+        .expect(201);
+      const clip = (seconds: number) =>
+        c.post('/v1/media', { kind: 'audio', mimeType: 'audio/wav', dataBase64: 'UklGRiQAAABXQVZF', durationSec: seconds }).expect(201);
+      const first = await clip(5);
+      const post = await c
+        .post('/v1/me/posts', { kind: 'audio', mediaId: first.body.mediaId, prompt: 'How do I sound?', category: 'voice', focusAreas: ['tone'] })
+        .expect(201);
+
+      const second = await clip(9);
+      const updated = await c.patch(`/v1/me/posts/${post.body.id}`, { audioMediaId: second.body.mediaId }).expect(200);
+      expect(updated.body.durationSec).toBe(9);
+      expect(updated.body.audioMediaUrl).toBeNull();
+
+      const removed = await c.patch(`/v1/me/posts/${post.body.id}`, { audioMediaId: null }).expect(400);
+      expect(removed.body.error.code).toBe('VALIDATION_FAILED');
+    });
+
     it('rejects audio longer than 15 seconds', async () => {
       const c = await signUp(app, 'long@test.local');
       await c.post('/v1/media', { kind: 'audio', mimeType: 'audio/wav', dataBase64: 'UklGRiQAAABXQVZF', durationSec: 16 }).expect(400);

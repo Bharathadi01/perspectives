@@ -48,6 +48,22 @@ export const VALUE_STEPS: readonly StepId[] = ['value-perspectives', 'value-word
 /** Steps you cannot swipe back from: going back would undo nothing and only confuse. */
 export const NO_BACK_STEPS: readonly StepId[] = ['value-perspectives', 'verified', 'how-it-works', 'notifications', 'ready'];
 
+/**
+ * Steps with a sideways drag control (the age slider). iOS recognises its back-swipe natively,
+ * before the slider's touch handler can claim the drag, so a thumb drag went back a step. The
+ * swipe is off there; the on-screen back button still works.
+ */
+export const DRAG_STEPS: readonly StepId[] = ['audience'];
+
+/** The native stack's back-swipe on a step. `undefined` keeps the platform's own default. */
+export function swipeBack(step: StepId | null): { gestureEnabled: boolean; fullScreenGestureEnabled: false | undefined } {
+  if (step && DRAG_STEPS.includes(step)) return { gestureEnabled: false, fullScreenGestureEnabled: false };
+  return {
+    gestureEnabled: !(step && (NO_BACK_STEPS.includes(step) || step === 'more-posts')),
+    fullScreenGestureEnabled: undefined,
+  };
+}
+
 /** The thin progress bar along the top of the profile questions, 0 to 100, as in the design. */
 export const STEP_PROGRESS: Partial<Record<StepId, number>> = {
   name: 5,

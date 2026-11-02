@@ -404,7 +404,8 @@ export function VoiceStep() {
     setError(null);
     try {
       const { mediaId } = await upload.run({ kind: 'audio', mimeType: clip.mimeType, dataBase64: clip.dataBase64, durationSec: clip.durationSec });
-      await create.run({ kind: 'audio', mediaId: null, audioMediaId: mediaId, prompt: prompt.trim(), category: 'voice', focusAreas });
+      // A voice-only post keeps its clip as the post's main media.
+      await create.run({ kind: 'audio', mediaId, audioMediaId: null, prompt: prompt.trim(), category: 'voice', focusAreas });
       success();
       // Back to the list of posts, where the new one now shows.
       router.back();

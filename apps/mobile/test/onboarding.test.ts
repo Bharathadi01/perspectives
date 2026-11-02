@@ -8,6 +8,7 @@ import {
   isStepId,
   nextStep,
   resumeStep,
+  swipeBack,
   type StepId,
 } from '../src/features/onboarding/flow';
 import {
@@ -111,6 +112,19 @@ describe('onboarding flow', () => {
     expect(STEP_PROGRESS.name).toBe(5);
     expect(STEP_PROGRESS.review).toBe(100);
     expect(NO_BACK_STEPS).toContain('verified');
+  });
+
+  it('turns the back-swipe off on the age slider step, so a thumb drag never goes back', () => {
+    expect(swipeBack('audience')).toEqual({ gestureEnabled: false, fullScreenGestureEnabled: false });
+  });
+
+  it('keeps every other step’s back-swipe as it was', () => {
+    for (const step of STEP_IDS.filter((id) => id !== 'audience')) {
+      const locked = NO_BACK_STEPS.includes(step) || step === 'more-posts';
+      expect(swipeBack(step)).toEqual({ gestureEnabled: !locked, fullScreenGestureEnabled: undefined });
+    }
+    expect(swipeBack('goal').gestureEnabled).toBe(true);
+    expect(swipeBack(null).gestureEnabled).toBe(true);
   });
 
   it('knows its own step ids', () => {
